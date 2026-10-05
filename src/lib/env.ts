@@ -1,4 +1,5 @@
 import "server-only";
+import { normalizeSupabaseUrl } from "@/lib/supabase/url";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -10,10 +11,10 @@ function required(name: string): string {
 
 export const serverEnv = {
   get supabaseUrl() {
-    return required("NEXT_PUBLIC_SUPABASE_URL");
+    return normalizeSupabaseUrl(required("NEXT_PUBLIC_SUPABASE_URL"));
   },
   get supabaseServiceKey() {
-    return required("SUPABASE_SERVICE_ROLE_KEY");
+    return required("SUPABASE_SERVICE_ROLE_KEY").trim();
   },
   get familyCode() {
     return required("FAMILY_CODE");
