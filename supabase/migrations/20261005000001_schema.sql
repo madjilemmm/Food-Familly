@@ -160,6 +160,13 @@ alter table public.push_subscriptions  enable row level security;
 revoke all on all tables in schema public from anon, authenticated;
 revoke all on public.active_matches from anon, authenticated;
 
+-- Le serveur (clé secrète = rôle service_role) a besoin d'un accès explicite :
+-- les projets Supabase récents n'exposent plus les nouvelles tables par défaut.
+grant usage on schema public to service_role;
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+grant execute on all functions in schema public to service_role;
+
 -- ─── Stockage des photos ─────────────────────────────────────────────
 -- Bucket public en lecture (URL difficile à deviner), écriture réservée au
 -- serveur (clé secrète).
