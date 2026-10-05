@@ -10,6 +10,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { StartTrip } from "@/components/parent/StartTrip";
 import { RecipeChecklist } from "@/components/parent/RecipeChecklist";
 import { ConfirmButton } from "@/components/parent/ConfirmButton";
+import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 
 export default async function ParentHome() {
   const [me, overview] = await Promise.all([requireProfile("parent"), getTripOverview()]);
@@ -19,6 +20,7 @@ export default async function ParentHome() {
     return (
       <>
         <PageHeader title={`Bonjour ${me.name} 👋`} big />
+        <NotificationsCard variant="banner" />
         <StartTrip choices={departureChoices()} kids={kids.join(" et ")} />
       </>
     );
@@ -31,6 +33,7 @@ export default async function ParentHome() {
   return (
     <>
       <PageHeader title="Les courses" />
+      <NotificationsCard variant="banner" />
 
       {/* Compte à rebours ou liste prête */}
       {validated ? (

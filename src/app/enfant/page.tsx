@@ -5,6 +5,7 @@ import { isPastDeadline } from "@/lib/domain/trip";
 import { PageHeader } from "@/components/PageHeader";
 import { Countdown } from "@/components/Countdown";
 import { SwipeDeck } from "@/components/child/SwipeDeck";
+import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 
 export default async function ChildSwipe() {
   const me = await requireProfile("child");
@@ -32,6 +33,7 @@ export default async function ChildSwipe() {
           <span className="text-2xl">›</span>
         </Link>
       )}
+      <NotificationsCard variant="banner" />
       <SwipeDeck initialDeck={deck} />
     </div>
   );

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
 import { forgetProfile } from "@/app/actions/auth";
+import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 
 export const metadata = { title: "Réglages — À table !" };
 
@@ -22,6 +23,8 @@ export default async function SettingsPage() {
           <button className="text-stone-500 underline">Ce n&apos;est pas moi</button>
         </form>
       </section>
+
+      <NotificationsCard variant="full" />
 
       <Link href="/recettes" className="block rounded-3xl bg-white p-5 font-semibold">
         📖 Gérer les recettes
