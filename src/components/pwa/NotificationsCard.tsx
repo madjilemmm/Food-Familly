@@ -38,7 +38,7 @@ export function NotificationsCard({ variant }: { variant: "banner" | "full" }) {
 
       {state === "off" && (
         <>
-          <p className="mb-3">Pour être prévenu au bon moment, sans rien surveiller.</p>
+          <p className="mb-3">Recevez une alerte au bon moment, sans rien surveiller.</p>
           <button
             onClick={enable}
             className="w-full rounded-2xl bg-amber-500 py-4 text-xl font-bold text-white shadow active:scale-[0.98]"

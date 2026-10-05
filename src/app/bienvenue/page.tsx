@@ -1,4 +1,5 @@
 import { FamilyCodeForm } from "./FamilyCodeForm";
+import { InstallFirst } from "./InstallFirst";
 
 export const metadata = { title: "Bienvenue — À table !" };
 
@@ -10,7 +11,9 @@ export default function WelcomePage() {
         <h1 className="text-4xl font-extrabold tracking-tight">À table !</h1>
         <p className="mt-3 text-lg text-stone-600">Les courses et les repas de la famille, sans prise de tête.</p>
       </div>
-      <FamilyCodeForm />
+      <InstallFirst>
+        <FamilyCodeForm />
+      </InstallFirst>
     </main>
   );
 }
