@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", Roboto, sans-serif;
+  --color-cream: #fff8f0;
+  --color-ink: #2b2118;
+  --color-tomato-50: #fff1ee;
+  --color-tomato-100: #ffe0d9;
+  --color-tomato-500: #f0573c;
+  --color-tomato-600: #d9432a;
+  --color-tomato-700: #b5341f;
+  --color-basil-100: #dff5e3;
+  --color-basil-500: #2f9e55;
+  --color-basil-600: #238444;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Safe areas iPhone (encoche, barre d'accueil) */
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top), 1rem);
+}
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
+}
+
+/* Empêche le zoom automatique d'iOS sur les champs (police >= 16px) */
+input,
+textarea,
+select {
+  font-size: max(16px, 1em);
+}
+
+button {
+  cursor: pointer;
+  touch-action: manipulation;
+}
