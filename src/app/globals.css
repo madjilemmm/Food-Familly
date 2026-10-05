@@ -34,6 +34,14 @@ body {
   padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
 }
 
+/* Espace réservé sous le contenu pour la barre d'onglets */
+.pb-tabbar {
+  padding-bottom: calc(5.5rem + max(env(safe-area-inset-bottom), 0.75rem));
+}
+.h-screen-tabbar {
+  height: calc(100dvh - 5.5rem - max(env(safe-area-inset-bottom), 0.75rem));
+}
+
 /* Empêche le zoom automatique d'iOS sur les champs (police >= 16px) */
 input,
 textarea,
