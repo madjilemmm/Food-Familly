@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
 import { isAisle } from "@/lib/domain/aisles";
+import { extractRecipe, type ImportedRecipe } from "@/lib/domain/recipe-import";
+import { safeFetch } from "@/lib/safe-fetch";
 import { changed, cleanText } from "./_shared";
 
 const BUCKET = "recipe-photos";
@@ -41,6 +43,32 @@ function storagePath(publicUrl: string | null): string | null {
   return i === -1 ? null : decodeURIComponent(publicUrl.slice(i + marker.length));
 }
 
+const IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+/** Récupère la photo d'un site et la range dans notre stockage (les liens externes finissent par casser). */
+async function downloadPhoto(url: string): Promise<File> {
+  const { body, contentType } = await safeFetch(url, { maxBytes: MAX_PHOTO_BYTES, accept: "image/*" });
+  const type = contentType.split(";")[0].trim().toLowerCase();
+  if (!IMAGE_TYPES[type]) throw new Error("La photo de ce site n'est pas dans un format accepté.");
+  return new File([new Uint8Array(body)], `photo.${IMAGE_TYPES[type]}`, { type });
+}
+
+/** Lit une recette sur un site de cuisine pour pré-remplir le formulaire. */
+export async function importRecipeFromUrl(url: string): Promise<{ recipe?: ImportedRecipe; error?: string }> {
+  await requireUser();
+  try {
+    const { body, contentType } = await safeFetch(url, { maxBytes: 3 * 1024 * 1024, accept: "text/html" });
+    if (!contentType.includes("html")) return { error: "Ce lien ne mène pas à une page de recette." };
+    const recipe = extractRecipe(body.toString("utf8"));
+    if (!recipe || !recipe.title) return { error: "Je n'ai pas trouvé de recette sur cette page." };
+    return { recipe };
+  } catch (err) {
+    console.warn("Import de recette impossible :", url, err);
+    const message = err instanceof Error && !/fetch failed|aborted|timeout/i.test(err.message) ? err.message : "Le site ne répond pas.";
+    return { error: `Import impossible : ${message}` };
+  }
+}
+
 async function uploadPhoto(recipeId: string, file: File): Promise<string> {
   if (!file.type.startsWith("image/")) throw new Error("Le fichier n'est pas une image");
   if (file.size > MAX_PHOTO_BYTES) throw new Error("Photo trop lourde");
@@ -59,6 +87,7 @@ export async function saveRecipe(_prev: { error?: string }, formData: FormData):
   const ingredients = parseIngredients(formData.get("ingredients"));
   const photo = formData.get("photo");
   const removePhoto = formData.get("remove_photo") === "1";
+  const remotePhoto = cleanText(formData.get("photo_remote_url"), 2000);
 
   if (!title) return { error: "Donnez un nom à la recette." };
 
@@ -81,6 +110,15 @@ export async function saveRecipe(_prev: { error?: string }, formData: FormData):
     // Photo : nouvelle, supprimée ou inchangée
     let photoUrl: string | null | undefined;
     if (photo instanceof File && photo.size > 0) photoUrl = await uploadPhoto(recipeId!, photo);
+    else if (remotePhoto) {
+      // Une photo introuvable ne doit pas empêcher d'enregistrer la recette.
+      photoUrl = await downloadPhoto(remotePhoto)
+        .then((file) => uploadPhoto(recipeId!, file))
+        .catch((err) => {
+          console.warn("Photo du site non récupérée :", remotePhoto, err);
+          return undefined;
+        });
+    }
     else if (removePhoto) photoUrl = null;
     if (photoUrl !== undefined) {
       await db().from("recipes").update({ photo_url: photoUrl }).eq("id", recipeId);

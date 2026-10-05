@@ -3,6 +3,8 @@
 /* eslint-disable @next/next/no-img-element -- aperçu local de la photo */
 import { useActionState, useState, useTransition } from "react";
 import { deleteRecipe, saveRecipe } from "@/app/actions/recipes";
+import type { ImportedRecipe } from "@/lib/domain/recipe-import";
+import { ImportFromUrl } from "./ImportFromUrl";
 import { AISLES } from "@/lib/domain/aisles";
 import type { RecipeWithIngredients } from "@/lib/data";
 import { resizeImage } from "./resizeImage";
@@ -34,6 +36,31 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
   const [preview, setPreview] = useState<string | null>(recipe?.photo_url ?? null);
   const [removePhoto, setRemovePhoto] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [title, setTitle] = useState(recipe?.title ?? "");
+  const [remotePhoto, setRemotePhoto] = useState<string | null>(null);
+  const [servings, setServings] = useState<string | null>(null);
+
+  function applyImport(imported: ImportedRecipe) {
+    setTitle(imported.title);
+    if (imported.ingredients.length > 0) {
+      setRows(
+        imported.ingredients.map((i) => ({
+          key: nextKey++,
+          name: i.name,
+          quantity: i.quantity == null ? "" : String(i.quantity).replace(".", ","),
+          unit: i.unit,
+          aisle: i.aisle,
+        })),
+      );
+    }
+    if (imported.imageUrl) {
+      setPhoto(null);
+      setRemotePhoto(imported.imageUrl);
+      setPreview(imported.imageUrl);
+      setRemovePhoto(false);
+    }
+    setServings(imported.servings);
+  }
 
   const update = (key: number, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -44,6 +71,7 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
     try {
       const small = await resizeImage(file);
       setPhoto(small);
+      setRemotePhoto(null);
       setPreview(URL.createObjectURL(small));
       setRemovePhoto(false);
     } catch {
@@ -62,7 +90,10 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
       }}
       className="space-y-6"
     >
+      <ImportFromUrl onImport={applyImport} compact={Boolean(recipe)} />
+
       {recipe && <input type="hidden" name="id" value={recipe.id} />}
+      {remotePhoto && <input type="hidden" name="photo_remote_url" value={remotePhoto} />}
       <input type="hidden" name="remove_photo" value={removePhoto ? "1" : "0"} />
       <input
         type="hidden"
@@ -85,7 +116,8 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
           <input
             name="title"
             required
-            defaultValue={recipe?.title}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             maxLength={120}
             placeholder="Ex : Poulet basquaise"
             className="w-full rounded-2xl border-2 border-stone-200 bg-white px-4 py-3 text-xl outline-none focus:border-tomato-500"
@@ -97,7 +129,7 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
         <span className="mb-1 block font-semibold">Photo</span>
         <div className="flex items-center gap-4">
           {preview ? (
-            <img src={preview} alt="" className="size-28 rounded-2xl object-cover" />
+            <img src={preview} alt="" referrerPolicy="no-referrer" className="size-28 rounded-2xl object-cover" />
           ) : (
             <div className="flex size-28 items-center justify-center rounded-2xl bg-stone-100 text-4xl">📷</div>
           )}
@@ -117,6 +149,7 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
                 type="button"
                 onClick={() => {
                   setPhoto(null);
+                  setRemotePhoto(null);
                   setPreview(null);
                   setRemovePhoto(true);
                 }}
@@ -131,6 +164,11 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
 
       <fieldset className="min-w-0">
         <legend className="mb-2 font-semibold">Ingrédients</legend>
+        {servings && (
+          <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-amber-900">
+            Quantités prévues pour <strong>{servings}</strong> : ajustez-les si besoin.
+          </p>
+        )}
         <datalist id="units">
           {UNITS.map((u) => (
             <option key={u} value={u} />
