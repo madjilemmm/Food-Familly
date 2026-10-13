@@ -8,6 +8,7 @@ import { getProfile } from "@/lib/data";
 import { requireFamily, requireUser, setSession } from "@/lib/auth";
 import { SESSION_COOKIE, newSession, type Style } from "@/lib/session";
 import { ROUTES } from "@/lib/routes";
+import { STARTER_RECIPES } from "@/lib/starter-recipes";
 import { cleanText, changed } from "./_shared";
 
 const CODE_WORDS = [
@@ -97,11 +98,28 @@ export async function createFamily(_prev: { error?: string }, formData: FormData
     await db().from("families").delete().eq("id", familyId);
     return { error: "La création a échoué. Réessayez." };
   }
-  await db().rpc("add_starter_recipes", { p_family: familyId });
+  await addStarterRecipes(familyId);
 
   const me = profiles.find((p) => p.sort_order === meIndex)!;
   await setSession(newSession(familyId, me.id as string, members[meIndex].style));
   redirect("/famille?bienvenue=1");
+}
+
+/** 10 recettes classiques pour qu'une nouvelle famille puisse swiper tout de suite. */
+async function addStarterRecipes(familyId: string) {
+  const { data: recipes } = await db()
+    .from("recipes")
+    .insert(STARTER_RECIPES.map(({ title, emoji }) => ({ family_id: familyId, title, emoji })))
+    .select("id, title");
+  if (!recipes) return;
+  const idByTitle = new Map(recipes.map((r) => [r.title as string, r.id as string]));
+  await db()
+    .from("recipe_ingredients")
+    .insert(
+      STARTER_RECIPES.flatMap((r) =>
+        r.ingredients.map((ing, position) => ({ ...ing, position: position + 1, recipe_id: idByTitle.get(r.title) })),
+      ),
+    );
 }
 
 // ─── Choisir son profil ────────────────────────────────────────────────
