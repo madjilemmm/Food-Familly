@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
+import { AutoUpdate } from "@/components/pwa/AutoUpdate";
 
 export const metadata: Metadata = {
   title: "À table !",
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="fr">
       <body className="min-h-dvh font-sans antialiased">
         <ServiceWorkerRegister />
+        <AutoUpdate />
         {children}
       </body>
     </html>

@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
+// Identifiant de la version mise en ligne : sert à recharger l'appli
+// installée dès qu'une nouvelle version est disponible.
+const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA || `local-${Date.now()}`;
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_BUILD_ID: BUILD_ID },
   async headers() {
     return [
       {
