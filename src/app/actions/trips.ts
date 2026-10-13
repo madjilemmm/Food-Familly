@@ -1,59 +1,88 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, type CurrentUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
-import { getCurrentTrip, getRecipesWithIngredients, getListItems } from "@/lib/data";
+import { getCurrentTrip, getRecipesWithIngredients, getListItems, getProfile } from "@/lib/data";
 import { deadlineFor, type DepartureChoice } from "@/lib/domain/trip";
 import { mergeIngredients, itemKey } from "@/lib/domain/shopping-list";
 import { notifyTripStarted, notifyRequestReceived } from "@/lib/notifications";
+import { ROUTES } from "@/lib/routes";
 import { changed, cleanText } from "./_shared";
 
 const CHOICES: DepartureChoice[] = ["30min", "1h", "2h", "soir"];
 
-async function currentTripOrThrow() {
-  const trip = await getCurrentTrip();
+async function currentTripOrThrow(user: CurrentUser) {
+  const trip = await getCurrentTrip(user.familyId);
   if (!trip) throw new Error("Aucune course en cours");
   return trip;
 }
 
-// ─── Maman ─────────────────────────────────────────────────────────────
+/** Seule la personne qui fait les courses choisit les plats et valide la liste. */
+async function myTripOrThrow(user: CurrentUser) {
+  const trip = await currentTripOrThrow(user);
+  if (trip.created_by !== user.profileId) throw new Error("Ce n'est pas vous qui faites ces courses");
+  return trip;
+}
 
-export async function startTrip(choice: DepartureChoice) {
-  const user = await requireUser("parent");
+/** Ne garde que les recettes de la famille. */
+async function familyRecipeIds(user: CurrentUser, ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const { data } = await db().from("recipes").select("id").eq("family_id", user.familyId).in("id", ids);
+  return (data ?? []).map((r) => r.id as string);
+}
+
+// ─── La personne qui part faire les courses ────────────────────────────
+
+export async function startTrip(choice: DepartureChoice): Promise<{ error?: string }> {
+  const user = await requireUser();
   if (!CHOICES.includes(choice)) throw new Error("Choix invalide");
-  const deadline = deadlineFor(choice);
 
-  // Une seule session à la fois : les anciennes sont closes.
-  await db().from("shopping_trips").update({ status: "done" }).neq("status", "done");
+  const current = await getCurrentTrip(user.familyId);
+  if (current && current.created_by !== user.profileId) {
+    const shopper = current.created_by ? await getProfile(user.familyId, current.created_by) : null;
+    if (shopper) return { error: `${shopper.name} fait déjà les courses.` };
+  }
+
+  const deadline = deadlineFor(choice);
+  // Une seule session à la fois par famille : les anciennes sont closes.
+  await db().from("shopping_trips").update({ status: "done" }).eq("family_id", user.familyId).neq("status", "done");
   const { data: trip, error } = await db()
     .from("shopping_trips")
-    .insert({ created_by: user.profileId, deadline_at: deadline.toISOString(), departs_at: deadline.toISOString() })
+    .insert({
+      family_id: user.familyId,
+      created_by: user.profileId,
+      deadline_at: deadline.toISOString(),
+      departs_at: deadline.toISOString(),
+    })
     .select("id, deadline_at")
     .single();
   if (error) throw new Error(error.message);
 
-  changed(() => notifyTripStarted(trip.deadline_at));
+  changed(() => notifyTripStarted(user.familyId, user.profileId, trip.deadline_at));
+  return {};
 }
 
 export async function cancelTrip() {
-  await requireUser("parent");
-  const trip = await currentTripOrThrow();
+  const user = await requireUser();
+  const trip = await myTripOrThrow(user);
   await db().from("shopping_trips").delete().eq("id", trip.id);
   changed();
 }
 
+/** N'importe qui peut clore des courses terminées (par exemple si on les a faites à deux). */
 export async function finishTrip() {
-  await requireUser("parent");
-  const trip = await currentTripOrThrow();
+  const user = await requireUser();
+  const trip = await currentTripOrThrow(user);
   await db().from("shopping_trips").update({ status: "done" }).eq("id", trip.id);
   changed();
-  redirect("/maman");
+  redirect(ROUTES[user.style].courses);
 }
 
 export async function setTripRecipe(recipeId: string, selected: boolean) {
-  await requireUser("parent");
-  const trip = await currentTripOrThrow();
+  const user = await requireUser();
+  const trip = await myTripOrThrow(user);
+  if ((await familyRecipeIds(user, [recipeId])).length === 0) throw new Error("Recette inconnue");
   const { error } = await db()
     .from("trip_recipes")
     .upsert({ trip_id: trip.id, recipe_id: recipeId, selected }, { onConflict: "trip_id,recipe_id" });
@@ -67,8 +96,8 @@ export async function setTripRecipe(recipeId: string, selected: boolean) {
  * le restent.
  */
 export async function validateTrip() {
-  await requireUser("parent");
-  const trip = await currentTripOrThrow();
+  const user = await requireUser();
+  const trip = await myTripOrThrow(user);
 
   const { data: selection, error } = await db()
     .from("trip_recipes")
@@ -77,10 +106,8 @@ export async function validateTrip() {
     .eq("selected", true);
   if (error) throw new Error(error.message);
 
-  const recipes = await getRecipesWithIngredients(selection.map((s) => s.recipe_id));
-  const merged = mergeIngredients(
-    recipes.map((r) => ({ recipeTitle: r.title, ingredients: r.recipe_ingredients })),
-  );
+  const recipes = await getRecipesWithIngredients(user.familyId, selection.map((s) => s.recipe_id));
+  const merged = mergeIngredients(recipes.map((r) => ({ recipeTitle: r.title, ingredients: r.recipe_ingredients })));
 
   const previous = await getListItems(trip.id);
   const wasChecked = new Set(
@@ -110,21 +137,22 @@ export async function validateTrip() {
     .eq("id", trip.id);
 
   changed();
-  redirect("/maman/liste");
+  redirect(ROUTES[user.style].liste);
 }
 
-// ─── Enfants ───────────────────────────────────────────────────────────
+// ─── Les autres membres ────────────────────────────────────────────────
 
 export async function submitRequest(
   _prev: { ok?: boolean; error?: string },
   formData: FormData,
 ): Promise<{ ok?: boolean; error?: string }> {
-  const user = await requireUser("child");
-  const trip = await getCurrentTrip();
-  if (!trip) return { error: "Maman n'a pas (encore) annoncé de courses." };
+  const user = await requireUser();
+  const trip = await getCurrentTrip(user.familyId);
+  if (!trip) return { error: "Personne n'a (encore) annoncé de courses." };
+  if (trip.created_by === user.profileId) return { error: "C'est vous qui faites ces courses !" };
 
   const freeText = cleanText(formData.get("free_text")) || null;
-  const recipeIds = [...new Set(formData.getAll("recipe_ids").map(String))].slice(0, 30);
+  const recipeIds = await familyRecipeIds(user, [...new Set(formData.getAll("recipe_ids").map(String))].slice(0, 30));
   if (!freeText && recipeIds.length === 0) {
     return { error: "Écris quelque chose ou choisis au moins un plat." };
   }
@@ -137,8 +165,8 @@ export async function submitRequest(
     );
   if (error) return { error: "Oups, l'envoi a échoué. Réessaie." };
 
-  // Les plats demandés sont pré-cochés pour maman (sans annuler un plat
-  // qu'elle aurait volontairement décoché).
+  // Les plats demandés sont pré-cochés pour la personne qui fait les courses
+  // (sans annuler un plat qu'elle aurait volontairement décoché).
   if (recipeIds.length > 0) {
     await db()
       .from("trip_recipes")
@@ -148,6 +176,6 @@ export async function submitRequest(
       );
   }
 
-  changed(() => notifyRequestReceived(user.profileId, freeText, recipeIds.length));
+  changed(() => notifyRequestReceived(user.familyId, trip.created_by, user.profileId, freeText, recipeIds.length));
   return { ok: true };
 }

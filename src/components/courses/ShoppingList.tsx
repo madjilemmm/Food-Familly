@@ -79,7 +79,7 @@ export function ShoppingList({
 
       {pendingRequests.length > 0 && (
         <section className="mb-6 rounded-3xl bg-amber-50 p-4">
-          <h2 className="mb-2 text-xl font-bold">Ce que vos fils ont demandé</h2>
+          <h2 className="mb-2 text-xl font-bold">Ce que la famille a demandé</h2>
           <ul className="space-y-2">
             {pendingRequests.map((r) => (
               <li key={r.id} className="flex items-center gap-3">

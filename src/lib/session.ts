@@ -1,22 +1,24 @@
 /**
- * Session familiale : un cookie signé (HMAC-SHA256) qui retient que le code
- * famille a été saisi et, ensuite, quel profil utilise l'appareil.
+ * Session : un cookie signé (HMAC-SHA256) qui retient la famille rejointe
+ * (avec son code) puis le profil qui utilise l'appareil et son style
+ * d'interface.
  *
  * Utilise uniquement Web Crypto pour fonctionner aussi dans le middleware.
- * La clé de signature dépend du code famille : changer FAMILY_CODE
- * déconnecte tous les appareils.
  */
 
-export type Role = "parent" | "child";
+export type Style = "simple" | "fun";
 
 export type Session = {
-  /** Le code famille a été saisi. */
-  family: true;
+  v: 2;
+  familyId: string;
   profileId: string | null;
-  role: Role | null;
+  style: Style | null;
   /** Date d'émission (secondes). */
   iat: number;
 };
+
+/** Cookie de la première version (une seule famille, rôles parent/enfant). */
+export type LegacySession = { family: true; profileId: string | null; iat: number };
 
 export const SESSION_COOKIE = "ff_session";
 /** 400 jours : le maximum accepté par les navigateurs. */
@@ -38,11 +40,9 @@ function fromBase64url(input: string): Uint8Array {
 
 function signingSecret(): string {
   const secret = process.env.SESSION_SECRET;
-  const code = process.env.FAMILY_CODE;
-  if (!secret || !code) {
-    throw new Error("SESSION_SECRET et FAMILY_CODE doivent être définis (voir .env.example)");
-  }
-  return `${secret}:${code}`;
+  if (!secret) throw new Error("SESSION_SECRET doit être défini (voir .env.example)");
+  // FAMILY_CODE (ancienne version) reste dans la clé pour ne déconnecter personne.
+  return `${secret}:${process.env.FAMILY_CODE ?? ""}`;
 }
 
 async function hmac(data: string): Promise<Uint8Array> {
@@ -63,22 +63,33 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   return diff === 0;
 }
 
-export async function encodeSession(session: Session): Promise<string> {
+export async function encodeSession(session: Session | LegacySession): Promise<string> {
   const payload = base64url(encoder.encode(JSON.stringify(session)));
   const signature = base64url(await hmac(payload));
   return `${payload}.${signature}`;
 }
 
 export async function decodeSession(token: string | undefined | null): Promise<Session | null> {
+  const decoded = await decodeAnySession(token);
+  return decoded && "v" in decoded ? decoded : null;
+}
+
+export function newSession(familyId: string, profileId: string | null = null, style: Style | null = null): Session {
+  return { v: 2, familyId, profileId, style, iat: Math.floor(Date.now() / 1000) };
+}
+
+/** Décode aussi l'ancien format, pour pouvoir le convertir. */
+export async function decodeAnySession(token: string | undefined | null): Promise<Session | LegacySession | null> {
   if (!token) return null;
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return null;
   try {
     const expected = await hmac(payload);
     if (!timingSafeEqual(expected, fromBase64url(signature))) return null;
-    const session = JSON.parse(new TextDecoder().decode(fromBase64url(payload))) as Session;
-    if (session.family !== true) return null;
-    return session;
+    const session = JSON.parse(new TextDecoder().decode(fromBase64url(payload))) as Session | LegacySession;
+    if ("v" in session && session.v === 2 && typeof session.familyId === "string") return session;
+    if ("family" in session && session.family === true) return session;
+    return null;
   } catch {
     return null;
   }

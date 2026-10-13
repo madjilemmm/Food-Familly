@@ -166,7 +166,7 @@ function MatchOverlay({ recipe, onClose }: { recipe: Recipe; onClose: () => void
       <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
         <RecipeVisual recipe={recipe} className="mx-auto mt-8 size-48 rounded-[2rem] shadow-2xl ring-4 ring-white" emojiClassName="text-8xl" />
         <p className="mt-6 text-2xl font-bold">{recipe.title}</p>
-        <p className="mt-2 text-lg opacity-90">Vous aimez tous les deux. Maman le verra ! 💞</p>
+        <p className="mt-2 text-lg opacity-90">La famille adore ! Il sera proposé pour les prochaines courses 💞</p>
       </motion.div>
       <button onClick={onClose} className="mt-10 rounded-full bg-white px-10 py-4 text-xl font-bold text-pink-600 shadow-lg">
         Continuer à swiper

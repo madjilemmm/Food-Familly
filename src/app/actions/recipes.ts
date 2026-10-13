@@ -80,7 +80,7 @@ async function uploadPhoto(recipeId: string, file: File): Promise<string> {
 }
 
 export async function saveRecipe(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
-  await requireUser();
+  const user = await requireUser();
   const id = cleanText(formData.get("id"), 64) || null;
   const title = cleanText(formData.get("title"), 120);
   const emoji = cleanText(formData.get("emoji"), 16) || "🍽️";
@@ -96,13 +96,18 @@ export async function saveRecipe(_prev: { error?: string }, formData: FormData):
 
   try {
     if (recipeId) {
-      const { data: existing } = await db().from("recipes").select("photo_url").eq("id", recipeId).maybeSingle();
+      const { data: existing } = await db()
+        .from("recipes")
+        .select("photo_url")
+        .eq("id", recipeId)
+        .eq("family_id", user.familyId)
+        .maybeSingle();
       if (!existing) return { error: "Cette recette n'existe plus." };
       oldPhoto = existing.photo_url;
-      const { error } = await db().from("recipes").update({ title, emoji }).eq("id", recipeId);
+      const { error } = await db().from("recipes").update({ title, emoji }).eq("id", recipeId).eq("family_id", user.familyId);
       if (error) throw error;
     } else {
-      const { data, error } = await db().from("recipes").insert({ title, emoji }).select("id").single();
+      const { data, error } = await db().from("recipes").insert({ title, emoji, family_id: user.familyId }).select("id").single();
       if (error) throw error;
       recipeId = data.id as string;
     }
@@ -144,9 +149,15 @@ export async function saveRecipe(_prev: { error?: string }, formData: FormData):
 }
 
 export async function deleteRecipe(recipeId: string) {
-  await requireUser();
-  const { data } = await db().from("recipes").select("photo_url").eq("id", recipeId).maybeSingle();
-  await db().from("recipes").delete().eq("id", recipeId);
+  const user = await requireUser();
+  const { data } = await db()
+    .from("recipes")
+    .select("photo_url")
+    .eq("id", recipeId)
+    .eq("family_id", user.familyId)
+    .maybeSingle();
+  if (!data) return;
+  await db().from("recipes").delete().eq("id", recipeId).eq("family_id", user.familyId);
   const path = storagePath(data?.photo_url ?? null);
   if (path) await db().storage.from(BUCKET).remove([path]);
   changed();

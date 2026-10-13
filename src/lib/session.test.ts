@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { decodeSession, encodeSession, safeCompare, type Session } from "./session";
-
-const session: Session = { family: true, profileId: "abc", role: "child", iat: 1 };
+import { decodeAnySession, decodeSession, encodeSession, newSession, safeCompare } from "./session";
 
 describe("session", () => {
   beforeEach(() => {
@@ -10,19 +8,26 @@ describe("session", () => {
   });
 
   it("encode puis décode la session", async () => {
-    expect(await decodeSession(await encodeSession(session))).toEqual(session);
+    const s = newSession("fam-1", "p-1", "fun");
+    expect(await decodeSession(await encodeSession(s))).toEqual(s);
   });
 
-  it("refuse une session modifiée", async () => {
-    const token = await encodeSession(session);
+  it("refuse une session modifiée (changer de famille)", async () => {
+    const token = await encodeSession(newSession("fam-1", "p-1", "fun"));
     const [, sig] = token.split(".");
-    const forged = Buffer.from(JSON.stringify({ ...session, role: "parent" })).toString("base64url");
+    const forged = Buffer.from(JSON.stringify(newSession("fam-2", "p-1", "fun"))).toString("base64url");
     expect(await decodeSession(`${forged}.${sig}`)).toBeNull();
   });
 
-  it("invalide les sessions quand le code famille change", async () => {
-    const token = await encodeSession(session);
-    process.env.FAMILY_CODE = "nouveau-code";
+  it("reconnaît l'ancien format pour le convertir, sans le prendre pour une session valide", async () => {
+    const legacy = await encodeSession({ family: true, profileId: "p-1", iat: 1 });
+    expect(await decodeSession(legacy)).toBeNull();
+    expect(await decodeAnySession(legacy)).toEqual({ family: true, profileId: "p-1", iat: 1 });
+  });
+
+  it("change de clé si le secret change", async () => {
+    const token = await encodeSession(newSession("fam-1"));
+    process.env.SESSION_SECRET = "autre";
     expect(await decodeSession(token)).toBeNull();
   });
 

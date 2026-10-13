@@ -11,11 +11,13 @@ export function RequestForm({
   initialText,
   initialRecipeIds,
   alreadySent,
+  shopperName,
 }: {
   choices: Recipe[];
   initialText: string;
   initialRecipeIds: string[];
   alreadySent: boolean;
+  shopperName: string;
 }) {
   const [state, action] = useActionState(submitRequest, {});
 
@@ -34,9 +36,9 @@ export function RequestForm({
       </label>
 
       <fieldset className="min-w-0">
-        <legend className="mb-2 text-lg font-bold">Et/ou choisis parmi vos matchs 💞</legend>
+        <legend className="mb-2 text-lg font-bold">Et/ou choisis parmi les matchs de la famille 💞</legend>
         {choices.length === 0 ? (
-          <p className="rounded-2xl bg-white/70 px-4 py-3 text-stone-500">Pas encore de match. Swipe avec ton frère !</p>
+          <p className="rounded-2xl bg-white/70 px-4 py-3 text-stone-500">Pas encore de match. Swipe avec ta famille !</p>
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {choices.map((r) => (
@@ -62,13 +64,13 @@ export function RequestForm({
       </fieldset>
 
       {state.error && <p className="rounded-xl bg-red-100 px-4 py-2 text-red-700">{state.error}</p>}
-      {state.ok && <p className="rounded-xl bg-emerald-100 px-4 py-2 font-semibold text-emerald-800">Envoyé à maman ! 📨</p>}
+      {state.ok && <p className="rounded-xl bg-emerald-100 px-4 py-2 font-semibold text-emerald-800">Envoyé à {shopperName} ! 📨</p>}
 
       <SubmitButton
         pendingLabel="Envoi…"
-        className="sticky bottom-24 w-full rounded-full bg-gradient-to-r from-fuchsia-600 to-orange-500 py-4 text-xl font-extrabold text-white shadow-xl active:scale-[0.98]"
+        className="w-full rounded-full bg-gradient-to-r from-fuchsia-600 to-orange-500 py-4 text-xl font-extrabold text-white shadow-xl active:scale-[0.98]"
       >
-        {alreadySent ? "Mettre à jour ma demande" : "Envoyer à maman 📨"}
+        {alreadySent ? "Mettre à jour ma demande" : `Envoyer à ${shopperName} 📨`}
       </SubmitButton>
     </form>
   );

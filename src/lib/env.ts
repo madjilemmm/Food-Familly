@@ -16,9 +16,6 @@ export const serverEnv = {
   get supabaseServiceKey() {
     return required("SUPABASE_SERVICE_ROLE_KEY").trim();
   },
-  get familyCode() {
-    return required("FAMILY_CODE");
-  },
   get vapidPublicKey() {
     return required("NEXT_PUBLIC_VAPID_PUBLIC_KEY");
   },

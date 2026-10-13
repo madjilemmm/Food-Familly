@@ -24,6 +24,16 @@ export function AutoUpdate() {
         if (!res.ok) return;
         const { version } = (await res.json()) as { version?: string };
         if (version && LOADED_VERSION && version !== LOADED_VERSION) {
+          // Garde-fou : un seul rechargement par version, jamais de boucle.
+          const key = "atable-reloaded-for";
+          let already = false;
+          try {
+            already = sessionStorage.getItem(key) === version;
+            sessionStorage.setItem(key, version);
+          } catch {
+            // stockage indisponible : on recharge quand même une fois
+          }
+          if (already) return;
           // Le service worker se met aussi à jour, puis on recharge la page.
           await navigator.serviceWorker?.getRegistration().then((r) => r?.update()).catch(() => {});
           location.reload();

@@ -18,14 +18,17 @@ export function db(): SupabaseClient {
   return client;
 }
 
-export const REFRESH_TOPIC = "famille";
+/** Un canal par famille : un changement ne réveille que les écrans de cette famille. */
+export function refreshTopic(familyId: string) {
+  return `famille-${familyId}`;
+}
 export const REFRESH_EVENT = "refresh";
 
 /**
  * Prévient tous les écrans ouverts qu'ils doivent recharger leurs données.
  * Le message ne contient aucune donnée : juste un signal.
  */
-export async function broadcastRefresh(): Promise<void> {
+export async function broadcastRefresh(familyId: string): Promise<void> {
   try {
     const res = await fetch(`${serverEnv.supabaseUrl}/realtime/v1/api/broadcast`, {
       method: "POST",
@@ -38,7 +41,7 @@ export async function broadcastRefresh(): Promise<void> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        messages: [{ topic: REFRESH_TOPIC, event: REFRESH_EVENT, payload: {} }],
+        messages: [{ topic: refreshTopic(familyId), event: REFRESH_EVENT, payload: {} }],
       }),
     });
     if (!res.ok) console.warn("Broadcast realtime refusé :", res.status);
