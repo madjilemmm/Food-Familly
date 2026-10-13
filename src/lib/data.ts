@@ -1,11 +1,13 @@
 import "server-only";
 import { db } from "@/lib/supabase/server";
 import { buildDeck } from "@/lib/domain/swipe-deck";
-import type { Role } from "@/lib/session";
+import type { Style } from "@/lib/session";
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
-export type Profile = { id: string; name: string; role: Role; emoji: string };
+export type Profile = { id: string; family_id: string; name: string; style: Style; emoji: string };
+
+export type Family = { id: string; name: string; join_code: string };
 
 export type IngredientRow = {
   id: string;
@@ -26,12 +28,13 @@ export type Recipe = {
 
 export type RecipeWithIngredients = Recipe & { recipe_ingredients: IngredientRow[] };
 
-export type Match = Recipe & { matched_at: string; expires_at: string };
+export type Match = Recipe & { matched_at: string; expires_at: string; like_count: number };
 
 export type TripStatus = "open" | "validated" | "done";
 
 export type Trip = {
   id: string;
+  created_by: string | null;
   departs_at: string;
   deadline_at: string;
   status: TripStatus;
@@ -69,39 +72,49 @@ function check<T>(result: { data: T | null; error: { message: string } | null })
   return result.data as T;
 }
 
-// ─── Profils ───────────────────────────────────────────────────────────
+const PROFILE_FIELDS = "id, family_id, name, style, emoji";
 
-export async function getProfiles(): Promise<Profile[]> {
-  return check(await db().from("profiles").select("id, name, role, emoji").order("sort_order"));
+// ─── Familles et profils ───────────────────────────────────────────────
+
+export async function getFamily(familyId: string): Promise<Family | null> {
+  return check(await db().from("families").select("id, name, join_code").eq("id", familyId).maybeSingle());
 }
 
-export async function getProfile(id: string): Promise<Profile | null> {
-  return check(await db().from("profiles").select("id, name, role, emoji").eq("id", id).maybeSingle());
+export async function getProfiles(familyId: string): Promise<Profile[]> {
+  return check(
+    await db().from("profiles").select(PROFILE_FIELDS).eq("family_id", familyId).order("sort_order").order("created_at"),
+  );
+}
+
+export async function getProfile(familyId: string, id: string): Promise<Profile | null> {
+  return check(await db().from("profiles").select(PROFILE_FIELDS).eq("family_id", familyId).eq("id", id).maybeSingle());
 }
 
 // ─── Recettes ──────────────────────────────────────────────────────────
 
-export async function getRecipes(): Promise<Recipe[]> {
-  return check(await db().from("recipes").select(RECIPE_FIELDS).order("title"));
+export async function getRecipes(familyId: string): Promise<Recipe[]> {
+  return check(await db().from("recipes").select(RECIPE_FIELDS).eq("family_id", familyId).order("title"));
 }
 
-export async function getRecipe(id: string): Promise<RecipeWithIngredients | null> {
+export async function getRecipe(familyId: string, id: string): Promise<RecipeWithIngredients | null> {
   return check(
     await db()
       .from("recipes")
       .select(`${RECIPE_FIELDS}, recipe_ingredients(id, position, name, quantity, unit, aisle)`)
+      .eq("family_id", familyId)
       .eq("id", id)
       .order("position", { referencedTable: "recipe_ingredients" })
       .maybeSingle(),
   );
 }
 
-export async function getRecipesWithIngredients(ids: string[]): Promise<RecipeWithIngredients[]> {
+export async function getRecipesWithIngredients(familyId: string, ids: string[]): Promise<RecipeWithIngredients[]> {
   if (ids.length === 0) return [];
   return check(
     await db()
       .from("recipes")
       .select(`${RECIPE_FIELDS}, recipe_ingredients(id, position, name, quantity, unit, aisle)`)
+      .eq("family_id", familyId)
       .in("id", ids)
       .order("title")
       .order("position", { referencedTable: "recipe_ingredients" }),
@@ -110,42 +123,51 @@ export async function getRecipesWithIngredients(ids: string[]): Promise<RecipeWi
 
 // ─── Swipes & matchs ───────────────────────────────────────────────────
 
-export async function getMatches(): Promise<Match[]> {
+export async function getMatches(familyId: string): Promise<Match[]> {
   const rows = check(
-    await db().from("active_matches").select("recipe_id, matched_at, expires_at").order("matched_at", { ascending: false }),
-  ) as { recipe_id: string; matched_at: string; expires_at: string }[];
+    await db()
+      .from("active_matches")
+      .select("recipe_id, matched_at, expires_at, like_count")
+      .eq("family_id", familyId)
+      .order("matched_at", { ascending: false }),
+  ) as { recipe_id: string; matched_at: string; expires_at: string; like_count: number }[];
   if (rows.length === 0) return [];
-  const recipes = check(await db().from("recipes").select(RECIPE_FIELDS).in("id", rows.map((r) => r.recipe_id))) as Recipe[];
+  const recipes = check(
+    await db().from("recipes").select(RECIPE_FIELDS).eq("family_id", familyId).in("id", rows.map((r) => r.recipe_id)),
+  ) as Recipe[];
   const byId = new Map(recipes.map((r) => [r.id, r]));
   return rows.flatMap((m) => {
     const recipe = byId.get(m.recipe_id);
-    return recipe ? [{ ...recipe, matched_at: m.matched_at, expires_at: m.expires_at }] : [];
+    return recipe ? [{ ...recipe, matched_at: m.matched_at, expires_at: m.expires_at, like_count: m.like_count }] : [];
   });
 }
 
-export async function getDeck(profileId: string): Promise<Recipe[]> {
+export async function getDeck(familyId: string, profileId: string): Promise<Recipe[]> {
   const [recipes, swipes] = await Promise.all([
-    getRecipes(),
+    getRecipes(familyId),
     db().from("swipes").select("recipe_id, swiped_at").eq("profile_id", profileId).then(check),
   ]);
   return buildDeck(recipes, swipes as { recipe_id: string; swiped_at: string }[]);
 }
 
-/** Est-ce que tous les enfants ont liké cette recette récemment ? */
-export async function isMatch(recipeId: string): Promise<boolean> {
-  const row = check(await db().from("active_matches").select("recipe_id").eq("recipe_id", recipeId).maybeSingle());
+/** Est-ce que la majorité de la famille a liké cette recette récemment ? */
+export async function isMatch(familyId: string, recipeId: string): Promise<boolean> {
+  const row = check(
+    await db().from("active_matches").select("recipe_id").eq("family_id", familyId).eq("recipe_id", recipeId).maybeSingle(),
+  );
   return row != null;
 }
 
 // ─── Courses ───────────────────────────────────────────────────────────
 
-/** La session de courses en cours (ouverte ou validée, pas trop ancienne). */
-export async function getCurrentTrip(): Promise<Trip | null> {
+/** La session de courses en cours de la famille (ouverte ou validée, pas trop ancienne). */
+export async function getCurrentTrip(familyId: string): Promise<Trip | null> {
   const since = new Date(Date.now() - TRIP_MAX_AGE_MS).toISOString();
   return check(
     await db()
       .from("shopping_trips")
-      .select("id, departs_at, deadline_at, status, validated_at, created_at")
+      .select("id, created_by, departs_at, deadline_at, status, validated_at, created_at")
+      .eq("family_id", familyId)
       .neq("status", "done")
       .gte("created_at", since)
       .order("created_at", { ascending: false })

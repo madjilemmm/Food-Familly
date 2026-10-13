@@ -1,10 +1,11 @@
 # 🍽️ À table !
 
 La petite appli familiale pour choisir les repas et faire les courses sans prise de tête.
-Trois utilisateurs : **Karin** (parent), **Madji** et **Yoalem** (enfants), tous sur iPhone.
+Chaque famille crée son espace, ajoute ses membres et partage un code. Ensuite, **n'importe qui** peut faire les courses :
 
-- **Karin** annonce son départ en courses en 2 taps. Ses fils sont prévenus, elle voit leurs réponses en direct, coche les plats, et la liste de courses se fait toute seule, triée par rayon.
-- **Madji et Yoalem** swipent des recettes comme sur une appli de rencontre. Quand les deux likent le même plat, c'est un **match**. Quand maman part, ils répondent avec du texte libre et/ou des matchs.
+- **Celui ou celle qui part** l'annonce en 2 taps. Les autres sont prévenus, il voit leurs réponses en direct, coche les plats, et la liste de courses se fait toute seule, triée par rayon.
+- **Tout le monde** swipe des recettes comme sur une appli de rencontre. Quand la **majorité de la famille** like le même plat, c'est un **match**. Quand quelqu'un part, les autres répondent avec du texte libre et/ou des matchs.
+- Chacun choisit son **style d'interface** : **simple** (très gros boutons, l'essentiel) ou **fun** (animé).
 
 Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres, Realtime, Storage), Web Push (VAPID), hébergement sur Vercel (gratuit).
 
@@ -28,10 +29,12 @@ Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres,
 
 | Règle | Détail |
 |---|---|
-| Connexion | Un **code famille** saisi une seule fois, puis on choisit son profil. C'est retenu sur le téléphone pendant plus d'un an. Changer le code déconnecte tous les téléphones. |
+| Familles | Au premier lancement : **« Créer ma famille »** (nom, membres, style de chacun) ou **« J'ai un code famille »**. Chaque famille a ses propres membres, recettes, matchs et listes, invisibles des autres. Une nouvelle famille reçoit 10 recettes de départ. |
+| Connexion | Le code famille est saisi une seule fois, puis on choisit son prénom (ou « Je ne suis pas dans la liste »). C'est retenu sur le téléphone pendant plus d'un an. |
+| Qui fait les courses | N'importe quel membre. Une seule course à la fois par famille : les autres voient « X part dans… » et lui envoient leurs demandes. Tout le monde peut consulter et compléter la liste. |
 | Départ en courses | Choix : 30 min, 1 h, 2 h ou « ce soir, 18 h ». Ce dernier choix disparaît après 17 h. |
-| Heure limite dépassée | Si personne n'a répondu, l'écran de Karin propose automatiquement les plats matchés. C'est calculé à l'affichage, sans tâche planifiée. Karin n'attend jamais personne : elle peut faire sa liste à tout moment. |
-| Match | Une recette likée par **les deux** fils dans les 14 derniers jours. |
+| Heure limite dépassée | Si personne n'a répondu, la personne qui fait les courses voit automatiquement les plats matchés. C'est calculé à l'affichage, sans tâche planifiée. Elle n'attend jamais personne : elle peut faire sa liste à tout moment. |
+| Match | Une recette likée par **plus de la moitié** de la famille dans les 14 derniers jours (2 sur 3, 3 sur 4, 3 sur 5…). |
 | Paquet de swipe | Une recette swipée revient dans le paquet 14 jours plus tard, donc il ne s'épuise jamais. |
 | Liste de courses | Les doublons sont fusionnés (« 1 oignon » + « 2 oignons » = 3 oignons, 400 g + 1 kg = 1,4 kg) et regroupés par rayon. Régénérer la liste garde les articles ajoutés à la main et ce qui est déjà coché. |
 | Sécurité | Toute la base passe par le serveur avec la clé secrète. La clé publique Supabase ne peut **rien** lire ni écrire (RLS activée sans aucune autorisation). Elle sert uniquement à recevoir le signal « rafraîchis-toi », qui ne contient aucune donnée. |
@@ -49,8 +52,12 @@ Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres,
 2. **Créer les tables** : menu de gauche **SQL Editor** → **New query**. Copiez-collez **tout** le contenu du fichier
    [`supabase/migrations/20261005000001_schema.sql`](supabase/migrations/20261005000001_schema.sql), puis cliquez sur **Run**. Le message attendu est « Success. No rows returned ».
 
-3. **Ajouter les profils et les 10 recettes d'exemple** : nouvelle requête, collez le contenu de
-   [`supabase/seed.sql`](supabase/seed.sql), puis **Run**. Le script peut être relancé sans créer de doublons.
+3. **Ajouter les familles** : nouvelle requête, collez le contenu de
+   [`supabase/migrations/20261013000001_familles.sql`](supabase/migrations/20261013000001_familles.sql), puis **Run**.
+   Chaque fichier ne se lance qu'une seule fois, dans cet ordre.
+
+   Pas besoin de données de départ : on crée sa famille directement dans l'appli. (Le fichier facultatif
+   [`supabase/seed.sql`](supabase/seed.sql) crée une famille de démonstration, code `demo-1234-test`.)
 
 4. **Vérifier** : menu **Table Editor**. Vous devez voir `profiles` (3 lignes), `recipes` (10 lignes) et `recipe_ingredients`.
    Menu **Storage** : un bucket public `recipe-photos` doit exister (il sert aux photos des recettes).
@@ -97,7 +104,7 @@ Il reste trois variables à remplir :
 
 - `VAPID_SUBJECT` : `mailto:votre@email.fr` (une adresse de contact pour Apple et Google).
 - `SESSION_SECRET` : une longue chaîne aléatoire. Générez-la avec `openssl rand -base64 32`, ou tapez 40 caractères au hasard.
-- `FAMILY_CODE` : le code familial. Ni la casse ni les accents ne comptent (`Poulet` = `poulet`).
+- `FAMILY_CODE` : facultatif depuis l'arrivée des familles (chaque famille a son code, géré dans l'appli). Si la variable existe déjà, **ne la supprimez pas** : elle entre dans la signature des sessions, et la retirer déconnecterait tout le monde.
 
 ---
 
@@ -148,13 +155,14 @@ Les notifications ne fonctionnent pas sur iPhone en local : elles demandent un v
 
 Il faut **iOS 16.4 ou plus récent** (Réglages → Général → Informations → Version iOS).
 
-À faire sur **chaque** iPhone (Karin, Madji, Yoalem) :
+À faire sur **chaque** iPhone de la famille :
 
 1. Ouvrez l'adresse Vercel dans **Safari** (pas Chrome : seul Safari permet l'installation sur iPhone).
 2. Touchez le bouton **Partager** (le carré avec une flèche vers le haut ⬆︎).
 3. Faites défiler et touchez **« Sur l'écran d'accueil »**, puis **Ajouter**.
 4. **Fermez Safari** et ouvrez l'appli **depuis sa nouvelle icône** 🍽️ sur l'écran d'accueil.
-5. Saisissez le **code famille**, puis touchez votre prénom.
+5. La première personne touche **« Créer ma famille »** et ajoute tous les membres. Elle obtient un **code famille** (exemple : `paella-6024-lasagne`) à partager avec le bouton 📤.
+   Les autres touchent **« J'ai un code famille »**, saisissent ce code puis leur prénom.
 6. Touchez le bouton **« Activer les notifications »**, puis **Autoriser**.
 7. Pour vérifier : ⚙️ (en haut à droite) → **Tester**. Une notification doit arriver.
 
@@ -171,7 +179,7 @@ Points importants sur iPhone :
 
 ### Remplacer les recettes d'exemple
 
-Depuis l'appli, dans l'onglet **Recettes** (enfants) ou **Plats → Gérer mes recettes** (Karin), vous pouvez :
+Depuis l'appli, dans l'onglet **Recettes** (style fun) ou **Plats → Gérer mes recettes** (style simple), vous pouvez :
 - **ajouter** une recette (nom, emoji, photo, ingrédients avec quantité, unité et rayon) ;
 - **modifier** une recette ;
 - **supprimer** une recette.
@@ -182,13 +190,14 @@ Conseils pour une liste de courses bien fusionnée :
 - Utilisez les mêmes noms d'une recette à l'autre (« Oignon » et « Oignons » sont reconnus comme le même article).
 - Les unités `g`/`kg` et `ml`/`cl`/`l` s'additionnent entre elles. Laissez l'unité vide pour compter à la pièce.
 
-### Changer un prénom ou un emoji
+### Gérer les membres, le style et le code
 
-Dans Supabase : **Table Editor → profiles**. Modifiez `name` ou `emoji` directement dans le tableau.
+Tout se fait dans l'appli, ⚙️ → **Ma famille** :
+- ajouter, modifier (prénom, emoji, style) ou retirer un membre ;
+- renommer la famille ;
+- **partager** le code, ou en **changer** (l'ancien ne permet plus de rejoindre la famille ; les téléphones déjà connectés le restent).
 
-### Changer le code famille
-
-Modifiez `FAMILY_CODE` dans Vercel, puis redéployez. Chaque téléphone devra saisir le nouveau code.
+Chacun peut aussi changer son propre style dans ⚙️ → **Style de l'appli** : l'interface bascule tout de suite.
 
 ---
 
@@ -221,11 +230,13 @@ npm run icons      # régénère les icônes depuis scripts/generate-icons.mjs
 
 ```
 src/
-  middleware.ts          # code famille, choix du profil, rôle parent/enfant
+  middleware.ts          # famille rejointe, profil choisi, style simple/fun
   app/
     bienvenue/ profil/   # saisie du code puis choix du profil
-    maman/               # Courses · Plats · Liste (interface de Karin)
-    enfant/              # Swipe · Matchs · Courses (interface des fils)
+    simple/              # style simple : Courses · Plats · Liste · J'aime
+    fun/                 # style fun : Swipe · Matchs · Courses · Liste
+    famille/             # membres, code de la famille
+    bienvenue/creer/     # création d'une famille
     recettes/            # liste + formulaire de recette
     reglages/            # notifications, changement de profil
     actions/             # server actions : toutes les écritures en base
@@ -242,23 +253,24 @@ public/
   icons/ offline.html
 supabase/
   migrations/            # schéma SQL
-  seed.sql               # profils + 10 recettes
+  seed.sql               # famille de démonstration (facultatif)
 ```
 
 ### Modèle de données
 
-- `profiles` : les 3 membres, avec leur rôle `parent` ou `child`
+- `families` : chaque famille et son code pour la rejoindre
+- `profiles` : les membres d'une famille, avec leur style `simple` ou `fun`
 - `recipes`, `recipe_ingredients` : nom, quantité, unité, rayon
 - `swipes` : un swipe par profil et par recette, daté (expiration après 14 jours)
-- vue `active_matches` : recettes likées par tous les enfants il y a moins de 14 jours
-- `shopping_trips` : une session de courses (heure limite, statut `open` → `validated` → `done`)
+- vue `active_matches` : recettes likées par la majorité de la famille il y a moins de 14 jours
+- `shopping_trips` : une session de courses d'une famille, avec la personne qui la fait (heure limite, statut `open` → `validated` → `done`)
 - `trip_requests` : la réponse de chaque fils (texte libre + recettes choisies)
-- `trip_recipes` : les plats cochés par Karin
+- `trip_recipes` : les plats cochés par la personne qui fait les courses
 - `shopping_list_items` : la liste (origine `recipe` / `manual` / `request`, coché ou non)
 - `push_subscriptions` : un abonnement par appareil
 
 ### Temps réel
 
-Après chaque écriture, le serveur envoie un **broadcast** Supabase vide sur le canal `famille`.
+Après chaque écriture, le serveur envoie un **broadcast** Supabase vide sur le canal de la famille (`famille-<id>`).
 Les écrans ouverts reçoivent ce signal et rechargent leurs données côté serveur (`router.refresh()`).
 Il y a aussi un rafraîchissement de secours toutes les 30 s et au retour au premier plan.

@@ -1,11 +1,13 @@
 import Link from "next/link";
+import { requireProfile } from "@/lib/auth";
 import { getRecipes } from "@/lib/data";
 import { RecipeVisual } from "@/components/RecipeVisual";
 
 export const metadata = { title: "Recettes — À table !" };
 
 export default async function RecipesPage() {
-  const recipes = await getRecipes();
+  const me = await requireProfile();
+  const recipes = await getRecipes(me.family_id);
   return (
     <>
       <div className="mb-5 flex items-center justify-between gap-3">

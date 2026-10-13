@@ -1,14 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  SESSION_COOKIE,
-  cookieOptions,
-  decodeSession,
-  encodeSession,
-  type Role,
-} from "@/lib/session";
+import { SESSION_COOKIE, cookieOptions, decodeAnySession, encodeSession } from "@/lib/session";
+import { equivalentFor, resolveAlias } from "@/lib/routes";
 
-const HOME: Record<Role, string> = { parent: "/maman", child: "/enfant" };
 const WEEK = 7 * 24 * 60 * 60;
+/** Accessibles sans famille : rejoindre ou créer une famille. */
+const PUBLIC = ["/bienvenue", "/bienvenue/creer"];
+/** Accessibles avec une famille mais sans profil choisi. */
+const NO_PROFILE = ["/profil", "/profil/nouveau"];
 
 function redirect(req: NextRequest, path: string) {
   return NextResponse.redirect(new URL(path, req.url));
@@ -16,27 +14,40 @@ function redirect(req: NextRequest, path: string) {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const session = await decodeSession(req.cookies.get(SESSION_COOKIE)?.value);
+  // Numéro de version de l'appli (mise à jour automatique) : rien de privé.
+  if (pathname === "/api/version") return NextResponse.next();
   const isApi = pathname.startsWith("/api/");
+  const session = await decodeAnySession(req.cookies.get(SESSION_COOKIE)?.value);
+
+  // Ancien cookie (première version) : converti sans redemander le code.
+  if (session && !("v" in session)) {
+    if (session.profileId && pathname !== "/api/session/refresh") {
+      return redirect(req, `/api/session/refresh?next=${encodeURIComponent(pathname)}`);
+    }
+    if (pathname === "/api/session/refresh") return NextResponse.next();
+    const res = PUBLIC.includes(pathname) ? NextResponse.next() : redirect(req, "/bienvenue");
+    res.cookies.delete(SESSION_COOKIE);
+    return res;
+  }
 
   if (!session) {
-    if (pathname === "/bienvenue") return NextResponse.next();
+    if (PUBLIC.includes(pathname)) return NextResponse.next();
     if (isApi) return NextResponse.json({ error: "Non connecté" }, { status: 401 });
     return redirect(req, "/bienvenue");
   }
 
-  if (pathname === "/bienvenue") return redirect(req, "/");
-
-  if (!session.profileId || !session.role) {
-    if (pathname === "/profil") return NextResponse.next();
+  if (!session.profileId || !session.style) {
+    if (NO_PROFILE.includes(pathname) || PUBLIC.includes(pathname)) return NextResponse.next();
     if (isApi) return NextResponse.json({ error: "Profil non choisi" }, { status: 401 });
     return redirect(req, "/profil");
   }
 
-  const home = HOME[session.role];
-  if (pathname === "/") return redirect(req, home);
-  if (pathname.startsWith("/maman") && session.role !== "parent") return redirect(req, home);
-  if (pathname.startsWith("/enfant") && session.role !== "child") return redirect(req, home);
+  if (PUBLIC.includes(pathname)) return redirect(req, "/");
+
+  const alias = resolveAlias(pathname, session.style);
+  if (alias && alias !== pathname) return redirect(req, alias);
+  const equivalent = equivalentFor(pathname, session.style);
+  if (equivalent) return redirect(req, equivalent);
 
   const res = NextResponse.next();
   // Prolonge la session des appareils utilisés régulièrement.
