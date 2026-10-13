@@ -6,9 +6,11 @@
 --   le rôle parent/enfant n'est plus utilisé.
 -- • Un match = une recette likée par la majorité de la famille.
 -- Les données existantes sont rattachées à une première famille.
+-- Le script peut être relancé sans risque (par exemple s'il s'est arrêté
+-- en cours de route).
 -- ════════════════════════════════════════════════════════════════════
 
-create table public.families (
+create table if not exists public.families (
   id          uuid primary key default gen_random_uuid(),
   name        text not null check (length(trim(name)) > 0),
   join_code   text not null unique check (join_code = lower(join_code) and length(join_code) >= 6),
@@ -22,29 +24,37 @@ grant all on public.families to service_role;
 -- update public.families set join_code = '...' where id = '20000000-0000-4000-8000-000000000001';)
 insert into public.families (id, name, join_code)
 select '20000000-0000-4000-8000-000000000001', 'Notre famille', 'a-changer-' || substr(md5(random()::text), 1, 12)
-where exists (select 1 from public.profiles) or exists (select 1 from public.recipes);
+where exists (select 1 from public.profiles) or exists (select 1 from public.recipes)
+on conflict (id) do nothing;
 
 -- ─── Profils ─────────────────────────────────────────────────────────
-alter table public.profiles add column family_id uuid references public.families(id) on delete cascade;
+alter table public.profiles add column if not exists family_id uuid references public.families(id) on delete cascade;
 update public.profiles set family_id = '20000000-0000-4000-8000-000000000001' where family_id is null;
 alter table public.profiles alter column family_id set not null;
-create index profiles_family_idx on public.profiles(family_id, sort_order);
+create index if not exists profiles_family_idx on public.profiles(family_id, sort_order);
 
-alter table public.profiles add column style text not null default 'fun' check (style in ('simple', 'fun'));
-update public.profiles set style = case when role = 'parent' then 'simple' else 'fun' end;
+-- Le style initial reprend l'ancien rôle, une seule fois (à l'ajout de la colonne).
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'profiles' and column_name = 'style') then
+    alter table public.profiles add column style text not null default 'fun' check (style in ('simple', 'fun'));
+    update public.profiles set style = case when role = 'parent' then 'simple' else 'fun' end;
+  end if;
+end $$;
 -- Conservé le temps de la mise en ligne, plus utilisé par l'appli.
 alter table public.profiles alter column role drop not null;
 
 -- ─── Recettes et courses ─────────────────────────────────────────────
-alter table public.recipes add column family_id uuid references public.families(id) on delete cascade;
+alter table public.recipes add column if not exists family_id uuid references public.families(id) on delete cascade;
 update public.recipes set family_id = '20000000-0000-4000-8000-000000000001' where family_id is null;
 alter table public.recipes alter column family_id set not null;
-create index recipes_family_idx on public.recipes(family_id, title);
+create index if not exists recipes_family_idx on public.recipes(family_id, title);
 
-alter table public.shopping_trips add column family_id uuid references public.families(id) on delete cascade;
+alter table public.shopping_trips add column if not exists family_id uuid references public.families(id) on delete cascade;
 update public.shopping_trips set family_id = '20000000-0000-4000-8000-000000000001' where family_id is null;
 alter table public.shopping_trips alter column family_id set not null;
-create index shopping_trips_family_idx on public.shopping_trips(family_id, created_at desc) where status <> 'done';
+create index if not exists shopping_trips_family_idx on public.shopping_trips(family_id, created_at desc) where status <> 'done';
 
 -- ─── Matchs : la majorité de la famille a liké (likes de moins de 14 j) ─
 -- expires_at : quand le like le plus ancien parmi ceux qui forment la
