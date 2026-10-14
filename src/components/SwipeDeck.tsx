@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useMotionValue, useTransform, type PanInfo } from "motion/react";
 import { swipe } from "@/app/actions/swipes";
@@ -30,10 +30,21 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
       .catch(() => setError(true));
   }
 
+  // Sur ordinateur : flèches ← → pour swiper.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (match || (e.target as HTMLElement)?.closest("input, textarea")) return;
+      if (e.key === "ArrowRight") decide(true);
+      if (e.key === "ArrowLeft") decide(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       {/* Jamais moins de 17rem, même sur iPhone SE avec des bandeaux : la page défile alors un peu. */}
-      <div className="relative min-h-[17rem] w-full flex-1">
+      <div className="relative mx-auto min-h-[17rem] w-full flex-1 sm:max-h-[36rem] sm:max-w-sm">
         {deck.length === 0 ? (
           <EmptyDeck />
         ) : (
@@ -50,20 +61,24 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
 
       {deck.length > 0 && (
         <div className="flex items-center justify-center gap-8 py-4">
-          <button
+          <motion.button
             onClick={() => decide(false)}
             aria-label="Non merci"
-            className="flex size-16 items-center justify-center rounded-full bg-white text-3xl shadow-lg transition-transform active:scale-90"
+            whileTap={{ scale: 0.85, rotate: -8 }}
+            transition={{ type: "spring", stiffness: 600, damping: 20 }}
+            className="flex size-16 items-center justify-center rounded-full bg-white text-3xl text-stone-500 shadow-lg"
           >
             ✕
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             onClick={() => decide(true)}
             aria-label="J'aime"
-            className="flex size-20 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-orange-400 text-4xl text-white shadow-xl shadow-pink-500/30 transition-transform active:scale-90"
+            whileTap={{ scale: 0.85 }}
+            transition={{ type: "spring", stiffness: 600, damping: 20 }}
+            className="flex size-20 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-orange-400 text-4xl text-white shadow-xl shadow-pink-500/30"
           >
             ♥
-          </button>
+          </motion.button>
         </div>
       )}
 

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { motion } from "motion/react";
 import { startTrip } from "@/app/actions/trips";
+import { Spinner } from "@/components/Spinner";
 import type { DepartureChoice } from "@/lib/domain/trip";
 import type { Style } from "@/lib/session";
 
@@ -46,7 +48,12 @@ export function StartTrip({
   }
 
   return (
-    <div className="rounded-[2rem] bg-white p-5 shadow-xl">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96, y: 8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 420, damping: 32 }}
+      className="rounded-[2rem] bg-white p-5 shadow-xl"
+    >
       <p className="mb-4 text-center text-2xl font-bold">Je pars dans…</p>
       <div className="grid grid-cols-2 gap-3">
         {choices.map((c) => (
@@ -61,7 +68,9 @@ export function StartTrip({
                 if (res?.error) setError(res.error);
               });
             }}
-            className={`min-h-24 rounded-3xl px-3 text-2xl font-bold active:scale-95 disabled:opacity-60 ${
+            className={`flex min-h-24 items-center justify-center rounded-3xl px-3 text-2xl font-bold transition-[transform,background-color,opacity] duration-150 active:scale-95 ${
+              pending && chosen !== c.id ? "opacity-40" : ""
+            } ${
               chosen === c.id
                 ? fun
                   ? "bg-fuchsia-600 text-white"
@@ -71,15 +80,15 @@ export function StartTrip({
                   : "bg-tomato-50 text-tomato-700"
             } ${choices.length % 2 === 1 && c === choices[choices.length - 1] ? "col-span-2" : ""}`}
           >
-            {pending && chosen === c.id ? "…" : c.label}
+            {pending && chosen === c.id ? <Spinner className="size-7" /> : c.label}
           </button>
         ))}
       </div>
       {error && <p className="mt-4 rounded-xl bg-red-100 px-4 py-3 text-center text-red-800">{error}</p>}
       <p className="mt-4 text-center text-base text-stone-500">{who}</p>
-      <button onClick={() => setOpen(false)} disabled={pending} className="mt-2 w-full py-3 text-lg text-stone-500 underline">
+      <button onClick={() => setOpen(false)} disabled={pending} className="mt-2 min-h-11 w-full text-lg text-stone-500 underline">
         Annuler
       </button>
-    </div>
+    </motion.div>
   );
 }

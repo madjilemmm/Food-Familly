@@ -50,7 +50,7 @@ export function RequestForm({
                   defaultChecked={initialRecipeIds.includes(r.id)}
                   className="peer sr-only"
                 />
-                <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-4 ring-transparent transition peer-checked:ring-fuchsia-500 peer-focus-visible:ring-fuchsia-300">
+                <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-4 ring-transparent transition duration-150 group-active:scale-95 peer-checked:scale-[0.97] peer-checked:ring-fuchsia-500 peer-focus-visible:ring-fuchsia-300">
                   <RecipeVisual recipe={r} className="aspect-square w-full" emojiClassName="text-5xl" />
                   <p className="px-3 py-2 text-sm leading-tight font-bold">{r.title}</p>
                 </div>

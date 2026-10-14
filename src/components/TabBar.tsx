@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { motion } from "motion/react";
 import { usePathname, useRouter } from "next/navigation";
 import { PrefetchKind } from "next/dist/client/components/router-reducer/router-reducer-types";
 
@@ -64,12 +65,18 @@ export function TabBar({ tabs, variant }: { tabs: Tab[]; variant: "parent" | "ch
                   active ? accent : "text-stone-400"
                 }`}
               >
-                <span
-                  className={`flex items-center justify-center rounded-full px-4 py-0.5 transition-all duration-200 ${
-                    big ? "text-3xl" : "text-2xl"
-                  } ${active ? `${pill} scale-105` : "grayscale-[35%]"}`}
-                >
-                  {tab.icon}
+                <span className={`relative flex items-center justify-center px-4 py-0.5 ${big ? "text-3xl" : "text-2xl"}`}>
+                  {/* Pastille qui glisse vers l'onglet choisi (ressort) */}
+                  {active && (
+                    <motion.span
+                      layoutId={`tab-pill-${variant}`}
+                      className={`absolute inset-0 rounded-full ${pill}`}
+                      transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                    />
+                  )}
+                  <span className={`relative transition-[transform,filter] duration-200 ${active ? "scale-110" : "grayscale-[35%]"}`}>
+                    {tab.icon}
+                  </span>
                 </span>
                 {tab.label}
                 {tab.badge ? (

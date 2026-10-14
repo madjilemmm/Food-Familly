@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useTransition } from "react";
+import { motion } from "motion/react";
 import { setTripRecipe } from "@/app/actions/trips";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import type { CandidateRecipe } from "@/lib/views";
@@ -28,7 +29,7 @@ export function RecipeChecklist({ recipes, disabled = false }: { recipes: Candid
                 await setTripRecipe(r.id, !r.checked);
               })
             }
-            className={`flex w-full items-center gap-4 rounded-3xl border-4 bg-white p-3 text-left transition-colors active:scale-[0.99] ${
+            className={`flex w-full items-center gap-4 rounded-3xl border-4 bg-white p-3 text-left shadow-sm transition-[border-color,transform] duration-150 active:scale-[0.98] ${
               r.checked ? "border-basil-500" : "border-transparent"
             }`}
           >
@@ -41,17 +42,19 @@ export function RecipeChecklist({ recipes, disabled = false }: { recipes: Candid
                     {name} le veut
                   </span>
                 ))}
-                {r.isMatch && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-rose-700">❤️ Les deux aiment</span>}
+                {r.isMatch && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-rose-700">❤️ La famille aime</span>}
               </span>
             </span>
-            <span
+            <motion.span
               aria-hidden
+              animate={{ scale: r.checked ? [1, 1.2, 1] : 1 }}
+              transition={{ duration: 0.25 }}
               className={`flex size-11 shrink-0 items-center justify-center rounded-full text-2xl font-bold ${
                 r.checked ? "bg-basil-500 text-white" : "border-4 border-stone-200"
               }`}
             >
               {r.checked ? "✓" : ""}
-            </span>
+            </motion.span>
           </button>
         </li>
       ))}

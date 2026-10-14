@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useRef, useTransition } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { addItem, deleteItem, setItemChecked } from "@/app/actions/list";
 import { finishTrip } from "@/app/actions/trips";
 import { groupByAisle } from "@/lib/domain/aisles";
@@ -131,9 +132,19 @@ export function ShoppingList({
           <h2 className="mb-2 flex items-center gap-2 text-xl font-bold text-stone-700">
             <span className="text-2xl">{group.emoji}</span> {group.label}
           </h2>
-          <ul className="overflow-hidden rounded-3xl bg-white">
+          <ul className="overflow-hidden rounded-3xl bg-white shadow-sm">
+            <AnimatePresence initial={false}>
             {group.items.map((item) => (
-              <li key={item.id} className="flex items-center border-b border-stone-100 last:border-0">
+              // Un article coché glisse en bas de son rayon ; ajout et retrait en douceur.
+              <motion.li
+                key={item.id}
+                layout="position"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 40, opacity: { duration: 0.15 } }}
+                className="flex items-center border-b border-stone-100 last:border-0"
+              >
                 <button
                   type="button"
                   aria-pressed={item.checked}
@@ -143,17 +154,19 @@ export function ShoppingList({
                       if (!item.id.startsWith("tmp-")) await setItemChecked(item.id, !item.checked);
                     })
                   }
-                  className="flex min-h-16 flex-1 items-center gap-4 px-4 py-3 text-left"
+                  className="flex min-h-16 flex-1 items-center gap-4 px-4 py-3 text-left active:bg-stone-50"
                 >
-                  <span
+                  <motion.span
                     aria-hidden
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-xl font-bold ${
+                    animate={{ scale: item.checked ? [1, 1.25, 1] : 1 }}
+                    transition={{ duration: 0.25 }}
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-xl font-bold transition-colors duration-150 ${
                       item.checked ? "bg-basil-500 text-white" : "border-4 border-stone-300"
                     }`}
                   >
                     {item.checked ? "✓" : ""}
-                  </span>
-                  <span className={`flex-1 ${item.checked ? "text-stone-400 line-through" : ""}`}>
+                  </motion.span>
+                  <span className={`flex-1 transition-colors duration-200 ${item.checked ? "text-stone-400 line-through" : ""}`}>
                     <span className="text-xl font-semibold">{item.name}</span>
                     {item.quantity != null || item.unit ? (
                       <span className="ml-2 text-xl text-stone-500">{formatQuantity(item.quantity, item.unit)}</span>
@@ -171,13 +184,14 @@ export function ShoppingList({
                         if (!item.id.startsWith("tmp-")) await deleteItem(item.id);
                       })
                     }
-                    className="px-4 py-3 text-2xl text-stone-300"
+                    className="flex size-14 shrink-0 items-center justify-center text-2xl text-stone-300 active:text-stone-500"
                   >
                     ✕
                   </button>
                 )}
-              </li>
+              </motion.li>
             ))}
+            </AnimatePresence>
           </ul>
         </section>
       ))}
