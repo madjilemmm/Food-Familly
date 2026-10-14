@@ -1,7 +1,7 @@
 import { requireProfile } from "@/lib/auth";
 import { getFamilyTastes, getProfiles } from "@/lib/data";
 import { ROUTES } from "@/lib/routes";
-import { AUTRE, DIETS } from "@/lib/domain/foods";
+import { AUTRE, DIETS, doitVoirNouvellesCartes } from "@/lib/domain/foods";
 import { Questionnaire } from "./Questionnaire";
 
 export const metadata = { title: "Mes goûts — Kaddie" };
@@ -12,7 +12,7 @@ function safeNext(raw: string | undefined, fallback: string) {
   return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : fallback;
 }
 
-export default async function TastesPage({ searchParams }: { searchParams: Promise<{ suite?: string }> }) {
+export default async function TastesPage({ searchParams }: { searchParams: Promise<{ suite?: string; nouvelles?: string }> }) {
   const me = await requireProfile();
   const [{ members }, profiles, params] = await Promise.all([getFamilyTastes(me.family_id), getProfiles(me.family_id), searchParams]);
   const mine = members.find((m) => m.id === me.id)?.tastes ?? {};
@@ -22,6 +22,7 @@ export default async function TastesPage({ searchParams }: { searchParams: Promi
   return (
     <Questionnaire
       style={me.style}
+      nouvelles={params.nouvelles === "1" && doitVoirNouvellesCartes(me.tastes_done_at)}
       suite={safeNext(params.suite, ROUTES[me.style].home)}
       initial={{
         diets: Object.entries(mine).filter(([k, l]) => l === "interdit" && dietKeys.has(k)).map(([k]) => k),

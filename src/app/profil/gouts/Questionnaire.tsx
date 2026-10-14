@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence } from "motion/react";
 import { Bouton, IconeJenVeux, IconePasEnvie, Logo, Scene } from "@/design-system/components/Kaddie";
 import { saveTastes, skipTastes, type CardAnswer } from "@/app/actions/tastes";
-import { DIETS, cartesPour, compatibility, type TasteLevel } from "@/lib/domain/foods";
+import { CARTES_AJOUTEES, DIETS, cartesPour, compatibility, type TasteLevel } from "@/lib/domain/foods";
 import { CarteGeste, PILE, type Direction } from "@/components/CarteGeste";
 import { IconeCoeur, IconeCroix, MessageErreur } from "@/components/ui";
 import { Spinner } from "@/components/Spinner";
@@ -21,9 +21,22 @@ const REPONSE: Record<Direction, CardAnswer> = { gauche: "pas_fan", droite: "ok"
  * Le questionnaire de goûts, façon appli de rencontre :
  * 1. régime et allergies, 2. des cartes d'ingrédients, 3. la compatibilité avec la famille.
  */
-export function Questionnaire({ style, suite, initial, others }: { style: Style; suite: string; initial: Initial; others: Other[] }) {
+export function Questionnaire({
+  style,
+  suite,
+  initial,
+  others,
+  nouvelles = false,
+}: {
+  style: Style;
+  suite: string;
+  initial: Initial;
+  others: Other[];
+  /** A déjà répondu avant les nouvelles cartes : seulement celles-là. */
+  nouvelles?: boolean;
+}) {
   const router = useRouter();
-  const [etape, setEtape] = useState<Etape>("regime");
+  const [etape, setEtape] = useState<Etape>(nouvelles ? "cartes" : "regime");
   const [diets, setDiets] = useState<string[]>(initial.diets);
   const [autres, setAutres] = useState<string[]>(initial.autres);
   const [cards, setCards] = useState<Record<string, CardAnswer>>(initial.cards);
@@ -32,7 +45,10 @@ export function Questionnaire({ style, suite, initial, others }: { style: Style;
   const [pending, startTransition] = useTransition();
 
   // Une carte déjà couverte par un régime coché (poisson, fruits de mer) n'est pas reposée.
-  const deck = useMemo(() => cartesPour(diets), [diets]);
+  const deck = useMemo(
+    () => cartesPour(diets).filter((f) => !nouvelles || CARTES_AJOUTEES.includes(f.key)),
+    [diets, nouvelles],
+  );
 
   const partir = () => {
     router.push(suite);
@@ -46,7 +62,9 @@ export function Questionnaire({ style, suite, initial, others }: { style: Style;
       else ensuite();
     });
   const plusTard = () =>
-    etape === "regime"
+    nouvelles
+      ? enregistrer(true, partir)
+      : etape === "regime"
       ? startTransition(async () => {
           await skipTastes();
           partir();
@@ -95,6 +113,7 @@ export function Questionnaire({ style, suite, initial, others }: { style: Style;
           index={index}
           pending={pending}
           onAnswer={repondre}
+          nouvelles={nouvelles}
           onBack={index > 0 ? () => setIndex(index - 1) : () => setEtape("regime")}
         />
       )}
@@ -206,7 +225,9 @@ function EtapeCartes({
   pending,
   onAnswer,
   onBack,
+  nouvelles,
 }: {
+  nouvelles: boolean;
   style: Style;
   deck: { key: string; label: string }[];
   index: number;
@@ -223,9 +244,9 @@ function EtapeCartes({
     <div className="flex flex-1 flex-col gap-5">
       <div>
         <p className="kd-etiquette text-blanc">
-          Étape 2 sur 3 · carte {Math.min(index + 1, deck.length)} sur {deck.length}
+          {nouvelles ? "Nouvelles cartes" : "Étape 2 sur 3"} · carte {Math.min(index + 1, deck.length)} sur {deck.length}
         </p>
-        <h1 className="kd-titre-2 mt-2">Et ça, tu aimes&nbsp;?</h1>
+        <h1 className="kd-titre-2 mt-2">{nouvelles ? "De nouvelles cartes à swiper" : "Et ça, tu aimes\u00a0?"}</h1>
       </div>
 
       {style === "fun" ? (

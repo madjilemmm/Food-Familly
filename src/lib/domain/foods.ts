@@ -21,6 +21,21 @@ export type Food = {
   dans?: string[];
 };
 
+/**
+ * Les cartes arrivées avec la version à 48 cartes : ceux qui avaient rempli
+ * le questionnaire avant (`tastes_done_at` < CARTES_DEPUIS) les reçoivent une fois.
+ */
+export const CARTES_DEPUIS = "2026-10-14T17:28:00Z";
+export const CARTES_AJOUTEES = [
+  "boeuf", "veau", "porc", "charcuterie", "poulet", "saumon", "thon", "poissons_gras",
+  "courgette", "carotte", "haricots_verts", "petits_pois", "poireau", "celeri", "fenouil", "artichaut",
+  "asperges", "endives", "courge", "patate_douce", "lentilles", "pois_chiches", "tofu", "chevre",
+  "capres_cornichons", "menthe", "curry", "gingembre", "coco", "sucre_sale",
+];
+
+/** A rempli le questionnaire avant l'arrivée des nouvelles cartes ? */
+export const doitVoirNouvellesCartes = (doneAt: string | null) => Boolean(doneAt && doneAt < CARTES_DEPUIS);
+
 /** Une carte déjà couverte par un régime coché n'est pas posée. */
 export function cartesPour(diets: string[]): Food[] {
   return INGREDIENTS.filter((f) => !diets.includes(f.key) && !f.dans?.some((d) => diets.includes(d)));
