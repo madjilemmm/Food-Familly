@@ -1,0 +1,55 @@
+/* Kaddie — à coller dans app/globals.css si le projet utilise Tailwind v4,
+   APRÈS @import "tailwindcss"; et APRÈS @import "../design-system/tokens/tokens.css";
+   Donne les utilitaires : bg-violet, text-aubergine, bg-like, font-display, text-titre-2, rounded-carte… */
+
+@theme inline {
+  --color-violet: var(--violet);
+  --color-aubergine: var(--aubergine);
+  --color-pistache: var(--pistache);
+  --color-blanc: var(--blanc);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-lilas: var(--lilas);
+  --color-encre: var(--encre);
+  --color-encre-douce: var(--encre-douce);
+  --color-trait: var(--trait);
+  --color-fond: var(--fond);
+  --color-surface: var(--surface);
+  --color-action: var(--action);
+  --color-on-action: var(--on-action);
+  --color-like: var(--like);
+  --color-on-like: var(--on-like);
+  --color-nope: var(--nope);
+  --color-on-nope: var(--on-nope);
+  --color-match: var(--match);
+  --color-on-match: var(--on-match);
+  --color-focus: var(--focus);
+
+  --font-display: var(--police-display);
+  --font-sans: var(--police-texte);
+
+  --text-display: var(--taille-display);
+  --text-display--line-height: var(--interligne-display);
+  --text-titre-1: var(--taille-titre-1);
+  --text-titre-1--line-height: var(--interligne-titre-1);
+  --text-titre-2: var(--taille-titre-2);
+  --text-titre-2--line-height: var(--interligne-titre-2);
+  --text-titre-3: var(--taille-titre-3);
+  --text-titre-3--line-height: var(--interligne-titre-3);
+  --text-bouton: var(--taille-bouton);
+  --text-bouton--line-height: var(--interligne-bouton);
+  --text-corps: var(--taille-corps);
+  --text-corps--line-height: var(--interligne-corps);
+  --text-petit: var(--taille-petit);
+  --text-petit--line-height: var(--interligne-petit);
+  --text-etiquette: var(--taille-etiquette);
+  --text-etiquette--line-height: var(--interligne-etiquette);
+  --text-etiquette--letter-spacing: 0.06em;
+
+  --radius-pastille: var(--rayon-s);
+  --radius-bouton: var(--rayon-m);
+  --radius-carte: var(--rayon-l);
+
+  --ease-sortie: var(--courbe-sortie);
+  --ease-rebond: var(--courbe-rebond);
+}

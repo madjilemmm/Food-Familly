@@ -1,0 +1,251 @@
+/* Kaddie — styles des composants. Importer après tokens.css.
+   Toutes les classes sont préfixées kd- pour ne rien casser dans le reste de l'appli. */
+
+/* ---------- Base ---------- */
+:where(.kd-app, .kd-scene, .kd-carte, .kd-btn, .kd-champ, .kd-case),
+:where(.kd-app, .kd-scene, .kd-carte) *,
+:where(.kd-app, .kd-scene, .kd-carte) *::before,
+:where(.kd-app, .kd-scene, .kd-carte) *::after { box-sizing: border-box; }
+
+.kd-app {
+  min-height: 100dvh;
+  background: var(--fond);
+  color: var(--encre);
+  font-family: var(--police-texte);
+  font-size: var(--taille-corps);
+  line-height: var(--interligne-corps);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- Typo ---------- */
+.kd-display, .kd-titre-1, .kd-titre-2, .kd-titre-3 {
+  margin: 0;
+  font-family: var(--police-display);
+  font-weight: 400;
+  text-wrap: balance;
+}
+.kd-display { font-size: var(--taille-display); line-height: var(--interligne-display); letter-spacing: -0.01em; }
+.kd-titre-1 { font-size: var(--taille-titre-1); line-height: var(--interligne-titre-1); }
+.kd-titre-2 { font-size: var(--taille-titre-2); line-height: var(--interligne-titre-2); }
+.kd-titre-3 { font-size: var(--taille-titre-3); line-height: var(--interligne-titre-3); }
+.kd-petit { font-size: var(--taille-petit); line-height: var(--interligne-petit); color: var(--encre-douce); }
+.kd-etiquette {
+  font-size: var(--taille-etiquette);
+  line-height: var(--interligne-etiquette);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--encre-douce);
+}
+
+/* ---------- Duos : une couleur de fond + une couleur de blocs ---------- */
+/* aubergine = l'appli ; pistache = moments de fête et com */
+[data-duo="aubergine"] { --duo-fond: var(--violet);   --duo-blocs: var(--aubergine); --duo-texte: var(--blanc); }
+[data-duo="pistache"]  { --duo-fond: var(--pistache); --duo-blocs: var(--aubergine); --duo-texte: var(--blanc); }
+
+.kd-scene {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--duo-fond);
+  color: var(--duo-texte);
+  font-family: var(--police-texte);
+}
+.kd-motif {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+img.kd-motif { object-fit: cover; object-position: center; }
+.kd-motif__fond { fill: var(--duo-fond); }
+.kd-motif__blocs { fill: var(--duo-blocs); }
+
+/* ---------- Boutons ---------- */
+.kd-btn {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espace-2);
+  min-height: 56px;
+  padding: 0 var(--espace-5);
+  border-radius: var(--rayon-m);
+  background: var(--action);
+  color: var(--on-action);
+  font-family: var(--police-display);
+  font-size: var(--taille-bouton);
+  line-height: var(--interligne-bouton);
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: transform var(--duree-rapide) var(--courbe-sortie), filter var(--duree-rapide);
+}
+.kd-btn:active { transform: scale(0.96); }
+.kd-btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.kd-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.kd-btn--secondaire { background: var(--surface); color: var(--aubergine); box-shadow: inset 0 0 0 3px var(--aubergine); }
+.kd-btn--like { background: var(--like); color: var(--on-like); }
+.kd-btn--nope { background: var(--nope); color: var(--on-nope); }
+.kd-btn--large { width: 100%; }
+.kd-btn--rond { width: 72px; min-height: 72px; padding: 0; border-radius: var(--rayon-rond); }
+.kd-btn--rond svg { width: 30px; height: 30px; }
+.kd-btn--geant {
+  width: 100%;
+  min-height: 132px;
+  padding: var(--espace-5);
+  border-radius: var(--rayon-l);
+  background: var(--blanc);
+  color: var(--aubergine);
+  font-size: var(--taille-titre-2);
+  line-height: var(--interligne-titre-2);
+}
+/* sur une scène, le focus doit rester visible sur la couleur du duo */
+.kd-scene .kd-btn:focus-visible { outline-color: var(--blanc); }
+
+/* ---------- Carte recette ---------- */
+.kd-carte {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--rayon-l);
+  overflow: hidden;
+  color: var(--encre);
+  font-family: var(--police-texte);
+}
+/* carte qui remplit son parent (pile du swipe) : la photo prend la place restante */
+.kd-carte--pleine { height: 100%; }
+.kd-carte--pleine .kd-carte__photo { flex: 1; min-height: 0; aspect-ratio: auto; }
+.kd-carte__photo {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--trait);
+}
+.kd-carte__corps { display: grid; gap: var(--espace-2); padding: var(--espace-5); }
+.kd-carte__titre {
+  margin: 0;
+  font-family: var(--police-display);
+  font-weight: 400;
+  font-size: var(--taille-titre-2);
+  line-height: var(--interligne-titre-2);
+  color: var(--aubergine);
+  text-wrap: balance;
+}
+.kd-carte__infos { margin: 0; font-size: var(--taille-petit); line-height: var(--interligne-petit); color: var(--encre-douce); }
+
+/* Tampons du swipe, posés en haut de la carte pendant le glisser */
+.kd-tampon {
+  position: absolute;
+  top: var(--espace-5);
+  padding: 6px 14px;
+  border-radius: var(--rayon-s);
+  font-family: var(--police-display);
+  font-size: var(--taille-titre-3);
+  line-height: 1;
+  pointer-events: none;
+}
+.kd-tampon--like { left: var(--espace-5); background: var(--like); color: var(--on-like); transform: rotate(-10deg); }
+.kd-tampon--nope { right: var(--espace-5); background: var(--nope); color: var(--on-nope); transform: rotate(10deg); }
+
+/* ---------- Pastille ---------- */
+.kd-pastille {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espace-1);
+  padding: 4px 10px;
+  border-radius: var(--rayon-s);
+  background: var(--like);
+  color: var(--on-like);
+  font-size: var(--taille-etiquette);
+  line-height: var(--interligne-etiquette);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kd-pastille--match { background: var(--match); color: var(--on-match); }
+
+/* ---------- Liste de courses ---------- */
+.kd-liste { list-style: none; margin: 0; padding: 0; }
+.kd-liste__article {
+  display: flex;
+  align-items: center;
+  gap: var(--espace-3);
+  min-height: 56px;
+  border-bottom: 2px solid var(--trait);
+}
+.kd-case {
+  appearance: none;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  border-radius: var(--rayon-s);
+  border: 3px solid var(--aubergine);
+  background: var(--surface);
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  transition: background var(--duree-rapide), transform var(--duree) var(--courbe-rebond);
+}
+.kd-case::after {
+  content: "";
+  width: 12px;
+  height: 7px;
+  border-left: 3px solid var(--on-like);
+  border-bottom: 3px solid var(--on-like);
+  transform: rotate(-45deg) translate(1px, -1px) scale(0);
+  transition: transform var(--duree) var(--courbe-rebond);
+}
+.kd-case:checked { background: var(--like); border-color: var(--aubergine); transform: scale(1.08); }
+.kd-case:checked::after { transform: rotate(-45deg) translate(1px, -1px) scale(1); }
+.kd-case:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.kd-case:checked + .kd-liste__texte { color: var(--encre-douce); text-decoration: line-through; text-decoration-thickness: 2px; }
+
+/* ---------- Champs ---------- */
+.kd-champ {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 var(--espace-4);
+  border-radius: var(--rayon-m);
+  border: 3px solid var(--aubergine);
+  background: var(--surface);
+  color: var(--encre);
+  font: inherit;
+  font-size: var(--taille-corps);
+}
+.kd-champ::placeholder { color: var(--encre-douce); }
+.kd-champ:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.kd-champ--code {
+  font-family: var(--police-display);
+  font-size: var(--taille-titre-2);
+  letter-spacing: 0.2em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* ---------- Mouvement ---------- */
+@keyframes kd-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes kd-monte {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.kd-pop { animation: kd-pop var(--duree-lente) var(--courbe-rebond) both; }
+.kd-monte { animation: kd-monte var(--duree-lente) var(--courbe-sortie) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kd-btn, .kd-case, .kd-case::after { transition: none; }
+  .kd-pop, .kd-monte { animation: none; }
+}

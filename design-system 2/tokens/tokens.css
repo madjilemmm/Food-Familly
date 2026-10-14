@@ -1,0 +1,78 @@
+/* Kaddie — tokens de design. Source : tokens.json (charte Kaddie).
+   À importer une seule fois, en premier, dans app/globals.css. */
+
+@font-face {
+  font-family: "BoldenVan";
+  src: url("/fonts/BoldenVan.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+
+  /* Palette de marque */
+  --violet: #971cd0;
+  --aubergine: #540472;
+  --pistache: #aaf951;
+  --blanc: #ffffff;
+
+  /* Neutres de l'interface */
+  --lilas: #f6eefb;
+  --encre: #24062f;
+  --encre-douce: #6a4479;
+  --trait: #e3d0ee;
+
+  /* Accent : la seule couleur vive à côté du violet (presque son opposé sur le cercle chromatique) */
+  --accent: var(--pistache);
+  --on-accent: var(--aubergine);
+
+  /* Rôles */
+  --fond: var(--lilas);
+  --surface: var(--blanc);
+  --action: var(--violet);
+  --on-action: var(--blanc);
+  --like: var(--accent);
+  --on-like: var(--on-accent);
+  --nope: var(--blanc);
+  --on-nope: var(--aubergine);
+  --match: var(--accent);
+  --on-match: var(--on-accent);
+  --focus: var(--aubergine);
+
+  /* Typo — Rubik est chargée par next/font avec la variable --font-rubik.
+     Noms en français exprès : ils ne doivent pas entrer en conflit avec les variables de Tailwind (--font-*, --text-*). */
+  --police-display: "BoldenVan", var(--font-rubik, "Rubik"), system-ui, sans-serif;
+  --police-texte: var(--font-rubik, "Rubik"), system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --taille-display: 96px;   --interligne-display: 0.92;
+  --taille-titre-1: 48px;   --interligne-titre-1: 1;
+  --taille-titre-2: 32px;   --interligne-titre-2: 1.05;
+  --taille-titre-3: 24px;   --interligne-titre-3: 1.1;
+  --taille-bouton: 20px;    --interligne-bouton: 1;
+  --taille-corps: 17px;     --interligne-corps: 24px;
+  --taille-petit: 14px;     --interligne-petit: 20px;
+  --taille-etiquette: 12px; --interligne-etiquette: 16px;
+
+  /* Espaces */
+  --espace-1: 4px;
+  --espace-2: 8px;
+  --espace-3: 12px;
+  --espace-4: 16px;
+  --espace-5: 24px;
+  --espace-6: 40px;
+
+  /* Rayons */
+  --rayon-s: 10px;   /* pastilles, champs, cases à cocher */
+  --rayon-m: 18px;   /* boutons */
+  --rayon-l: 28px;   /* cartes, grand bouton, blocs du motif à l'écran */
+  --rayon-rond: 999px;
+
+  /* Mouvement */
+  --duree-rapide: 120ms;
+  --duree: 240ms;
+  --duree-lente: 420ms;
+  --courbe-sortie: cubic-bezier(0.22, 1, 0.36, 1);
+  --courbe-rebond: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
