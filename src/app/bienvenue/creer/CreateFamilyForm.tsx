@@ -71,7 +71,7 @@ export function CreateFamilyForm() {
                       setMembers((ms) => ms.filter((x) => x.key !== m.key));
                       setMe((cur) => (cur === i ? 0 : cur > i ? cur - 1 : cur));
                     }}
-                    className="px-2 text-xl text-stone-400"
+                    className="flex size-11 shrink-0 items-center justify-center text-xl text-stone-400"
                   >
                     ✕
                   </button>
@@ -83,7 +83,7 @@ export function CreateFamilyForm() {
               <button
                 type="button"
                 onClick={() => setMe(i)}
-                className={`mt-3 w-full rounded-xl py-2 font-semibold ${me === i ? "bg-tomato-500 text-white" : "bg-stone-100 text-stone-600"}`}
+                className={`mt-3 min-h-11 w-full rounded-xl font-semibold ${me === i ? "bg-tomato-500 text-white" : "bg-stone-100 text-stone-600"}`}
               >
                 {me === i ? "✓ C'est moi" : "C'est moi"}
               </button>

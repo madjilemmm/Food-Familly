@@ -26,7 +26,7 @@ export function InstallFirst({ children }: { children: React.ReactNode }) {
         <InstallHelp />
       </div>
       <p className="mt-4 text-stone-500">C&apos;est indispensable pour recevoir les notifications.</p>
-      <button onClick={() => setSkipped(true)} className="mt-5 w-full py-2 text-stone-400 underline">
+      <button onClick={() => setSkipped(true)} className="mt-5 min-h-11 w-full text-stone-400 underline">
         Continuer dans Safari quand même
       </button>
     </div>

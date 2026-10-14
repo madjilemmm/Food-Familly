@@ -1,18 +1,37 @@
 "use client";
 
+import Link from "next/link";
 import { usePush } from "./usePush";
 import { InstallHelp } from "./InstallHelp";
 
 /**
  * - variant "banner" : n'apparaît que s'il reste quelque chose à faire
  *   (sur l'écran d'accueil de chacun) ;
+ * - variant "pill" : une seule ligne, pour les écrans où la place compte (swipe) ;
  * - variant "full" : toujours visible (dans les réglages).
  */
-export function NotificationsCard({ variant }: { variant: "banner" | "full" }) {
+export function NotificationsCard({ variant }: { variant: "banner" | "pill" | "full" }) {
   const { state, error, enable, disable, test } = usePush();
 
   if (state === "loading") return null;
-  if (variant === "banner" && (state === "on" || state === "unsupported" || state === "denied")) return null;
+  if (variant !== "full" && (state === "on" || state === "unsupported" || state === "denied")) return null;
+
+  if (variant === "pill") {
+    const pill = "mb-3 flex min-h-12 w-full items-center gap-2 rounded-2xl bg-amber-100 px-4 py-2 text-left font-semibold text-amber-900 active:scale-[0.98]";
+    return state === "install-first" ? (
+      <Link href="/reglages" className={pill}>
+        <span className="text-xl">🔔</span>
+        <span className="flex-1">Notifications : installez d&apos;abord l&apos;appli</span>
+        <span>›</span>
+      </Link>
+    ) : (
+      <button onClick={enable} className={pill}>
+        <span className="text-xl">🔔</span>
+        <span className="flex-1">Activer les notifications</span>
+        {error && <span className="text-sm text-red-700">Réessayez</span>}
+      </button>
+    );
+  }
 
   return (
     <section className={`rounded-3xl p-5 ${variant === "banner" ? "mb-5 bg-amber-100" : "mb-6 bg-white"}`}>

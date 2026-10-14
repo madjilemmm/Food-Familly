@@ -38,8 +38,9 @@ body {
 .pb-tabbar {
   padding-bottom: calc(5.5rem + max(env(safe-area-inset-bottom), 0.75rem));
 }
+/* Remplit l'écran au-dessus des onglets ; s'allonge (et la page défile) si le contenu ne tient pas. */
 .h-screen-tabbar {
-  height: calc(100dvh - 5.5rem - max(env(safe-area-inset-bottom), 0.75rem));
+  min-height: calc(100dvh - 5.5rem - max(env(safe-area-inset-bottom), 0.75rem));
 }
 
 /* Empêche le zoom automatique d'iOS sur les champs (police >= 16px) */

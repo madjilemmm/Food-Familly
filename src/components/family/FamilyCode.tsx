@@ -39,7 +39,7 @@ export function FamilyCode({ code, familyName }: { code: string; familyName: str
           confirm("Changer le code ? L'ancien ne marchera plus pour rejoindre la famille (les téléphones déjà connectés le restent).") &&
           startTransition(() => regenerateJoinCode())
         }
-        className="mt-3 w-full py-2 text-base text-stone-400 underline disabled:opacity-50"
+        className="mt-3 min-h-11 w-full text-base text-stone-400 underline disabled:opacity-50"
       >
         Changer le code
       </button>

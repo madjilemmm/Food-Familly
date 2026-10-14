@@ -36,7 +36,7 @@ export default async function ProfilePage() {
       </Link>
       <p className="mt-8 text-center text-stone-500">Ton choix est retenu sur ce téléphone.</p>
       <form action={leaveFamily} className="mt-2 text-center">
-        <button className="py-2 text-sm text-stone-400 underline">Ce n&apos;est pas ma famille</button>
+        <button className="min-h-11 px-2 text-base text-stone-400 underline">Ce n&apos;est pas ma famille</button>
       </form>
     </main>
   );

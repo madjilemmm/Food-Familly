@@ -25,7 +25,7 @@ export function MembersEditor({ members, myId }: { members: Profile[]; myId: str
                   </span>
                   <span className="text-base text-stone-500">Style {m.style === "simple" ? "simple 👆" : "fun 🔥"}</span>
                 </span>
-                <button onClick={() => setEditing(m.id)} className="rounded-xl bg-stone-100 px-3 py-2 text-base font-semibold">
+                <button onClick={() => setEditing(m.id)} className="min-h-11 rounded-xl bg-stone-100 px-3 text-base font-semibold">
                   Modifier
                 </button>
                 {m.id !== myId && (
@@ -36,7 +36,7 @@ export function MembersEditor({ members, myId }: { members: Profile[]; myId: str
                       confirm(`Retirer ${m.name} de la famille ? Ses likes et ses demandes seront effacés.`) &&
                       startTransition(() => removeMember(m.id))
                     }
-                    className="px-2 text-xl text-stone-300"
+                    className="flex size-11 shrink-0 items-center justify-center text-xl text-stone-300"
                   >
                     ✕
                   </button>
@@ -50,7 +50,7 @@ export function MembersEditor({ members, myId }: { members: Profile[]; myId: str
       {editing === "new" ? (
         <div className="mt-3 rounded-3xl bg-white p-4 shadow-sm">
           <MemberForm action={saveMember} submitLabel="Ajouter" onDone={() => setEditing(null)} />
-          <button onClick={() => setEditing(null)} className="mt-2 w-full py-2 text-stone-500 underline">
+          <button onClick={() => setEditing(null)} className="mt-2 min-h-11 w-full text-stone-500 underline">
             Annuler
           </button>
         </div>

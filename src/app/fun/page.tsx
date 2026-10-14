@@ -20,12 +20,12 @@ export default async function FunSwipe() {
   const who = shopper?.name ?? "Quelqu'un";
 
   return (
-    <div className="h-screen-tabbar flex min-h-[34rem] flex-col">
+    <div className="h-screen-tabbar flex flex-col">
       <PageHeader title={`Salut ${me.name} ${me.emoji}`} />
       {trip && (iAmShopper || (!answered && trip.status === "open")) && (
         <Link
           href="/fun/courses"
-          className="mb-4 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-orange-500 to-fuchsia-500 px-4 py-3 font-semibold text-white shadow-lg active:scale-[0.98]"
+          className="mb-3 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-orange-500 to-fuchsia-500 px-4 py-2.5 leading-snug font-semibold text-white shadow-lg active:scale-[0.98]"
         >
           <span className="text-3xl">🛒</span>
           <span className="flex-1">
@@ -42,7 +42,7 @@ export default async function FunSwipe() {
           <span className="text-2xl">›</span>
         </Link>
       )}
-      <NotificationsCard variant="banner" />
+      <NotificationsCard variant="pill" />
       <SwipeDeck initialDeck={deck} />
     </div>
   );

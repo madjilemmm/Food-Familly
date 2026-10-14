@@ -32,7 +32,8 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      <div className="relative min-h-0 w-full flex-1">
+      {/* Jamais moins de 17rem, même sur iPhone SE avec des bandeaux : la page défile alors un peu. */}
+      <div className="relative min-h-[17rem] w-full flex-1">
         {deck.length === 0 ? (
           <EmptyDeck />
         ) : (

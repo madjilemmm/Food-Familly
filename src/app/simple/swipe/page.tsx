@@ -7,7 +7,7 @@ export default async function SimpleSwipe() {
   const me = await requireProfile("simple");
   const deck = await getDeck(me.family_id, me.id);
   return (
-    <div className="h-screen-tabbar flex min-h-[34rem] flex-col">
+    <div className="h-screen-tabbar flex flex-col">
       <PageHeader title="J'aime ou pas ?" subtitle="Touchez ♥ ou ✕ pour chaque plat" />
       <SwipeDeck initialDeck={deck} />
     </div>

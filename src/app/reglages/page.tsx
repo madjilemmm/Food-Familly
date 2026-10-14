@@ -28,7 +28,7 @@ export default async function SettingsPage() {
           <MyStyle me={me} />
         </div>
         <form action={forgetProfile} className="mt-4">
-          <button className="text-stone-500 underline">Ce n&apos;est pas moi</button>
+          <button className="min-h-11 text-stone-500 underline">Ce n&apos;est pas moi</button>
         </form>
       </section>
 
@@ -44,7 +44,7 @@ export default async function SettingsPage() {
       </Link>
 
       <form action={leaveFamily} className="mt-10 text-center">
-        <button className="py-2 text-base text-stone-400 underline">Quitter cette famille sur ce téléphone</button>
+        <button className="min-h-11 px-2 text-base text-stone-400 underline">Quitter cette famille sur ce téléphone</button>
       </form>
     </main>
   );

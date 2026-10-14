@@ -153,7 +153,7 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
                   setPreview(null);
                   setRemovePhoto(true);
                 }}
-                className="text-stone-500 underline"
+                className="min-h-11 text-stone-500 underline"
               >
                 Retirer la photo
               </button>
@@ -189,7 +189,7 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
                   type="button"
                   aria-label="Supprimer l'ingrédient"
                   onClick={() => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== row.key) : [emptyRow()]))}
-                  className="px-2 text-xl text-stone-400"
+                  className="flex size-11 shrink-0 items-center justify-center text-xl text-stone-400"
                 >
                   ✕
                 </button>
