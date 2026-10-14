@@ -50,6 +50,16 @@ describe("guessAisle", () => {
     expect(guessAisle("Pâtes")).toBe("epicerie");
     expect(guessAisle("Truc bizarre")).toBe("autre");
   });
+
+  it("range les articles du quotidien ajoutés à la main", () => {
+    expect(guessAisle("Papier toilette")).toBe("hygiene");
+    expect(guessAisle("Lessive")).toBe("hygiene");
+    expect(guessAisle("Crème solaire")).toBe("hygiene");
+    expect(guessAisle("Pain de mie")).toBe("epicerie");
+    expect(guessAisle("Pain")).toBe("boulangerie");
+    expect(guessAisle("Eau gazeuse")).toBe("boissons");
+    expect(guessAisle("Yaourts nature")).toBe("cremerie");
+  });
 });
 
 describe("cleanTitle", () => {

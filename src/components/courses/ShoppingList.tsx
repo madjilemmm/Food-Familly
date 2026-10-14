@@ -1,12 +1,14 @@
 "use client";
 
-import { useOptimistic, useRef, useTransition } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { addItem, deleteItem, setItemChecked } from "@/app/actions/list";
 import { finishTrip } from "@/app/actions/trips";
 import { groupByAisle } from "@/lib/domain/aisles";
+import { guessAisle } from "@/lib/domain/recipe-import";
 import { formatQuantity } from "@/lib/domain/shopping-list";
 import type { ListItem } from "@/lib/data";
+import { AisleOrderEditor, useAisleOrder } from "./AisleOrder";
 import { ConfirmButton } from "./ConfirmButton";
 
 type Action =
@@ -23,6 +25,8 @@ export function ShoppingList({
 }) {
   const [, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [aisleOrder, setAisleOrder] = useAisleOrder();
+  const [editingOrder, setEditingOrder] = useState(false);
   const [list, apply] = useOptimistic(items, (state, action: Action) => {
     switch (action.type) {
       case "check":
@@ -45,7 +49,7 @@ export function ShoppingList({
           name: clean,
           quantity: null,
           unit: "",
-          aisle: "autre",
+          aisle: guessAisle(clean),
           source,
           for_recipes: null,
           checked: false,
@@ -59,11 +63,15 @@ export function ShoppingList({
   const alreadyAdded = new Set(list.filter((i) => i.source === "request").map((i) => i.name.trim().toLowerCase()));
   const pendingRequests = requests.filter((r) => !alreadyAdded.has(r.text.trim().toLowerCase()));
   const done = list.filter((i) => i.checked).length;
+  // Les rayons dans l'ordre de mon magasin ; un rayon terminé passe en bas.
   // Dans chaque rayon, ce qui reste à prendre en haut, ce qui est pris en bas.
-  const groups = groupByAisle(list).map((g) => ({
-    ...g,
-    items: [...g.items].sort((a, b) => Number(a.checked) - Number(b.checked)),
-  }));
+  const groups = groupByAisle(list, aisleOrder)
+    .map((g) => ({
+      ...g,
+      done: g.items.every((i) => i.checked),
+      items: [...g.items].sort((a, b) => Number(a.checked) - Number(b.checked)),
+    }))
+    .sort((a, b) => Number(a.done) - Number(b.done));
 
   return (
     <div>
@@ -75,7 +83,20 @@ export function ShoppingList({
           <div className="h-3 overflow-hidden rounded-full bg-stone-200">
             <div className="h-full rounded-full bg-basil-500 transition-all" style={{ width: `${(done / list.length) * 100}%` }} />
           </div>
+          {!editingOrder && (
+            <button
+              type="button"
+              onClick={() => setEditingOrder(true)}
+              className="mt-2 min-h-11 text-base font-semibold text-stone-500 underline"
+            >
+              🗺️ Ranger dans l&apos;ordre de mon magasin
+            </button>
+          )}
         </div>
+      )}
+
+      {editingOrder && (
+        <AisleOrderEditor order={aisleOrder} onChange={setAisleOrder} onClose={() => setEditingOrder(false)} />
       )}
 
       {pendingRequests.length > 0 && (
@@ -128,9 +149,10 @@ export function ShoppingList({
       )}
 
       {groups.map((group) => (
-        <section key={group.id} className="mb-6">
-          <h2 className="mb-2 flex items-center gap-2 text-xl font-bold text-stone-700">
+        <motion.section key={group.id} layout="position" transition={{ type: "spring", stiffness: 400, damping: 40 }} className="mb-6">
+          <h2 className={`mb-2 flex items-center gap-2 text-xl font-bold ${group.done ? "text-stone-400" : "text-stone-700"}`}>
             <span className="text-2xl">{group.emoji}</span> {group.label}
+            {group.done && <span className="ml-auto text-base font-semibold text-basil-600">✓ fini</span>}
           </h2>
           <ul className="overflow-hidden rounded-3xl bg-white shadow-sm">
             <AnimatePresence initial={false}>
@@ -193,7 +215,7 @@ export function ShoppingList({
             ))}
             </AnimatePresence>
           </ul>
-        </section>
+        </motion.section>
       ))}
 
       {list.length > 0 && (

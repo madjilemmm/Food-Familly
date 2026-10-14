@@ -3,6 +3,7 @@
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
 import { getCurrentTrip } from "@/lib/data";
+import { guessAisle } from "@/lib/domain/recipe-import";
 import { changed } from "./_shared";
 
 /** La liste appartient à la course en cours de la famille ; tout le monde peut la compléter. */
@@ -23,7 +24,7 @@ export async function addItem(name: string, source: "manual" | "request" = "manu
   if (!clean) return;
   const { error } = await db()
     .from("shopping_list_items")
-    .insert({ trip_id: await tripId(), name: clean, source, aisle: "autre" });
+    .insert({ trip_id: await tripId(), name: clean, source, aisle: guessAisle(clean) });
   if (error) throw new Error(error.message);
   changed();
 }

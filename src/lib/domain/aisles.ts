@@ -23,10 +23,21 @@ export function aisleInfo(id: string) {
   return AISLES.find((a) => a.id === id) ?? AISLES[AISLES.length - 1];
 }
 
-/** Regroupe des éléments par rayon, dans l'ordre d'un magasin. */
-export function groupByAisle<T extends { aisle: string }>(items: T[]) {
-  return AISLES.map((aisle) => ({
-    ...aisle,
-    items: items.filter((i) => (isAisle(i.aisle) ? i.aisle : "autre") === aisle.id),
-  })).filter((group) => group.items.length > 0);
+/**
+ * Un ordre de rayons complet et sans doublon, à partir de ce qui a été
+ * enregistré (les rayons inconnus sautent, les oubliés vont à la fin).
+ */
+export function normalizeAisleOrder(order: unknown): AisleId[] {
+  const saved = Array.isArray(order) ? order.filter(isAisle) : [];
+  return [...new Set([...saved, ...AISLE_IDS])];
+}
+
+/** Regroupe des éléments par rayon, dans l'ordre du magasin (par défaut, l'ordre classique). */
+export function groupByAisle<T extends { aisle: string }>(items: T[], order?: readonly string[]) {
+  return normalizeAisleOrder(order)
+    .map((id) => ({
+      ...aisleInfo(id),
+      items: items.filter((i) => (isAisle(i.aisle) ? i.aisle : "autre") === id),
+    }))
+    .filter((group) => group.items.length > 0);
 }
