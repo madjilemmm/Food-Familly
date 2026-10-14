@@ -4,7 +4,7 @@ import { ROUTES } from "@/lib/routes";
 import { getRecipes } from "@/lib/data";
 import { RecipeVisual } from "@/components/RecipeVisual";
 
-export const metadata = { title: "Recettes — À table !" };
+export const metadata = { title: "Recettes — Kaddie" };
 
 export default async function RecipesPage() {
   const user = await requireUser();

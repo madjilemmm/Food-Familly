@@ -3,8 +3,8 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "À table ! — Courses et repas en famille",
-    short_name: "À table !",
+    name: "Kaddie — Courses et repas en famille",
+    short_name: "Kaddie",
     description: "Les courses et les repas de la famille, sans prise de tête.",
     lang: "fr",
     start_url: "/",

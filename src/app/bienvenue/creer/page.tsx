@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CreateFamilyForm } from "./CreateFamilyForm";
 
-export const metadata = { title: "Créer ma famille — À table !" };
+export const metadata = { title: "Créer ma famille — Kaddie" };
 
 export default function CreateFamilyPage() {
   return (

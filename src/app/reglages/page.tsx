@@ -6,7 +6,7 @@ import { forgetProfile, leaveFamily } from "@/app/actions/auth";
 import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 import { MyStyle } from "@/components/family/MyStyle";
 
-export const metadata = { title: "Réglages — À table !" };
+export const metadata = { title: "Réglages — Kaddie" };
 
 export default async function SettingsPage() {
   const user = await requireUser();

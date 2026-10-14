@@ -9,10 +9,10 @@ export function FamilyCode({ code, familyName }: { code: string; familyName: str
   const [pending, startTransition] = useTransition();
 
   async function share() {
-    const message = `Rejoins « ${familyName} » sur À table ! 🍽️\n${location.origin}\nCode famille : ${code}`;
+    const message = `Rejoins « ${familyName} » sur Kaddie 🛒\n${location.origin}\nCode famille : ${code}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: "À table !", text: message });
+        await navigator.share({ title: "Kaddie", text: message });
         return;
       }
     } catch {

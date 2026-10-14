@@ -1,4 +1,4 @@
-/* Service worker « À table ! » : notifications push + page hors connexion. */
+/* Service worker « Kaddie » : notifications push + page hors connexion. */
 
 const CACHE = "atable-v1";
 const OFFLINE_URL = "/offline.html";
@@ -31,7 +31,7 @@ self.addEventListener("push", (event) => {
   } catch {
     data = { body: event.data ? event.data.text() : "" };
   }
-  const title = data.title || "À table !";
+  const title = data.title || "Kaddie";
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || "",

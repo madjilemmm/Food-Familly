@@ -3,7 +3,7 @@ import { requireFamily } from "@/lib/auth";
 import { MemberForm } from "@/components/family/MemberForm";
 import { addMyself } from "@/app/actions/auth";
 
-export const metadata = { title: "Me rajouter — À table !" };
+export const metadata = { title: "Me rajouter — Kaddie" };
 
 export default async function AddMyselfPage() {
   await requireFamily();

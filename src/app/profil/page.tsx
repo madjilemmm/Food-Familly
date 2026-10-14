@@ -3,7 +3,7 @@ import { requireFamily } from "@/lib/auth";
 import { getFamily, getProfiles } from "@/lib/data";
 import { chooseProfile, leaveFamily } from "@/app/actions/auth";
 
-export const metadata = { title: "Qui es-tu ? — À table !" };
+export const metadata = { title: "Qui es-tu ? — Kaddie" };
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {

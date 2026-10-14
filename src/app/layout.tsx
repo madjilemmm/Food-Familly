@@ -4,12 +4,12 @@ import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { AutoUpdate } from "@/components/pwa/AutoUpdate";
 
 export const metadata: Metadata = {
-  title: "À table !",
+  title: "Kaddie",
   description: "Les courses et les repas de la famille, sans prise de tête.",
-  applicationName: "À table !",
+  applicationName: "Kaddie",
   appleWebApp: {
     capable: true,
-    title: "À table !",
+    title: "Kaddie",
     statusBarStyle: "default",
   },
   formatDetection: { telephone: false },

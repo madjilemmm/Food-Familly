@@ -51,7 +51,7 @@ export function NotificationsCard({ variant }: { variant: "banner" | "pill" | "f
       {state === "denied" && (
         <p>
           Les notifications sont bloquées. Pour les autoriser : <strong>Réglages</strong> de l&apos;iPhone →{" "}
-          <strong>Notifications</strong> → <strong>À table !</strong>
+          <strong>Notifications</strong> → <strong>Kaddie</strong>
         </p>
       )}
 

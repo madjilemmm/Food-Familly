@@ -6,7 +6,7 @@ import { FamilyCode } from "@/components/family/FamilyCode";
 import { MembersEditor } from "@/components/family/MembersEditor";
 import { FamilyName } from "@/components/family/FamilyName";
 
-export const metadata = { title: "Ma famille — À table !" };
+export const metadata = { title: "Ma famille — Kaddie" };
 
 export default async function FamilyPage({ searchParams }: { searchParams: Promise<{ bienvenue?: string }> }) {
   const user = await requireUser();

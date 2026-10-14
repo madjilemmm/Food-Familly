@@ -1,4 +1,4 @@
-# 🍽️ À table !
+# 🛒 Kaddie
 
 La petite appli familiale pour choisir les repas et faire les courses sans prise de tête.
 Chaque famille crée son espace, ajoute ses membres et partage un code. Ensuite, **n'importe qui** peut faire les courses :
@@ -170,7 +170,7 @@ Points importants sur iPhone :
 
 - L'appli installée et Safari ne partagent pas leur mémoire. Il faut donc saisir le code **dans l'appli installée**, pas dans Safari.
 - Les notifications ne marchent **que** dans l'appli installée. Pour cette raison, la demande d'autorisation ne s'affiche jamais toute seule : elle part toujours de ce bouton.
-- Si vous avez touché « Ne pas autoriser » : **Réglages de l'iPhone → Notifications → À table !** → activez **Autoriser les notifications**.
+- Si vous avez touché « Ne pas autoriser » : **Réglages de l'iPhone → Notifications → Kaddie** → activez **Autoriser les notifications**.
 - Un mauvais profil a été choisi sur un téléphone ? ⚙️ → **« Ce n'est pas moi »**.
 
 ---

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
 
-export const metadata = { title: "Nouvelle recette — À table !" };
+export const metadata = { title: "Nouvelle recette — Kaddie" };
 
 export default function NewRecipePage() {
   return (
