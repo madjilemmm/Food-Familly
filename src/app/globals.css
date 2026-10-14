@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
 @import "../../design-system/tokens/tokens.css";
-@import "../../design-system/styles/kaddie.css";
+/* Dans la couche components : les utilitaires Tailwind (px-4, flex-row…) peuvent ajuster les classes kd- */
+@import "../../design-system/styles/kaddie.css" layer(components);
 
 /* Utilitaires Tailwind tirés des tokens Kaddie (copie de design-system/tokens/tailwind-v4.css) */
 @theme inline {

@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { after } from "next/server";
 import { requireProfile, requireUser } from "@/lib/auth";
+import { remplirSiBesoin } from "@/lib/marmiton";
 import { getCurrentTrip, getDeck, getMatches, getProfiles } from "@/lib/data";
 import { isPastDeadline } from "@/lib/domain/trip";
 import { Scene } from "@/design-system/components/Kaddie";
@@ -8,6 +10,9 @@ import { SwipeDeck } from "@/components/SwipeDeck";
 import { IconePanier } from "@/components/ui";
 import { SwipeHeader } from "@/components/SwipeHeader";
 import { NotificationsCard } from "@/components/pwa/NotificationsCard";
+
+// Laisse le temps à l'import Marmiton (lancé après l'affichage) de finir.
+export const maxDuration = 60;
 
 export default async function FunSwipe() {
   const user = await requireUser();
@@ -23,6 +28,9 @@ export default async function FunSwipe() {
   const answered = trip?.trip_requests.some((r) => r.profile_id === me.id) ?? false;
   const shopper = members.find((m) => m.id === trip?.created_by) ?? null;
   const who = shopper?.name ?? "Quelqu'un";
+
+  // Presque plus rien à découvrir : de nouvelles recettes arrivent de Marmiton, sans rien faire.
+  after(() => remplirSiBesoin(user.familyId, deck.length));
 
   return (
     <Scene duo="aubergine" seed={21} className="ecran-scene gap-4">

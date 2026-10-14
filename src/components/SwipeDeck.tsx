@@ -37,6 +37,14 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
   // L'état local n'est pas réinitialisé par les rafraîchissements de la page :
   // le paquet reste stable pendant qu'on swipe.
   const [deck, setDeck] = useState(initialDeck);
+  // Nouvelles recettes arrivées pendant qu'on swipe (import Marmiton) : ajoutées au bout de la pile.
+  const vues = useRef(new Set(initialDeck.map((r) => r.id)));
+  useEffect(() => {
+    const nouvelles = initialDeck.filter((r) => !vues.current.has(r.id));
+    if (nouvelles.length === 0) return;
+    nouvelles.forEach((r) => vues.current.add(r.id));
+    setDeck((d) => [...d, ...nouvelles]);
+  }, [initialDeck]);
   const [match, setMatch] = useState<Recipe | null>(null);
   const [error, setError] = useState(false);
   const pileRef = useRef<HTMLDivElement>(null);
@@ -69,8 +77,8 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col gap-5">
-      {/* Jamais moins de 17rem, même sur iPhone SE : la page défile alors un peu. */}
-      <div ref={pileRef} className="relative mx-auto min-h-[17rem] w-full flex-1 sm:max-h-[36rem] sm:max-w-sm">
+      {/* Jamais moins de 12rem, même sur iPhone SE : la page défile alors un peu. */}
+      <div ref={pileRef} className="relative mx-auto min-h-[12rem] w-full flex-1 sm:max-h-[36rem] sm:max-w-sm">
         {deck.length === 0 ? (
           <PileVide />
         ) : (
@@ -176,7 +184,7 @@ function Carte({
       exit={{ opacity: 0, transition: { duration: calme ? 0.12 : 0 } }}
       transition={{ duration: calme ? 0.12 : 0.24, ease: [0.22, 1, 0.36, 1] }}
     >
-      <CarteRecette className="kd-carte--pleine" titre={recipe.title} photo={recipe.photo_url} />
+      <CarteRecette className="kd-carte--pleine" titre={recipe.title} photo={recipe.photo_url} infos={recipe.source_url ? "Recette Marmiton" : undefined} />
       {isTop && (
         <>
           <motion.span style={{ opacity: miam }} className="kd-tampon kd-tampon--like" aria-hidden>
@@ -194,8 +202,8 @@ function Carte({
 function PileVide() {
   return (
     <div className="kd-carte h-full justify-center gap-4 p-6 text-center">
-      <p className="kd-titre-2 text-aubergine">Plus de recettes pour l&apos;instant.</p>
-      <p className="text-encre-douce">Les plats reviennent 14 jours après ton swipe.</p>
+      <p className="kd-titre-2 text-aubergine">De nouvelles recettes arrivent…</p>
+      <p className="text-encre-douce">Kaddie va en chercher sur Marmiton. Reviens dans une minute.</p>
       <Link href="/recettes/nouvelle" className="kd-btn kd-btn--large">
         Ajouter une recette
       </Link>

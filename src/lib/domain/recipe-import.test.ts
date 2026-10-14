@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanTitle, extractRecipe, guessAisle, parseIngredientLine } from "./recipe-import";
+import { cleanTitle, extractRecipe, guessAisle, parseDuration, parseIngredientLine } from "./recipe-import";
 
 const p = (s: string) => parseIngredientLine(s);
 
@@ -110,5 +110,35 @@ describe("extractRecipe", () => {
 
   it("renvoie null pour une page sans rien d'exploitable", () => {
     expect(extractRecipe("<html></html>")).toBeNull();
+  });
+});
+
+describe("parseDuration", () => {
+  it("lit les durées ISO 8601", () => {
+    expect(parseDuration("PT1H40M")).toBe(100);
+    expect(parseDuration("PT25M")).toBe(25);
+    expect(parseDuration("P1DT2H")).toBe(1560);
+    expect(parseDuration("PT")).toBeNull();
+    expect(parseDuration("n'importe quoi")).toBeNull();
+  });
+});
+
+describe("extractRecipe : infos pour l'import automatique", () => {
+  it("garde la catégorie, la note et la durée", () => {
+    const html = `<script type="application/ld+json">${JSON.stringify({
+      "@type": "Recipe",
+      name: "Hachis parmentier",
+      recipeCategory: "Plat principal",
+      aggregateRating: { ratingValue: "4.7", ratingCount: 312 },
+      totalTime: "PT1H10M",
+      image: ["https://exemple.fr/photo.jpg"],
+      recipeIngredient: ["1 kg de pommes de terre", "500 g de boeuf haché", "50 g de beurre"],
+    })}</script>`;
+    const r = extractRecipe(html)!;
+    expect(r.category).toBe("Plat principal");
+    expect(r.rating).toBe(4.7);
+    expect(r.ratingCount).toBe(312);
+    expect(r.totalMinutes).toBe(70);
+    expect(r.ingredients).toHaveLength(3);
   });
 });

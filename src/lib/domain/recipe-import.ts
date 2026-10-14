@@ -14,7 +14,26 @@ export type ImportedRecipe = {
   imageUrl: string | null;
   servings: string | null;
   ingredients: ImportedIngredient[];
+  /** Pour l'import automatique : de quoi ne garder que les bons plats. */
+  category?: string | null;
+  rating?: number | null;
+  ratingCount?: number | null;
+  totalMinutes?: number | null;
 };
+
+/** « PT1H40M » → 100 (minutes). */
+export function parseDuration(value: unknown): number | null {
+  if (typeof value !== "string") return null;
+  const m = value.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?$/i);
+  if (!m || m[0] === "P" || /T$/i.test(value)) return null;
+  const minutes = Number(m[1] ?? 0) * 1440 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0);
+  return minutes > 0 ? minutes : null;
+}
+
+function numberOf(value: unknown): number | null {
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value.replace(",", ".")) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
 
 // ─── Extraction du JSON-LD ────────────────────────────────────────────
 
@@ -130,6 +149,16 @@ export function extractRecipe(html: string): ImportedRecipe | null {
       const parsed = parseIngredientLine(decodeEntities(String(l)));
       return parsed ? [parsed] : [];
     }),
+    category: Array.isArray(recipe.recipeCategory)
+      ? String(recipe.recipeCategory[0] ?? "") || null
+      : typeof recipe.recipeCategory === "string"
+        ? recipe.recipeCategory
+        : null,
+    rating: numberOf((recipe.aggregateRating as Json | undefined)?.ratingValue),
+    ratingCount: numberOf(
+      (recipe.aggregateRating as Json | undefined)?.ratingCount ?? (recipe.aggregateRating as Json | undefined)?.reviewCount,
+    ),
+    totalMinutes: parseDuration(recipe.totalTime) ?? parseDuration(recipe.cookTime),
   };
 }
 

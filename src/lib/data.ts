@@ -30,6 +30,8 @@ export type Recipe = {
   title: string;
   emoji: string;
   photo_url: string | null;
+  /** Page Marmiton d'origine pour les recettes importées automatiquement. */
+  source_url: string | null;
   created_at: string;
 };
 
@@ -76,7 +78,7 @@ export type ListItem = {
 /** Une session non terminée plus vieille que ça est considérée comme oubliée. */
 const TRIP_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 
-const RECIPE_FIELDS = "id, title, emoji, photo_url, created_at";
+const RECIPE_FIELDS = "id, title, emoji, photo_url, source_url, created_at";
 
 function check<T>(result: { data: T | null; error: { message: string } | null }): T {
   if (result.error) throw new Error(result.error.message);
