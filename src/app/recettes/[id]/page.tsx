@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireProfile, requireUser } from "@/lib/auth";
 import { getRecipe } from "@/lib/data";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
+import { IconeRetour } from "@/components/ui";
 
 export default async function EditRecipePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,11 +14,11 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
   return (
     <>
       <div className="pt-safe">
-        <Link href="/recettes" className="inline-flex min-h-11 items-center font-semibold text-tomato-600">
-          ‹ Les recettes
+        <Link href="/recettes" className="-ml-2 inline-flex min-h-14 items-center gap-1 font-semibold text-violet">
+          <IconeRetour className="size-6" /> Les recettes
         </Link>
       </div>
-      <h1 className="mb-5 text-3xl font-extrabold">Modifier la recette</h1>
+      <h1 className="kd-titre-1 mb-6 text-aubergine">Modifier la recette</h1>
       <RecipeForm recipe={recipe} />
     </>
   );

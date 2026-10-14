@@ -6,9 +6,9 @@ import { motion } from "motion/react";
 import { usePathname, useRouter } from "next/navigation";
 import { PrefetchKind } from "next/dist/client/components/router-reducer/router-reducer-types";
 
-export type Tab = { href: string; label: string; icon: string; badge?: number };
+export type Tab = { href: string; label: string; icon: React.ReactNode; badge?: number };
 
-export function TabBar({ tabs, variant }: { tabs: Tab[]; variant: "parent" | "child" }) {
+export function TabBar({ tabs }: { tabs: Tab[] }) {
   const pathname = usePathname();
   // L'onglet touché s'allume tout de suite, sans attendre la page suivante.
   const [pressed, setPressed] = useState<string | null>(null);
@@ -37,12 +37,8 @@ export function TabBar({ tabs, variant }: { tabs: Tab[]; variant: "parent" | "ch
     href === tabs[0].href ? path === href : path === href || path.startsWith(`${href}/`);
   const isActive = (href: string) => (pressed ? pressed === href : matches(href, pathname));
 
-  const big = variant === "parent";
-  const accent = big ? "text-tomato-600" : "text-fuchsia-600";
-  const pill = big ? "bg-tomato-50" : "bg-fuchsia-50";
-
   return (
-    <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-black/5 bg-white/90 backdrop-blur-xl">
+    <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t-2 border-trait bg-surface">
       <ul className="mx-auto flex max-w-xl">
         {tabs.map((tab) => {
           const active = isActive(tab.href);
@@ -61,26 +57,24 @@ export function TabBar({ tabs, variant }: { tabs: Tab[]; variant: "parent" | "ch
                   }
                   setPressed(tab.href);
                 }}
-                className={`relative flex flex-col items-center gap-0.5 pt-1.5 ${big ? "pb-1 text-base" : "pb-0.5 text-xs"} font-semibold transition-colors active:scale-95 ${
-                  active ? accent : "text-stone-400"
+                className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 pt-1.5 pb-1 text-petit font-semibold transition-colors active:scale-95 ${
+                  active ? "text-violet" : "text-encre-douce"
                 }`}
               >
-                <span className={`relative flex items-center justify-center px-4 py-0.5 ${big ? "text-3xl" : "text-2xl"}`}>
-                  {/* Pastille qui glisse vers l'onglet choisi (ressort) */}
+                <span className="relative flex items-center justify-center px-5 py-1">
+                  {/* Pastille qui glisse vers l'onglet choisi */}
                   {active && (
                     <motion.span
-                      layoutId={`tab-pill-${variant}`}
-                      className={`absolute inset-0 rounded-full ${pill}`}
+                      layoutId="tab-pill"
+                      className="absolute inset-0 rounded-full bg-lilas"
                       transition={{ type: "spring", stiffness: 500, damping: 35 }}
                     />
                   )}
-                  <span className={`relative transition-[transform,filter] duration-200 ${active ? "scale-110" : "grayscale-[35%]"}`}>
-                    {tab.icon}
-                  </span>
+                  <span className="relative">{tab.icon}</span>
                 </span>
                 {tab.label}
                 {tab.badge ? (
-                  <span className="absolute top-0.5 left-1/2 ml-3 min-w-5 rounded-full bg-tomato-500 px-1.5 text-center text-xs leading-5 text-white shadow">
+                  <span className="absolute top-1 left-1/2 ml-3 min-w-5 rounded-full bg-accent px-1.5 text-center text-etiquette leading-5 font-semibold text-on-accent">
                     {tab.badge}
                   </span>
                 ) : null}

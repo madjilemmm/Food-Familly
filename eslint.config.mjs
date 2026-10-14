@@ -19,6 +19,8 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
       ".e2e/**",
+      // Maquettes de référence du kit Kaddie (exemples, pas du code de l'appli)
+      "design-system/exemples/**",
     ],
   },
 ];

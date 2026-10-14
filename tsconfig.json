@@ -19,6 +19,7 @@
       }
     ],
     "paths": {
+      "@/design-system/*": ["./design-system/*"],
       "@/*": ["./src/*"]
     }
   },

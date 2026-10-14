@@ -1,21 +1,59 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", Roboto, sans-serif;
-  --color-cream: #fff8f0;
-  --color-ink: #2b2118;
-  --color-tomato-50: #fff1ee;
-  --color-tomato-100: #ffe0d9;
-  --color-tomato-500: #f0573c;
-  --color-tomato-600: #d9432a;
-  --color-tomato-700: #b5341f;
-  --color-basil-100: #dff5e3;
-  --color-basil-500: #2f9e55;
-  --color-basil-600: #238444;
-}
+@import "../../design-system/tokens/tokens.css";
+@import "../../design-system/styles/kaddie.css";
 
-:root {
-  color-scheme: light;
+/* Utilitaires Tailwind tirés des tokens Kaddie (copie de design-system/tokens/tailwind-v4.css) */
+@theme inline {
+  --color-violet: var(--violet);
+  --color-aubergine: var(--aubergine);
+  --color-pistache: var(--pistache);
+  --color-blanc: var(--blanc);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-lilas: var(--lilas);
+  --color-encre: var(--encre);
+  --color-encre-douce: var(--encre-douce);
+  --color-trait: var(--trait);
+  --color-fond: var(--fond);
+  --color-surface: var(--surface);
+  --color-action: var(--action);
+  --color-on-action: var(--on-action);
+  --color-like: var(--like);
+  --color-on-like: var(--on-like);
+  --color-nope: var(--nope);
+  --color-on-nope: var(--on-nope);
+  --color-match: var(--match);
+  --color-on-match: var(--on-match);
+  --color-focus: var(--focus);
+
+  --font-display: var(--police-display);
+  --font-sans: var(--police-texte);
+
+  --text-display: var(--taille-display);
+  --text-display--line-height: var(--interligne-display);
+  --text-titre-1: var(--taille-titre-1);
+  --text-titre-1--line-height: var(--interligne-titre-1);
+  --text-titre-2: var(--taille-titre-2);
+  --text-titre-2--line-height: var(--interligne-titre-2);
+  --text-titre-3: var(--taille-titre-3);
+  --text-titre-3--line-height: var(--interligne-titre-3);
+  --text-bouton: var(--taille-bouton);
+  --text-bouton--line-height: var(--interligne-bouton);
+  --text-corps: var(--taille-corps);
+  --text-corps--line-height: var(--interligne-corps);
+  --text-petit: var(--taille-petit);
+  --text-petit--line-height: var(--interligne-petit);
+  --text-etiquette: var(--taille-etiquette);
+  --text-etiquette--line-height: var(--interligne-etiquette);
+  --text-etiquette--letter-spacing: 0.06em;
+
+  --radius-pastille: var(--rayon-s);
+  --radius-bouton: var(--rayon-m);
+  --radius-carte: var(--rayon-l);
+
+  --ease-sortie: var(--courbe-sortie);
+  --ease-rebond: var(--courbe-rebond);
 }
 
 html {
@@ -26,8 +64,8 @@ html {
 
 html,
 body {
-  background: var(--color-cream);
-  color: var(--color-ink);
+  background: var(--fond);
+  color: var(--encre);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
@@ -42,11 +80,11 @@ body {
 
 /* Espace réservé sous le contenu pour la barre d'onglets */
 .pb-tabbar {
-  padding-bottom: calc(5.5rem + max(env(safe-area-inset-bottom), 0.75rem));
+  padding-bottom: calc(5.25rem + max(env(safe-area-inset-bottom), 0.75rem));
 }
 /* Remplit l'écran au-dessus des onglets ; s'allonge (et la page défile) si le contenu ne tient pas. */
 .h-screen-tabbar {
-  min-height: calc(100dvh - 5.5rem - max(env(safe-area-inset-bottom), 0.75rem));
+  min-height: calc(100dvh - 4.25rem - max(env(safe-area-inset-bottom), 0.75rem));
 }
 
 /* Empêche le zoom automatique d'iOS sur les champs (police >= 16px) */
@@ -83,10 +121,9 @@ label:has(input[type="radio"]) {
 button,
 a {
   transition:
-    transform 120ms ease,
-    opacity 120ms ease,
-    background-color 150ms ease,
-    box-shadow 150ms ease;
+    transform var(--duree-rapide) var(--courbe-sortie),
+    opacity var(--duree-rapide) var(--courbe-sortie),
+    background-color var(--duree-rapide) var(--courbe-sortie);
 }
 
 /* Apparition douce de chaque écran */
@@ -101,7 +138,7 @@ a {
   }
 }
 .page-in {
-  animation: page-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: page-in var(--duree) var(--courbe-sortie) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -117,9 +154,8 @@ a {
 
 /* Clavier (ordinateur) : contour net et cohérent, invisible au toucher */
 :focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--color-tomato-500) 70%, transparent);
-  outline-offset: 2px;
-  border-radius: 0.75rem;
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
 }
 :focus:not(:focus-visible) {
   outline: none;
@@ -130,5 +166,39 @@ a {
   button:not(:disabled):hover,
   a[href]:hover {
     filter: brightness(0.97);
+  }
+}
+
+/* ─── Kaddie : compléments au kit ──────────────────────────────────── */
+
+/* Écran entièrement en scène : du haut de l'écran jusque derrière la barre d'onglets */
+.ecran-scene {
+  margin: 0 -1.25rem calc(-5.25rem - max(env(safe-area-inset-bottom), 0.75rem));
+  min-height: 100dvh;
+  padding: max(env(safe-area-inset-top), 1rem) 1.25rem calc(6.5rem + max(env(safe-area-inset-bottom), 0.75rem));
+  display: flex;
+  flex-direction: column;
+}
+
+/* Le monogramme qui respire pendant les chargements */
+@keyframes kd-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+}
+.kd-pulse {
+  animation: kd-pulse 1.4s var(--courbe-sortie) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kd-pulse {
+    animation: none;
+    opacity: 0.8;
   }
 }

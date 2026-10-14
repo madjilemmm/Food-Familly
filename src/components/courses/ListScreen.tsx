@@ -2,7 +2,11 @@ import Link from "next/link";
 import type { Profile } from "@/lib/data";
 import { getCurrentTrip, getProfiles } from "@/lib/data";
 import { ROUTES } from "@/lib/routes";
+import { BandeauScene, EtatVide } from "@/components/ui";
 import { ShoppingList } from "./ShoppingList";
+
+const jour = (iso: string) =>
+  new Intl.DateTimeFormat("fr-FR", { weekday: "long", timeZone: "Europe/Paris" }).format(new Date(iso));
 
 /** La liste de la course en cours, que tout le monde peut consulter et compléter. */
 export async function ListScreen({ me }: { me: Profile }) {
@@ -11,27 +15,35 @@ export async function ListScreen({ me }: { me: Profile }) {
 
   if (!trip) {
     return (
-      <div className="rounded-3xl bg-white p-6 text-center">
-        <p className="text-5xl">📝</p>
-        <p className="mt-3 text-xl text-stone-600">Pas de liste pour l&apos;instant.</p>
-        <Link href={ROUTES[me.style].courses} className="mt-5 block rounded-2xl bg-tomato-500 py-4 text-xl font-bold text-white">
-          🛒 Lancer les courses
-        </Link>
-      </div>
+      <>
+        <BandeauScene illustration="courses" titre="Ta liste" />
+        <EtatVide seed={12} phrase="Pas de liste pour l'instant. Elle se remplit quand quelqu'un part en courses.">
+          <Link href={ROUTES[me.style].courses} className="kd-btn kd-btn--secondaire kd-btn--large">
+            Lancer les courses
+          </Link>
+        </EtatVide>
+      </>
     );
   }
 
   const names = new Map(profiles.map((p) => [p.id, p.name]));
   const shopper = trip.created_by ? names.get(trip.created_by) : null;
+  const plats = trip.trip_recipes.filter((r) => r.selected).length;
   const textRequests = trip.trip_requests
     .filter((r) => r.free_text)
     .map((r) => ({ id: r.id, from: names.get(r.profile_id) ?? "", text: r.free_text! }));
 
   return (
     <>
+      <BandeauScene
+        illustration="courses"
+        etiquette={`${jour(trip.created_at)} · ${plats} plat${plats > 1 ? "s" : ""}`}
+        titre={trip.created_by === me.id ? "Ta liste" : `La liste de ${shopper ?? "la famille"}`}
+      />
       {trip.created_by !== me.id && shopper && (
-        <p className="mb-4 rounded-2xl bg-white/80 px-4 py-3 text-stone-600">
-          🛒 C&apos;est <strong>{shopper}</strong> qui fait ces courses. Tu peux ajouter des articles ou cocher ce qui est déjà pris.
+        <p className="mb-5 text-encre-douce">
+          C&apos;est <strong className="text-encre">{shopper}</strong> qui fait ces courses. Tu peux ajouter des articles ou cocher ce qui
+          est déjà pris.
         </p>
       )}
       <ShoppingList items={trip.shopping_list_items} requests={textRequests} />

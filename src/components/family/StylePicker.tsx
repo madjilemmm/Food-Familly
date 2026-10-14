@@ -2,9 +2,9 @@
 
 import type { Style } from "@/lib/session";
 
-const OPTIONS: { id: Style; title: string; text: string; icon: string }[] = [
-  { id: "simple", title: "Simple", text: "Très gros boutons, l'essentiel", icon: "👆" },
-  { id: "fun", title: "Fun", text: "Animé, swipe façon appli de rencontre", icon: "🔥" },
+const OPTIONS: { id: Style; title: string; text: string }[] = [
+  { id: "simple", title: "Simple", text: "Gros boutons, l'essentiel" },
+  { id: "fun", title: "Fun", text: "Swipe, matchs et recettes" },
 ];
 
 /** Choix du style d'interface d'un membre. */
@@ -14,8 +14,8 @@ export function StylePicker({ value, onChange, name }: { value: Style; onChange?
       {OPTIONS.map((o) => (
         <label
           key={o.id}
-          className={`cursor-pointer rounded-2xl border-2 p-3 text-left transition ${
-            value === o.id ? "border-tomato-500 bg-tomato-50" : "border-stone-200 bg-white"
+          className={`flex min-h-14 cursor-pointer flex-col justify-center rounded-bouton border-[3px] p-3 text-left has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-focus ${
+            value === o.id ? "border-aubergine bg-accent text-on-accent" : "border-trait bg-surface"
           }`}
         >
           <input
@@ -26,10 +26,8 @@ export function StylePicker({ value, onChange, name }: { value: Style; onChange?
             onChange={() => onChange?.(o.id)}
             className="sr-only"
           />
-          <span className="block font-bold">
-            {o.icon} {o.title}
-          </span>
-          <span className="text-sm text-stone-500">{o.text}</span>
+          <span className="font-display text-bouton">{o.title}</span>
+          <span className={`text-petit ${value === o.id ? "" : "text-encre-douce"}`}>{o.text}</span>
         </label>
       ))}
     </div>

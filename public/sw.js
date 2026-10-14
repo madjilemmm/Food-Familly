@@ -1,10 +1,10 @@
 /* Service worker « Kaddie » : notifications push + page hors connexion. */
 
-const CACHE = "atable-v1";
+const CACHE = "kaddie-v1";
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([OFFLINE_URL, "/icons/icon-192.png"])));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([OFFLINE_URL, "/icons/icon-192.png", "/fonts/BoldenVan.ttf", "/brand/logo/kaddie-logo-blanc.svg"])));
   self.skipWaiting();
 });
 
@@ -20,7 +20,14 @@ self.addEventListener("activate", (event) => {
 // Les pages sont toujours chargées depuis le réseau (données en direct).
 // Sans réseau, on affiche une page d'excuse plutôt qu'une erreur Safari.
 self.addEventListener("fetch", (event) => {
-  if (event.request.mode !== "navigate") return;
+  if (event.request.mode !== "navigate") {
+    // Police et logo de la page hors connexion
+    const path = new URL(event.request.url).pathname;
+    if (path === "/fonts/BoldenVan.ttf" || path === "/brand/logo/kaddie-logo-blanc.svg") {
+      event.respondWith(caches.match(event.request).then((hit) => hit || fetch(event.request)));
+    }
+    return;
+  }
   event.respondWith(fetch(event.request).catch(() => caches.match(OFFLINE_URL)));
 });
 

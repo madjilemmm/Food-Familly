@@ -3,16 +3,16 @@
  * Les surgelés à la fin, pour qu'ils restent froids jusqu'à la maison.
  */
 export const AISLES = [
-  { id: "fruits_legumes", label: "Fruits et légumes", emoji: "🥬" },
-  { id: "boulangerie", label: "Boulangerie", emoji: "🥖" },
-  { id: "boucherie", label: "Boucherie, charcuterie", emoji: "🥩" },
-  { id: "poissonnerie", label: "Poissonnerie", emoji: "🐟" },
-  { id: "cremerie", label: "Crèmerie, œufs, frais", emoji: "🧈" },
-  { id: "epicerie", label: "Épicerie", emoji: "🥫" },
-  { id: "boissons", label: "Boissons", emoji: "🧃" },
-  { id: "hygiene", label: "Hygiène, maison", emoji: "🧴" },
-  { id: "surgeles", label: "Surgelés", emoji: "🧊" },
-  { id: "autre", label: "Autre", emoji: "🛒" },
+  { id: "fruits_legumes", label: "Fruits et légumes" },
+  { id: "boulangerie", label: "Boulangerie" },
+  { id: "boucherie", label: "Boucherie, charcuterie" },
+  { id: "poissonnerie", label: "Poissonnerie" },
+  { id: "cremerie", label: "Crèmerie, œufs, frais" },
+  { id: "epicerie", label: "Épicerie" },
+  { id: "boissons", label: "Boissons" },
+  { id: "hygiene", label: "Hygiène, maison" },
+  { id: "surgeles", label: "Surgelés" },
+  { id: "autre", label: "Autre" },
 ] as const;
 
 export type AisleId = (typeof AISLES)[number]["id"];

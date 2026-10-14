@@ -1,192 +1,244 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AnimatePresence, motion, useMotionValue, useTransform, type PanInfo } from "motion/react";
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+  type PanInfo,
+} from "motion/react";
 import { swipe } from "@/app/actions/swipes";
-import { RecipeVisual } from "@/components/RecipeVisual";
+import { Bouton, CarteRecette, IconeJenVeux, IconePasEnvie, Logo, Scene } from "@/design-system/components/Kaddie";
 import type { Recipe } from "@/lib/data";
 
-const SWIPE_DISTANCE = 110;
-const SWIPE_VELOCITY = 600;
-const EXIT_X = 700;
+/*
+ * Le swipe Kaddie (DESIGN.md §7) : la carte suit le doigt, rotation = déplacement / 20
+ * plafonnée à 15°, tampons « Miam » / « Bof » en fondu. Au-delà de 30 % de la largeur
+ * ou d'un geste rapide, la carte part en 240 ms ; sinon elle revient en rebondissant.
+ */
+const SEUIL = 0.3;
+const VITESSE = 600;
+const SORTIE = 0.24;
+const REBOND = [0.34, 1.56, 0.64, 1] as const;
+
+/** Les cartes du dessous, décalées et légèrement tournées. */
+const PILE = [
+  { rotate: 0, y: 0, scale: 1 },
+  { rotate: -2, y: 8, scale: 0.96 },
+  { rotate: 5, y: 16, scale: 0.92 },
+];
 
 export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
   // L'état local n'est pas réinitialisé par les rafraîchissements de la page :
   // le paquet reste stable pendant qu'on swipe.
   const [deck, setDeck] = useState(initialDeck);
-  const [exitX, setExitX] = useState(0);
   const [match, setMatch] = useState<Recipe | null>(null);
   const [error, setError] = useState(false);
-
+  const pileRef = useRef<HTMLDivElement>(null);
+  const [monte, setMonte] = useState(false);
+  useEffect(() => setMonte(true), []);
   const top = deck[0];
 
   function decide(liked: boolean) {
     if (!top) return;
-    setExitX(liked ? EXIT_X : -EXIT_X);
     setDeck((d) => d.slice(1));
     swipe(top.id, liked)
       .then((res) => res.match && setMatch(top))
       .catch(() => setError(true));
   }
 
+  // Boutons et clavier : la carte du dessus part comme avec le doigt.
+  const throwTop = useRef<((liked: boolean) => void) | null>(null);
+  const press = (liked: boolean) => (throwTop.current ? throwTop.current(liked) : decide(liked));
+
   // Sur ordinateur : flèches ← → pour swiper.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (match || (e.target as HTMLElement)?.closest("input, textarea")) return;
-      if (e.key === "ArrowRight") decide(true);
-      if (e.key === "ArrowLeft") decide(false);
+      if (e.key === "ArrowRight") press(true);
+      if (e.key === "ArrowLeft") press(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      {/* Jamais moins de 17rem, même sur iPhone SE avec des bandeaux : la page défile alors un peu. */}
-      <div className="relative mx-auto min-h-[17rem] w-full flex-1 sm:max-h-[36rem] sm:max-w-sm">
+    <div className="relative flex min-h-0 flex-1 flex-col gap-5">
+      {/* Jamais moins de 17rem, même sur iPhone SE : la page défile alors un peu. */}
+      <div ref={pileRef} className="relative mx-auto min-h-[17rem] w-full flex-1 sm:max-h-[36rem] sm:max-w-sm">
         {deck.length === 0 ? (
-          <EmptyDeck />
+          <PileVide />
         ) : (
-          <AnimatePresence custom={exitX}>
+          <AnimatePresence initial={false}>
             {deck
-              .slice(0, 2)
-              .reverse()
-              .map((recipe) => (
-                <SwipeCard key={recipe.id} recipe={recipe} isTop={recipe.id === top.id} onDecide={decide} />
-              ))}
+              .slice(0, PILE.length)
+              .map((recipe, i) => (
+                <Carte
+                  key={recipe.id}
+                  recipe={recipe}
+                  rang={i}
+                  pileRef={pileRef}
+                  onDecide={decide}
+                  register={i === 0 ? (fn) => (throwTop.current = fn) : undefined}
+                />
+              ))
+              .reverse()}
           </AnimatePresence>
         )}
       </div>
 
       {deck.length > 0 && (
-        <div className="flex items-center justify-center gap-8 py-4">
-          <motion.button
-            onClick={() => decide(false)}
-            aria-label="Non merci"
-            whileTap={{ scale: 0.85, rotate: -8 }}
-            transition={{ type: "spring", stiffness: 600, damping: 20 }}
-            className="flex size-16 items-center justify-center rounded-full bg-white text-3xl text-stone-500 shadow-lg"
-          >
-            ✕
-          </motion.button>
-          <motion.button
-            onClick={() => decide(true)}
-            aria-label="J'aime"
-            whileTap={{ scale: 0.85 }}
-            transition={{ type: "spring", stiffness: 600, damping: 20 }}
-            className="flex size-20 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-orange-400 text-4xl text-white shadow-xl shadow-pink-500/30"
-          >
-            ♥
-          </motion.button>
+        <div className="flex items-center justify-center gap-10">
+          <Bouton variante="nope" rond aria-label="Pas envie" onClick={() => press(false)}>
+            <IconePasEnvie />
+          </Bouton>
+          <Bouton variante="like" rond aria-label="J'en veux" onClick={() => press(true)}>
+            <IconeJenVeux />
+          </Bouton>
         </div>
       )}
 
       {error && (
-        <p className="mt-4 rounded-xl bg-red-100 px-4 py-2 text-center text-red-700">
-          Oups, un swipe n&apos;est pas passé. Vérifie ta connexion.
+        <p role="alert" className="kd-carte p-4 text-center">
+          Pas de réseau, un choix n&apos;est pas passé. Réessaie quand ça revient.
         </p>
       )}
 
-      <AnimatePresence>{match && <MatchOverlay recipe={match} onClose={() => setMatch(null)} />}</AnimatePresence>
+      {/* Au-dessus de tout (la scène isole ses calques) : rendu directement dans <body>. */}
+      {monte &&
+        createPortal(
+          <AnimatePresence>{match && <EcranMatch recipe={match} onClose={() => setMatch(null)} />}</AnimatePresence>,
+          document.body,
+        )}
     </div>
   );
 }
 
-function SwipeCard({
+function Carte({
   recipe,
-  isTop,
+  rang,
+  pileRef,
   onDecide,
+  register,
 }: {
   recipe: Recipe;
-  isTop: boolean;
+  rang: number;
+  pileRef: React.RefObject<HTMLDivElement | null>;
   onDecide: (liked: boolean) => void;
+  register?: (fn: (liked: boolean) => void) => void;
 }) {
+  const calme = useReducedMotion();
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-300, 300], [-18, 18]);
-  const likeOpacity = useTransform(x, [20, SWIPE_DISTANCE], [0, 1]);
-  const nopeOpacity = useTransform(x, [-SWIPE_DISTANCE, -20], [1, 0]);
+  const rotateDrag = useTransform(x, (v) => (calme ? 0 : Math.max(-15, Math.min(15, v / 20))));
+  const largeur = () => pileRef.current?.offsetWidth ?? 360;
+  const miam = useTransform(x, (v) => Math.min(1, Math.max(0, v / (largeur() * SEUIL))));
+  const bof = useTransform(x, (v) => Math.min(1, Math.max(0, -v / (largeur() * SEUIL))));
+  const isTop = rang === 0;
+  const pos = PILE[rang];
+
+  const parti = useRef(false);
+  const partir = (liked: boolean) => {
+    if (parti.current) return; // un double appui ne doit pas sauter une carte
+    parti.current = true;
+    const cible = (liked ? 1 : -1) * largeur() * 1.6;
+    if (calme) {
+      onDecide(liked);
+      return;
+    }
+    animate(x, cible, { duration: SORTIE, ease: [0.22, 1, 0.36, 1] }).then(() => onDecide(liked));
+  };
+
+  useEffect(() => {
+    register?.(partir);
+  });
 
   function onDragEnd(_: unknown, info: PanInfo) {
-    if (info.offset.x > SWIPE_DISTANCE || info.velocity.x > SWIPE_VELOCITY) onDecide(true);
-    else if (info.offset.x < -SWIPE_DISTANCE || info.velocity.x < -SWIPE_VELOCITY) onDecide(false);
+    const loin = Math.abs(info.offset.x) > largeur() * SEUIL;
+    const vite = Math.abs(info.velocity.x) > VITESSE;
+    if (loin || vite) partir((loin ? info.offset.x : info.velocity.x) > 0);
+    else animate(x, 0, { duration: 0.42, ease: REBOND });
   }
 
   return (
     <motion.div
-      className="absolute inset-0 touch-none overflow-hidden rounded-[2rem] bg-white shadow-2xl select-none"
-      style={{ x, rotate, zIndex: isTop ? 2 : 1 }}
+      className="absolute inset-0 touch-none select-none"
+      style={{ x, rotate: isTop ? rotateDrag : pos.rotate, zIndex: PILE.length - rang }}
       drag={isTop ? "x" : false}
-      dragSnapToOrigin
-      dragElastic={0.9}
+      dragMomentum={false}
       onDragEnd={onDragEnd}
-      initial={{ scale: 0.92, y: 16, opacity: 0.8 }}
-      animate={{ scale: isTop ? 1 : 0.94, y: isTop ? 0 : 14, opacity: 1 }}
-      exit="exit"
-      variants={{
-        exit: (exitX: number) => ({ x: exitX, rotate: exitX / 25, opacity: 0, transition: { duration: 0.35 } }),
-      }}
-      transition={{ type: "spring", stiffness: 300, damping: 26 }}
-      whileTap={isTop ? { cursor: "grabbing" } : undefined}
+      initial={false}
+      animate={{ y: pos.y, scale: pos.scale, rotate: isTop ? undefined : calme ? 0 : pos.rotate }}
+      exit={{ opacity: 0, transition: { duration: calme ? 0.12 : 0 } }}
+      transition={{ duration: calme ? 0.12 : 0.24, ease: [0.22, 1, 0.36, 1] }}
     >
-      <RecipeVisual recipe={recipe} className="pointer-events-none h-full w-full" emojiClassName="text-[9rem]" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent px-6 pt-20 pb-6">
-        <h2 className="text-3xl leading-tight font-extrabold text-white drop-shadow">{recipe.title}</h2>
-      </div>
-      <motion.span
-        style={{ opacity: likeOpacity }}
-        className="pointer-events-none absolute top-8 left-6 -rotate-12 rounded-xl border-4 border-emerald-400 px-3 py-1 text-3xl font-black text-emerald-400"
-      >
-        MIAM
-      </motion.span>
-      <motion.span
-        style={{ opacity: nopeOpacity }}
-        className="pointer-events-none absolute top-8 right-6 rotate-12 rounded-xl border-4 border-rose-500 px-3 py-1 text-3xl font-black text-rose-500"
-      >
-        BOF
-      </motion.span>
+      <CarteRecette className="kd-carte--pleine" titre={recipe.title} photo={recipe.photo_url} />
+      {isTop && (
+        <>
+          <motion.span style={{ opacity: miam }} className="kd-tampon kd-tampon--like" aria-hidden>
+            Miam
+          </motion.span>
+          <motion.span style={{ opacity: bof }} className="kd-tampon kd-tampon--nope" aria-hidden>
+            Bof
+          </motion.span>
+        </>
+      )}
     </motion.div>
   );
 }
 
-function EmptyDeck() {
+function PileVide() {
   return (
-    <div className="flex h-full flex-col items-center justify-center rounded-[2rem] border-4 border-dashed border-fuchsia-200 bg-white/60 p-8 text-center">
-      <p className="text-6xl">🍽️</p>
-      <p className="mt-4 text-2xl font-bold">Tu as tout swipé !</p>
-      <p className="mt-2 text-stone-500">Les recettes reviennent 14 jours après ton swipe.</p>
-      <Link href="/recettes/nouvelle" className="mt-6 rounded-full bg-fuchsia-500 px-6 py-3 font-bold text-white">
-        + Ajouter une recette
+    <div className="kd-carte h-full justify-center gap-4 p-6 text-center">
+      <p className="kd-titre-2 text-aubergine">Plus de recettes pour l&apos;instant.</p>
+      <p className="text-encre-douce">Les plats reviennent 14 jours après ton swipe.</p>
+      <Link href="/recettes/nouvelle" className="kd-btn kd-btn--large">
+        Ajouter une recette
       </Link>
     </div>
   );
 }
 
-function MatchOverlay({ recipe, onClose }: { recipe: Recipe; onClose: () => void }) {
+/** « C'est un match » : monogramme qui éclot, puis la carte qui monte (120 ms après). */
+function EcranMatch({ recipe, onClose }: { recipe: Recipe; onClose: () => void }) {
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-fuchsia-600/95 via-pink-500/95 to-orange-400/95 px-8 text-center text-white"
+      className="fixed inset-0 z-50"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={onClose}
+      transition={{ duration: 0.24 }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="C'est un match"
     >
-      <motion.p
-        className="text-5xl font-black italic drop-shadow-lg"
-        initial={{ scale: 0.3, rotate: -10 }}
-        animate={{ scale: 1, rotate: -4 }}
-        transition={{ type: "spring", stiffness: 260, damping: 12 }}
+      <Scene
+        duo="aubergine"
+        seed={31}
+        className="pb-safe mx-auto flex h-full max-w-xl flex-col justify-between gap-5 px-6 pt-[max(env(safe-area-inset-top),2.5rem)] text-center"
       >
-        C&apos;est un match !
-      </motion.p>
-      <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-        <RecipeVisual recipe={recipe} className="mx-auto mt-8 size-48 rounded-[2rem] shadow-2xl ring-4 ring-white" emojiClassName="text-8xl" />
-        <p className="mt-6 text-2xl font-bold">{recipe.title}</p>
-        <p className="mt-2 text-lg opacity-90">La famille adore ! Il sera proposé pour les prochaines courses 💞</p>
-      </motion.div>
-      <button onClick={onClose} className="mt-10 rounded-full bg-white px-10 py-4 text-xl font-bold text-pink-600 shadow-lg">
-        Continuer à swiper
-      </button>
+        <div className="flex flex-col items-center gap-4 pt-6">
+          <div className="kd-pop text-accent">
+            <Logo variante="monogramme" width={96} title="" />
+          </div>
+          <h2 className="kd-display text-[56px]!">C&apos;est un match&nbsp;!</h2>
+          <p className="kd-titre-3">La majorité de la famille en veut.</p>
+        </div>
+        <CarteRecette
+          className="kd-monte min-h-0 text-left [animation-delay:120ms] [&_.kd-carte__photo]:max-h-[30dvh]"
+          titre={recipe.title}
+          photo={recipe.photo_url}
+        />
+        <div className="pb-4">
+          <Bouton variante="like" large onClick={onClose} autoFocus>
+            Continuer
+          </Bouton>
+        </div>
+      </Scene>
     </motion.div>
   );
 }

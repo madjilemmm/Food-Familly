@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { removeMember, saveMember } from "@/app/actions/auth";
 import type { Profile } from "@/lib/data";
+import { IconeCroix, IconePlus } from "@/components/ui";
 import { MemberForm } from "./MemberForm";
 
 export function MembersEditor({ members, myId }: { members: Profile[]; myId: string }) {
@@ -11,21 +12,20 @@ export function MembersEditor({ members, myId }: { members: Profile[]; myId: str
 
   return (
     <>
-      <ul className="space-y-3">
+      <ul className="flex flex-col gap-3">
         {members.map((m) => (
-          <li key={m.id} className="rounded-3xl bg-white p-4 shadow-sm">
+          <li key={m.id} className="rounded-carte bg-surface p-4">
             {editing === m.id ? (
               <MemberForm action={saveMember} member={m} onDone={() => setEditing(null)} />
             ) : (
               <div className="flex items-center gap-3">
-                <span className="text-4xl">{m.emoji}</span>
-                <span className="flex-1">
-                  <span className="block text-xl font-bold">
-                    {m.name} {m.id === myId && <span className="text-base font-normal text-stone-400">(moi)</span>}
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-titre-3 text-aubergine">
+                    {m.name} {m.id === myId && <span className="font-sans text-petit text-encre-douce">(moi)</span>}
                   </span>
-                  <span className="text-base text-stone-500">Style {m.style === "simple" ? "simple 👆" : "fun 🔥"}</span>
+                  <span className="kd-petit">Style {m.style === "simple" ? "simple" : "fun"}</span>
                 </span>
-                <button onClick={() => setEditing(m.id)} className="min-h-11 rounded-xl bg-stone-100 px-3 text-base font-semibold">
+                <button onClick={() => setEditing(m.id)} className="kd-btn kd-btn--secondaire px-4 text-bouton">
                   Modifier
                 </button>
                 {m.id !== myId && (
@@ -36,9 +36,9 @@ export function MembersEditor({ members, myId }: { members: Profile[]; myId: str
                       confirm(`Retirer ${m.name} de la famille ? Ses likes et ses demandes seront effacés.`) &&
                       startTransition(() => removeMember(m.id))
                     }
-                    className="flex size-11 shrink-0 items-center justify-center text-xl text-stone-300"
+                    className="flex size-14 shrink-0 items-center justify-center text-encre-douce"
                   >
-                    ✕
+                    <IconeCroix className="size-6" />
                   </button>
                 )}
               </div>
@@ -48,18 +48,18 @@ export function MembersEditor({ members, myId }: { members: Profile[]; myId: str
       </ul>
 
       {editing === "new" ? (
-        <div className="mt-3 rounded-3xl bg-white p-4 shadow-sm">
+        <div className="mt-3 flex flex-col gap-2 rounded-carte bg-surface p-4">
           <MemberForm action={saveMember} submitLabel="Ajouter" onDone={() => setEditing(null)} />
-          <button onClick={() => setEditing(null)} className="mt-2 min-h-11 w-full text-stone-500 underline">
+          <button onClick={() => setEditing(null)} className="min-h-14 w-full text-encre-douce underline underline-offset-4">
             Annuler
           </button>
         </div>
       ) : (
         <button
           onClick={() => setEditing("new")}
-          className="mt-3 w-full rounded-2xl border-2 border-dashed border-stone-300 py-3 font-semibold text-stone-600"
+          className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-bouton border-[3px] border-dashed border-encre-douce font-semibold text-encre-douce"
         >
-          + Ajouter un membre
+          <IconePlus className="size-6" /> Ajouter un membre
         </button>
       )}
     </>

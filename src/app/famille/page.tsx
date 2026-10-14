@@ -2,9 +2,11 @@ import Link from "next/link";
 import { requireProfile, requireUser } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
 import { getFamily, getProfiles } from "@/lib/data";
+import { Scene } from "@/design-system/components/Kaddie";
 import { FamilyCode } from "@/components/family/FamilyCode";
 import { MembersEditor } from "@/components/family/MembersEditor";
 import { FamilyName } from "@/components/family/FamilyName";
+import { IconeRetour } from "@/components/ui";
 
 export const metadata = { title: "Ma famille — Kaddie" };
 
@@ -20,36 +22,31 @@ export default async function FamilyPage({ searchParams }: { searchParams: Promi
   const welcome = params.bienvenue === "1";
 
   return (
-    <main className="pt-safe pb-safe mx-auto max-w-xl px-5 pb-16 text-lg">
-      {!welcome && (
-        <Link href={ROUTES[me.style].home} className="inline-flex py-2 font-semibold text-tomato-600">
-          ‹ Retour
-        </Link>
-      )}
-      {welcome && (
-        <div className="mt-4 mb-6 rounded-3xl bg-basil-100 p-5">
-          <p className="text-2xl font-extrabold">🎉 Votre famille est créée !</p>
-          <p className="mt-2">
-            Envoyez le code ci-dessous aux autres membres. Sur leur téléphone, ils ouvrent l&apos;appli, touchent{" "}
-            <strong>« J&apos;ai un code famille »</strong> et choisissent leur prénom.
+    <main className="pt-safe pb-safe mx-auto flex max-w-xl flex-col gap-6 px-5 pb-16">
+      {welcome ? (
+        <Scene duo="aubergine" seed={14} format="carre" className="kd-monte mt-4 flex flex-col gap-3 rounded-carte p-6">
+          <p className="kd-titre-2">Ta famille est créée.</p>
+          <p>
+            Envoie le code ci-dessous aux autres. Sur leur téléphone, ils ouvrent Kaddie, tapent le code et choisissent leur prénom.
           </p>
-        </div>
+        </Scene>
+      ) : (
+        <Link href={ROUTES[me.style].home} className="-ml-2 inline-flex min-h-14 items-center gap-1 self-start font-semibold text-violet">
+          <IconeRetour className="size-6" /> Retour
+        </Link>
       )}
 
       <FamilyName name={family.name} />
       <FamilyCode code={family.join_code} familyName={family.name} />
 
-      <section className="mt-8">
-        <h2 className="mb-3 text-2xl font-bold">Les membres</h2>
+      <section>
+        <h2 className="kd-titre-2 mb-3 text-aubergine">Les membres</h2>
         <MembersEditor members={members} myId={me.id} />
       </section>
 
       {welcome && (
-        <Link
-          href={ROUTES[me.style].home}
-          className="mt-8 block rounded-2xl bg-tomato-500 py-4 text-center text-xl font-bold text-white shadow-lg active:scale-[0.98]"
-        >
-          C&apos;est parti ! 🍽️
+        <Link href={ROUTES[me.style].home} className="kd-btn kd-btn--large">
+          C&apos;est parti
         </Link>
       )}
     </main>

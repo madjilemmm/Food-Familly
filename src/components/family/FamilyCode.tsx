@@ -9,7 +9,7 @@ export function FamilyCode({ code, familyName }: { code: string; familyName: str
   const [pending, startTransition] = useTransition();
 
   async function share() {
-    const message = `Rejoins « ${familyName} » sur Kaddie 🛒\n${location.origin}\nCode famille : ${code}`;
+    const message = `Rejoins « ${familyName} » sur Kaddie\n${location.origin}\nCode famille : ${code}`;
     try {
       if (navigator.share) {
         await navigator.share({ title: "Kaddie", text: message });
@@ -24,14 +24,11 @@ export function FamilyCode({ code, familyName }: { code: string; familyName: str
   }
 
   return (
-    <section className="mt-5 rounded-3xl bg-white p-5 shadow-sm">
-      <p className="text-stone-500">Code pour rejoindre la famille</p>
-      <p className="mt-1 font-mono text-3xl font-bold tracking-wide break-all select-all">{code}</p>
-      <button
-        onClick={share}
-        className="mt-4 w-full rounded-2xl bg-tomato-500 py-4 text-xl font-bold text-white active:scale-[0.98]"
-      >
-        {copied ? "✓ Copié !" : "📤 Partager le code"}
+    <section className="kd-carte gap-3 p-5">
+      <p className="kd-etiquette">Code pour rejoindre la famille</p>
+      <p data-code className="font-display text-titre-2 tracking-[0.04em] break-all text-aubergine select-all">{code}</p>
+      <button onClick={share} className="kd-btn kd-btn--large">
+        {copied ? "Copié" : "Partager le code"}
       </button>
       <button
         disabled={pending}
@@ -39,7 +36,7 @@ export function FamilyCode({ code, familyName }: { code: string; familyName: str
           confirm("Changer le code ? L'ancien ne marchera plus pour rejoindre la famille (les téléphones déjà connectés le restent).") &&
           startTransition(() => regenerateJoinCode())
         }
-        className="mt-3 min-h-11 w-full text-base text-stone-400 underline disabled:opacity-50"
+        className="min-h-14 w-full text-encre-douce underline underline-offset-4 disabled:opacity-50"
       >
         Changer le code
       </button>

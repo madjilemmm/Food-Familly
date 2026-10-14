@@ -9,8 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "vapid": "web-push generate-vapid-keys",
-    "typecheck": "tsc --noEmit",
-    "icons": "node scripts/generate-icons.mjs"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

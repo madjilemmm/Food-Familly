@@ -3,6 +3,7 @@ import { requireProfile, requireUser } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
 import { getRecipes } from "@/lib/data";
 import { RecipeVisual } from "@/components/RecipeVisual";
+import { BandeauScene, IconeRetour } from "@/components/ui";
 
 export const metadata = { title: "Recettes — Kaddie" };
 
@@ -11,29 +12,27 @@ export default async function RecipesPage() {
   const [me, recipes] = await Promise.all([requireProfile(), getRecipes(user.familyId)]);
   return (
     <>
-      {/* En style simple, les recettes ne sont pas un onglet : on garde un retour vers les plats. */}
-      {me.style === "simple" ? (
-        <div className="pt-safe">
-          <Link href={ROUTES.simple.matchs} className="inline-flex min-h-11 items-center font-semibold text-tomato-600">
-            ‹ Les plats
+      <BandeauScene
+        illustration="marche"
+        etiquette={`${recipes.length} recette${recipes.length > 1 ? "s" : ""}`}
+        titre="Les recettes"
+      >
+        {/* En style simple, les recettes ne sont pas un onglet : on garde un retour vers les plats. */}
+        {me.style === "simple" && (
+          <Link href={ROUTES.simple.matchs} className="-ml-2 mt-2 inline-flex min-h-14 items-center gap-1 font-semibold text-blanc">
+            <IconeRetour className="size-6" /> Les plats
           </Link>
-        </div>
-      ) : (
-        <div className="pt-safe" />
-      )}
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <h1 className="text-3xl font-extrabold">Les recettes</h1>
-        <Link href="/recettes/nouvelle" className="rounded-full bg-tomato-500 px-5 py-3 text-lg font-bold text-white shadow active:scale-95">
-          + Ajouter
-        </Link>
-      </div>
-      <ul className="space-y-3">
+        )}
+      </BandeauScene>
+      <Link href="/recettes/nouvelle" className="kd-btn kd-btn--large mb-6">
+        Ajouter une recette
+      </Link>
+      <ul className="flex flex-col gap-3">
         {recipes.map((r) => (
           <li key={r.id}>
-            <Link href={`/recettes/${r.id}`} className="flex items-center gap-4 rounded-3xl bg-white p-3 shadow-sm active:scale-[0.99]">
-              <RecipeVisual recipe={r} className="size-16 shrink-0 rounded-2xl" emojiClassName="text-3xl" />
-              <span className="flex-1 text-xl font-bold">{r.title}</span>
-              <span className="pr-2 text-2xl text-stone-300">›</span>
+            <Link href={`/recettes/${r.id}`} className="kd-carte flex-row items-center gap-4 p-3 active:scale-[0.99]">
+              <RecipeVisual recipe={r} className="size-16 shrink-0 rounded-pastille" />
+              <span className="flex-1 font-display text-titre-3 text-aubergine">{r.title}</span>
             </Link>
           </li>
         ))}

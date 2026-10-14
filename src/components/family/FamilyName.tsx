@@ -10,9 +10,9 @@ export function FamilyName({ name }: { name: string }) {
 
   if (!editing) {
     return (
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <h1 className="text-3xl font-extrabold">{name}</h1>
-        <button onClick={() => setEditing(true)} className="min-h-11 shrink-0 px-1 text-base text-stone-500 underline">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="kd-titre-1 min-w-0 text-aubergine">{name}</h1>
+        <button onClick={() => setEditing(true)} className="min-h-14 shrink-0 px-1 text-encre-douce underline underline-offset-4">
           Renommer
         </button>
       </div>
@@ -20,7 +20,7 @@ export function FamilyName({ name }: { name: string }) {
   }
   return (
     <form
-      className="mt-2 flex gap-2"
+      className="flex gap-2"
       onSubmit={(e) => {
         e.preventDefault();
         startTransition(async () => {
@@ -34,9 +34,9 @@ export function FamilyName({ name }: { name: string }) {
         onChange={(e) => setValue(e.target.value)}
         maxLength={60}
         aria-label="Nom de la famille"
-        className="min-w-0 flex-1 rounded-2xl border-2 border-stone-200 bg-white px-4 py-2 text-xl outline-none focus:border-tomato-500"
+        className="kd-champ min-w-0 flex-1"
       />
-      <button disabled={pending} className="min-h-11 rounded-2xl bg-stone-800 px-4 font-semibold text-white disabled:opacity-50">
+      <button disabled={pending} className="kd-btn shrink-0 px-5">
         OK
       </button>
     </form>

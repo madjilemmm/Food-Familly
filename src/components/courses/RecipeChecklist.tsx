@@ -1,12 +1,11 @@
 "use client";
 
 import { useOptimistic, useTransition } from "react";
-import { motion } from "motion/react";
 import { setTripRecipe } from "@/app/actions/trips";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import type { CandidateRecipe } from "@/lib/views";
 
-/** Liste de plats à cocher pour les courses : un tap = coché / décoché. */
+/** Les plats proposés pour les courses : « Valider » ou « Pas cette fois ». */
 export function RecipeChecklist({ recipes, disabled = false }: { recipes: CandidateRecipe[]; disabled?: boolean }) {
   const [, startTransition] = useTransition();
   const [optimistic, setOptimistic] = useOptimistic(
@@ -14,48 +13,53 @@ export function RecipeChecklist({ recipes, disabled = false }: { recipes: Candid
     (state, { id, checked }: { id: string; checked: boolean }) =>
       state.map((r) => (r.id === id ? { ...r, checked } : r)),
   );
+  const set = (id: string, checked: boolean) =>
+    startTransition(async () => {
+      setOptimistic({ id, checked });
+      await setTripRecipe(id, checked);
+    });
 
   return (
-    <ul className="space-y-3">
+    <ul className="flex flex-col gap-4">
       {optimistic.map((r) => (
-        <li key={r.id}>
-          <button
-            type="button"
-            disabled={disabled}
-            aria-pressed={r.checked}
-            onClick={() =>
-              startTransition(async () => {
-                setOptimistic({ id: r.id, checked: !r.checked });
-                await setTripRecipe(r.id, !r.checked);
-              })
-            }
-            className={`flex w-full items-center gap-4 rounded-3xl border-4 bg-white p-3 text-left shadow-sm transition-[border-color,transform] duration-150 active:scale-[0.98] ${
-              r.checked ? "border-basil-500" : "border-transparent"
-            }`}
-          >
-            <RecipeVisual recipe={r} className="size-20 shrink-0 rounded-2xl" emojiClassName="text-4xl" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-xl leading-tight font-bold">{r.title}</span>
-              <span className="mt-1 flex flex-wrap gap-1.5 text-sm font-semibold">
+        <li
+          key={r.id}
+          className={`kd-carte outline-4 -outline-offset-4 transition-[outline-color] duration-150 ${r.checked ? "outline-accent" : "outline-transparent"}`}
+        >
+          <div className="flex gap-4 p-4 pb-0">
+            <RecipeVisual recipe={r} className="size-20 shrink-0 rounded-pastille" />
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <p className="font-display text-titre-3 text-aubergine">{r.title}</p>
+              <p className="flex flex-wrap gap-1.5">
                 {r.wantedBy.map((name) => (
-                  <span key={name} className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">
+                  <span key={name} className="kd-pastille">
                     {name} le veut
                   </span>
                 ))}
-                {r.isMatch && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-rose-700">❤️ La famille aime</span>}
-              </span>
-            </span>
-            <motion.span
-              aria-hidden
-              animate={{ scale: r.checked ? [1, 1.2, 1] : 1 }}
-              transition={{ duration: 0.25 }}
-              className={`flex size-11 shrink-0 items-center justify-center rounded-full text-2xl font-bold ${
-                r.checked ? "bg-basil-500 text-white" : "border-4 border-stone-200"
-              }`}
+                {r.isMatch && <span className="kd-pastille kd-pastille--match">Match</span>}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 p-4">
+            <button
+              type="button"
+              disabled={disabled}
+              aria-pressed={r.checked}
+              aria-label={`Valider ${r.title}`}
+              onClick={() => set(r.id, !r.checked)}
+              className={`kd-btn ${r.checked ? "kd-btn--like" : "kd-btn--secondaire"}`}
             >
-              {r.checked ? "✓" : ""}
-            </motion.span>
-          </button>
+              {r.checked ? "Validé" : "Valider"}
+            </button>
+            <button
+              type="button"
+              disabled={disabled || !r.checked}
+              onClick={() => set(r.id, false)}
+              className="kd-btn kd-btn--secondaire"
+            >
+              Pas cette fois
+            </button>
+          </div>
         </li>
       ))}
     </ul>

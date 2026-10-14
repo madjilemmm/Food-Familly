@@ -20,13 +20,11 @@ export function InstallFirst({ children }: { children: React.ReactNode }) {
   if (!mustInstall || skipped) return <>{children}</>;
 
   return (
-    <div className="rounded-3xl bg-white p-6 shadow-md">
-      <p className="mb-4 text-xl font-bold">📲 D&apos;abord, installez l&apos;appli sur votre iPhone :</p>
-      <div className="text-lg">
-        <InstallHelp />
-      </div>
-      <p className="mt-4 text-stone-500">C&apos;est indispensable pour recevoir les notifications.</p>
-      <button onClick={() => setSkipped(true)} className="mt-5 min-h-11 w-full text-stone-400 underline">
+    <div className="kd-carte gap-4 p-6">
+      <p className="kd-titre-3 text-aubergine">D&apos;abord, installe l&apos;appli sur ton iPhone</p>
+      <InstallHelp />
+      <p className="kd-petit">C&apos;est indispensable pour recevoir les notifs.</p>
+      <button onClick={() => setSkipped(true)} className="min-h-14 w-full text-encre-douce underline underline-offset-4">
         Continuer dans Safari quand même
       </button>
     </div>

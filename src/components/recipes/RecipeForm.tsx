@@ -8,6 +8,7 @@ import { ImportFromUrl } from "./ImportFromUrl";
 import { AISLES } from "@/lib/domain/aisles";
 import type { RecipeWithIngredients } from "@/lib/data";
 import { resizeImage } from "./resizeImage";
+import { IconeCroix, IconePlus, MessageErreur } from "@/components/ui";
 
 type Row = { key: number; name: string; quantity: string; unit: string; aisle: string };
 
@@ -88,7 +89,7 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
         if (photo) fd.set("photo", photo);
         action(fd);
       }}
-      className="space-y-6"
+      className="flex flex-col gap-6"
     >
       <ImportFromUrl onImport={applyImport} compact={Boolean(recipe)} />
 
@@ -101,40 +102,31 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
         value={JSON.stringify(rows.map(({ name, quantity, unit, aisle }) => ({ name, quantity, unit, aisle })))}
       />
 
-      <div className="flex gap-3">
-        <label className="w-20 shrink-0">
-          <span className="mb-1 block font-semibold">Emoji</span>
-          <input
-            name="emoji"
-            defaultValue={recipe?.emoji ?? "🍽️"}
-            maxLength={8}
-            className="w-full rounded-2xl border-2 border-stone-200 bg-white px-2 py-3 text-center text-2xl outline-none focus:border-tomato-500"
-          />
-        </label>
-        <label className="flex-1">
-          <span className="mb-1 block font-semibold">Nom du plat</span>
-          <input
-            name="title"
-            required
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={120}
-            placeholder="Ex : Poulet basquaise"
-            className="w-full rounded-2xl border-2 border-stone-200 bg-white px-4 py-3 text-xl outline-none focus:border-tomato-500"
-          />
-        </label>
-      </div>
+      {/* L'emoji reste enregistré (champ en base), sans être affiché. */}
+      <input type="hidden" name="emoji" value={recipe?.emoji ?? "🍽️"} />
+      <label className="block">
+        <span className="kd-etiquette mb-2 block">Nom du plat</span>
+        <input
+          name="title"
+          required
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          maxLength={120}
+          placeholder="Poulet basquaise"
+          className="kd-champ"
+        />
+      </label>
 
       <div>
-        <span className="mb-1 block font-semibold">Photo</span>
+        <span className="kd-etiquette mb-2 block">Photo</span>
         <div className="flex items-center gap-4">
           {preview ? (
-            <img src={preview} alt="" referrerPolicy="no-referrer" className="size-28 rounded-2xl object-cover" />
+            <img src={preview} alt="" referrerPolicy="no-referrer" className="size-28 rounded-carte object-cover" />
           ) : (
-            <div className="flex size-28 items-center justify-center rounded-2xl bg-stone-100 text-4xl">📷</div>
+            <div aria-hidden className="size-28 rounded-carte bg-trait" />
           )}
           <div className="flex flex-col gap-2">
-            <label className="cursor-pointer rounded-full bg-stone-800 px-5 py-3 text-center font-semibold text-white">
+            <label className="kd-btn kd-btn--secondaire cursor-pointer has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-focus">
               {photoBusy ? "…" : preview ? "Changer" : "Ajouter une photo"}
               <input
                 type="file"
@@ -153,7 +145,7 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
                   setPreview(null);
                   setRemovePhoto(true);
                 }}
-                className="min-h-11 text-stone-500 underline"
+                className="min-h-14 text-encre-douce underline underline-offset-4"
               >
                 Retirer la photo
               </button>
@@ -163,10 +155,10 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
       </div>
 
       <fieldset className="min-w-0">
-        <legend className="mb-2 font-semibold">Ingrédients</legend>
+        <legend className="kd-etiquette mb-2">Ingrédients</legend>
         {servings && (
-          <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-amber-900">
-            Quantités prévues pour <strong>{servings}</strong> : ajustez-les si besoin.
+          <p className="mb-3 text-encre-douce">
+            Quantités prévues pour <strong className="text-encre">{servings}</strong>&nbsp;: ajuste-les si besoin.
           </p>
         )}
         <datalist id="units">
@@ -174,34 +166,34 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
             <option key={u} value={u} />
           ))}
         </datalist>
-        <ul className="space-y-3">
+        <ul className="flex flex-col gap-3">
           {rows.map((row) => (
-            <li key={row.key} className="rounded-2xl bg-white p-3 shadow-sm">
+            <li key={row.key} className="flex flex-col gap-2 rounded-carte bg-surface p-3">
               <div className="flex gap-2">
                 <input
                   aria-label="Ingrédient"
                   value={row.name}
                   onChange={(e) => update(row.key, { name: e.target.value })}
                   placeholder="Ingrédient"
-                  className="min-w-0 flex-1 rounded-xl border-2 border-stone-200 px-3 py-2 outline-none focus:border-tomato-500"
+                  className="kd-champ min-w-0 flex-1"
                 />
                 <button
                   type="button"
                   aria-label="Supprimer l'ingrédient"
                   onClick={() => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== row.key) : [emptyRow()]))}
-                  className="flex size-11 shrink-0 items-center justify-center text-xl text-stone-400"
+                  className="flex size-14 shrink-0 items-center justify-center text-encre-douce"
                 >
-                  ✕
+                  <IconeCroix className="size-6" />
                 </button>
               </div>
-              <div className="mt-2 flex gap-2">
+              <div className="flex gap-2">
                 <input
                   aria-label="Quantité"
                   value={row.quantity}
                   onChange={(e) => update(row.key, { quantity: e.target.value })}
                   inputMode="decimal"
                   placeholder="Qté"
-                  className="w-20 rounded-xl border-2 border-stone-200 px-3 py-2 outline-none focus:border-tomato-500"
+                  className="kd-champ w-20 px-3"
                 />
                 <input
                   aria-label="Unité"
@@ -209,17 +201,17 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
                   onChange={(e) => update(row.key, { unit: e.target.value })}
                   list="units"
                   placeholder="unité"
-                  className="w-24 rounded-xl border-2 border-stone-200 px-3 py-2 outline-none focus:border-tomato-500"
+                  className="kd-champ w-24 px-3"
                 />
                 <select
                   aria-label="Rayon"
                   value={row.aisle}
                   onChange={(e) => update(row.key, { aisle: e.target.value })}
-                  className="min-w-0 flex-1 rounded-xl border-2 border-stone-200 bg-white px-2 py-2 outline-none focus:border-tomato-500"
+                  className="kd-champ min-w-0 flex-1 px-2"
                 >
                   {AISLES.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.emoji} {a.label}
+                      {a.label}
                     </option>
                   ))}
                 </select>
@@ -230,18 +222,18 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
         <button
           type="button"
           onClick={() => setRows((rs) => [...rs, emptyRow(rs[rs.length - 1]?.aisle)])}
-          className="mt-3 w-full rounded-2xl border-2 border-dashed border-stone-300 py-3 font-semibold text-stone-600"
+          className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-bouton border-[3px] border-dashed border-encre-douce font-semibold text-encre-douce"
         >
-          + Ajouter un ingrédient
+          <IconePlus className="size-6" /> Ajouter un ingrédient
         </button>
       </fieldset>
 
-      {state.error && <p className="rounded-xl bg-tomato-50 px-4 py-3 text-tomato-700">{state.error}</p>}
+      {state.error && <MessageErreur>{state.error}</MessageErreur>}
 
       <button
         type="submit"
         disabled={saving || photoBusy || deleting}
-        className="w-full rounded-2xl bg-tomato-500 py-4 text-xl font-bold text-white shadow-lg disabled:opacity-60"
+        className="kd-btn kd-btn--large"
       >
         {saving ? "Enregistrement…" : "Enregistrer"}
       </button>
@@ -251,7 +243,7 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
           type="button"
           disabled={saving || deleting}
           onClick={() => confirm(`Supprimer « ${recipe.title} » ?`) && startDelete(() => deleteRecipe(recipe.id))}
-          className="w-full py-3 text-tomato-600 underline disabled:opacity-50"
+          className="min-h-14 w-full text-encre-douce underline underline-offset-4 disabled:opacity-50"
         >
           {deleting ? "Suppression…" : "Supprimer cette recette"}
         </button>

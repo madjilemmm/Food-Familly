@@ -3,19 +3,29 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Pas de connexion — À table !</title>
+    <meta name="theme-color" content="#971cd0" />
+    <title>Pas de réseau — Kaddie</title>
     <style>
-      body { margin: 0; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center;
-             font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #fff8f0; color: #2b2118; text-align: center; padding: 24px; box-sizing: border-box; }
-      h1 { font-size: 28px; margin: 16px 0 8px; }
-      p { font-size: 19px; color: #6b5d52; max-width: 320px; }
-      button { margin-top: 24px; font-size: 20px; font-weight: 700; color: #fff; background: #f0573c; border: 0; border-radius: 18px; padding: 16px 32px; }
+      /* Page servie hors connexion : autonome, couleurs de tokens.css recopiées ici. */
+      :root { --violet: #971cd0; --aubergine: #540472; --blanc: #ffffff; }
+      @font-face { font-family: "BoldenVan"; src: url("/fonts/BoldenVan.ttf") format("truetype"); font-display: swap; }
+      body { margin: 0; min-height: 100dvh; display: flex; flex-direction: column; justify-content: space-between; gap: 24px;
+             padding: max(env(safe-area-inset-top), 48px) 24px max(env(safe-area-inset-bottom), 32px); box-sizing: border-box;
+             background: var(--violet); color: var(--blanc); font-family: system-ui, -apple-system, sans-serif; }
+      img { width: 120px; }
+      h1 { font-family: "BoldenVan", system-ui, sans-serif; font-weight: 400; font-size: 48px; line-height: 1; margin: 24px 0 12px; }
+      p { font-size: 17px; line-height: 24px; margin: 0; max-width: 320px; }
+      button { min-height: 56px; width: 100%; font-family: "BoldenVan", system-ui, sans-serif; font-size: 20px; color: var(--aubergine);
+               background: var(--blanc); border: 0; border-radius: 18px; }
+      button:active { transform: scale(0.96); }
     </style>
   </head>
   <body>
-    <div style="font-size: 64px">📶</div>
-    <h1>Pas de connexion</h1>
-    <p>Vérifiez le Wi-Fi ou les données mobiles, puis réessayez.</p>
+    <div>
+      <img src="/brand/logo/kaddie-logo-blanc.svg" alt="Kaddie" />
+      <h1>Pas de réseau</h1>
+      <p>Vérifie le wifi ou les données mobiles, puis réessaie.</p>
+    </div>
     <button onclick="location.reload()">Réessayer</button>
   </body>
 </html>

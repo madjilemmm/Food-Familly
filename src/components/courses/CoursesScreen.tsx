@@ -5,75 +5,97 @@ import { getTripOverview, type TripOverview } from "@/lib/views";
 import { departureChoices, formatTime } from "@/lib/domain/trip";
 import { ROUTES } from "@/lib/routes";
 import { cancelTrip, validateTrip } from "@/app/actions/trips";
+import { Logo, Scene } from "@/design-system/components/Kaddie";
 import { Countdown } from "@/components/Countdown";
 import { SubmitButton } from "@/components/SubmitButton";
+import { BandeauScene, LienReglages } from "@/components/ui";
 import { StartTrip } from "./StartTrip";
 import { RecipeChecklist } from "./RecipeChecklist";
 import { ConfirmButton } from "./ConfirmButton";
 import { RequestForm } from "./RequestForm";
 
 /**
- * L'écran « Courses », le même pour tout le monde, dans le style de chacun :
- * - personne ne fait les courses → gros bouton « Je pars… » ;
- * - c'est moi qui les fais → réponses de la famille, plats, liste ;
+ * L'écran « Courses », le même pour tout le monde :
+ * - personne ne fait les courses → une scène, un seul grand bouton « Je pars… » ;
+ * - c'est moi qui les fais → réponses de la famille, plats à valider, liste ;
  * - quelqu'un d'autre les fait → je lui dis ce que je veux.
  */
-export async function CoursesScreen({ me }: { me: Profile }) {
+export async function CoursesScreen({ me, notifications }: { me: Profile; notifications?: React.ReactNode }) {
   const overview = await getTripOverview(me.family_id, me.id);
 
   if (!overview) {
     const others = (await getProfiles(me.family_id)).filter((p) => p.id !== me.id).map((p) => p.name);
-    return <StartTrip choices={departureChoices()} others={others} variant={me.style} />;
+    return (
+      <Scene duo="aubergine" seed={4} className="ecran-scene justify-between gap-6">
+        <div className="flex flex-col gap-4 pt-6">
+          <div className="flex items-start justify-between">
+            <Logo width={120} />
+            <LienReglages surScene />
+          </div>
+          <h1 className="kd-titre-1">Salut {me.name}&nbsp;!</h1>
+          {notifications}
+        </div>
+        <StartTrip choices={departureChoices()} others={others} />
+      </Scene>
+    );
   }
   return overview.iAmShopper ? <ShopperView me={me} overview={overview} /> : <ResponderView me={me} overview={overview} />;
+}
+
+function Depart({ overview, qui }: { overview: TripOverview; qui?: string }) {
+  const { trip, pastDeadline } = overview;
+  if (pastDeadline) return <>{qui ? `${qui} devait partir` : "Départ prévu"} à {formatTime(trip.deadline_at)}</>;
+  return (
+    <>
+      {qui ? `${qui} part dans` : "Départ dans"} <Countdown deadline={trip.deadline_at} /> · {formatTime(trip.deadline_at)}
+    </>
+  );
 }
 
 function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) {
   const { trip, responses, candidates, pastDeadline, nobodyAnswered } = overview;
   const validated = trip.status === "validated";
   const checkedCount = candidates.filter((c) => c.checked).length;
-  const fun = me.style === "fun";
-  const accent = fun ? "bg-gradient-to-r from-orange-500 to-fuchsia-500" : "bg-tomato-500";
+  const answered = responses.filter((r) => r.request).length;
 
   return (
     <>
-      {validated ? (
-        <Link
-          href={ROUTES[me.style].liste}
-          className="mb-6 flex items-center gap-4 rounded-[2rem] bg-basil-500 px-6 py-6 text-white shadow-lg active:scale-[0.98]"
-        >
-          <span className="text-5xl">📝</span>
-          <span className="text-2xl leading-tight font-extrabold">Ma liste de courses est prête</span>
+      <BandeauScene
+        illustration="table"
+        etiquette={<Depart overview={overview} />}
+        titre={answered > 0 || candidates.length > 0 ? "Ce soir, ils veulent" : "Les courses"}
+      >
+        {candidates.length > 0 && (
+          <span className="kd-pastille kd-pastille--match mt-3">
+            {candidates.length} plat{candidates.length > 1 ? "s" : ""}
+          </span>
+        )}
+      </BandeauScene>
+
+      {validated && (
+        <Link href={ROUTES[me.style].liste} className="kd-btn kd-btn--like kd-btn--large mb-6">
+          Ma liste est prête, je l&apos;ouvre
         </Link>
-      ) : (
-        <section className={`mb-6 rounded-[2rem] px-6 py-6 text-center text-white shadow-lg ${accent}`}>
-          <p className="text-lg opacity-90">{pastDeadline ? "Départ prévu à" : "Je pars dans"}</p>
-          <p className="text-5xl font-extrabold">
-            {pastDeadline ? formatTime(trip.deadline_at) : <Countdown deadline={trip.deadline_at} />}
-          </p>
-          {!pastDeadline && <p className="mt-1 text-lg opacity-90">à {formatTime(trip.deadline_at)}</p>}
-        </section>
       )}
 
       <section className="mb-8">
-        <h2 className="mb-3 text-2xl font-bold">La famille</h2>
+        <h2 className="kd-etiquette mb-2">La famille</h2>
         {responses.length === 0 ? (
-          <p className="rounded-3xl bg-white p-4 text-stone-500">Personne d&apos;autre dans la famille pour l&apos;instant.</p>
+          <p className="text-encre-douce">Personne d&apos;autre dans la famille pour l&apos;instant.</p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="kd-liste">
             {responses.map(({ member, request, recipes }) => (
-              <li key={member.id} className="rounded-3xl bg-white p-4 shadow-sm">
-                <p className="flex items-center gap-3 text-xl font-bold">
-                  <span className="text-3xl">{member.emoji}</span>
-                  {member.name}
-                  <span className={`ml-auto text-base font-semibold ${request ? "text-basil-600" : "text-stone-400"}`}>
-                    {request ? "a répondu ✓" : "pas encore répondu"}
+              <li key={member.id} className="flex flex-col justify-center gap-1 border-b-2 border-trait py-3">
+                <p className="flex items-center gap-3">
+                  <span className="font-display text-titre-3 text-aubergine">{member.name}</span>
+                  <span className={`ml-auto ${request ? "kd-pastille kd-pastille--match" : "kd-petit"}`}>
+                    {request ? "a répondu" : "pas encore répondu"}
                   </span>
                 </p>
-                {request?.free_text && <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-xl">« {request.free_text} »</p>}
+                {request?.free_text && <p>« {request.free_text} »</p>}
                 {recipes.length > 0 && (
-                  <p className="mt-2 text-lg text-stone-600">
-                    Veut : <strong>{recipes.map((r) => r.title).join(", ")}</strong>
+                  <p className="text-encre-douce">
+                    Veut&nbsp;: <strong className="text-encre">{recipes.map((r) => r.title).join(", ")}</strong>
                   </p>
                 )}
               </li>
@@ -83,27 +105,24 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
       </section>
 
       <section className="mb-8">
-        <h2 className="text-2xl font-bold">Les plats</h2>
-        <p className="mb-3 text-stone-500">
+        <h2 className="kd-etiquette">Les plats</h2>
+        <p className="kd-petit mb-3">
           {pastDeadline && nobodyAnswered
-            ? "Personne n'a répondu ? Pas de souci : voici les plats que la famille aime. Touchez pour choisir."
-            : "Touchez un plat pour le choisir."}
+            ? "Personne n'a répondu ? Voici les plats que la famille aime. Garde ceux qui te tentent."
+            : "Garde les plats qui partent dans le caddie."}
         </p>
         {candidates.length > 0 ? (
           <RecipeChecklist recipes={candidates} />
         ) : (
-          <p className="rounded-3xl bg-white p-5 text-stone-500">Pas encore de plat proposé. Vous pouvez quand même faire votre liste.</p>
+          <p className="text-encre-douce">Pas encore de plat proposé. Tu peux quand même faire ta liste.</p>
         )}
       </section>
 
       <form action={validateTrip} className="sticky bottom-28 z-20">
-        <SubmitButton
-          pendingLabel="Je prépare la liste…"
-          className="w-full rounded-[2rem] bg-basil-500 py-6 text-2xl font-extrabold text-white shadow-xl shadow-basil-500/30 active:scale-[0.98]"
-        >
+        <SubmitButton pendingLabel="Je prépare la liste…">
           {validated
             ? "Mettre à jour ma liste"
-            : `✅ Faire ma liste${checkedCount ? ` (${checkedCount} plat${checkedCount > 1 ? "s" : ""})` : ""}`}
+            : `Faire ma liste${checkedCount ? ` (${checkedCount} plat${checkedCount > 1 ? "s" : ""})` : ""}`}
         </SubmitButton>
       </form>
 
@@ -111,7 +130,7 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
         <ConfirmButton
           action={cancelTrip}
           question="Annuler ces courses ? Les réponses et la liste seront effacées."
-          className="py-3 text-base text-stone-400 underline"
+          className="min-h-14 px-2 text-encre-douce underline underline-offset-4"
         >
           Annuler ces courses
         </ConfirmButton>
@@ -121,42 +140,33 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
 }
 
 async function ResponderView({ me, overview }: { me: Profile; overview: TripOverview }) {
-  const { trip, shopper, responses, pastDeadline } = overview;
+  const { trip, shopper, responses } = overview;
   const [matches, recipes] = await Promise.all([getMatches(me.family_id), getRecipes(me.family_id)]);
   const mine = responses.find((r) => r.member.id === me.id)?.request ?? null;
   const others = responses.filter((r) => r.member.id !== me.id && r.request);
   const matchIds = new Set(matches.map((m) => m.id));
   const choices = [...matches, ...recipes.filter((r) => mine?.recipe_ids.includes(r.id) && !matchIds.has(r.id))];
   const who = shopper?.name ?? "Quelqu'un";
-  const accent = me.style === "fun" ? "bg-gradient-to-r from-orange-500 to-fuchsia-500" : "bg-tomato-500";
+  const validated = trip.status === "validated";
 
   return (
     <>
-      <section className={`mb-5 rounded-[2rem] p-5 text-center text-white shadow-lg ${accent}`}>
-        {trip.status === "validated" ? (
-          <p className="text-xl font-bold">La liste de {who} est faite ✅ Tu peux encore ajouter une demande.</p>
-        ) : pastDeadline ? (
-          <p className="text-xl font-bold">
-            {who} devait partir à {formatTime(trip.deadline_at)}. Fais vite !
-          </p>
-        ) : (
-          <>
-            <p className="opacity-90">
-              {shopper?.emoji} {who} part dans
-            </p>
-            <p className="text-5xl font-black">
-              <Countdown deadline={trip.deadline_at} />
-            </p>
-          </>
-        )}
-      </section>
+      <BandeauScene
+        illustration="marche"
+        etiquette={validated ? `La liste de ${who} est faite` : <Depart overview={overview} qui={who} />}
+        titre={validated ? "Encore une envie ?" : "Tu veux quoi ?"}
+      />
 
-      {others.map(({ member, request, recipes: wanted }) => (
-        <p key={member.id} className="mb-4 rounded-2xl bg-white/80 px-4 py-3 text-stone-600">
-          <strong>{member.name}</strong> a demandé{" "}
-          {[request?.free_text && `« ${request.free_text} »`, wanted.map((r) => r.title).join(", ")].filter(Boolean).join(" + ")}
-        </p>
-      ))}
+      {others.length > 0 && (
+        <ul className="mb-6 flex flex-col gap-2">
+          {others.map(({ member, request, recipes: wanted }) => (
+            <li key={member.id} className="text-encre-douce">
+              <strong className="text-encre">{member.name}</strong> a demandé{" "}
+              {[request?.free_text && `« ${request.free_text} »`, wanted.map((r) => r.title).join(", ")].filter(Boolean).join(" + ")}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <RequestForm
         choices={choices}
@@ -166,9 +176,9 @@ async function ResponderView({ me, overview }: { me: Profile; overview: TripOver
         shopperName={who}
       />
 
-      {trip.status === "validated" && (
-        <Link href={ROUTES[me.style].liste} className="mt-6 block py-3 text-center text-lg font-semibold text-stone-600 underline">
-          📝 Voir la liste de courses
+      {validated && (
+        <Link href={ROUTES[me.style].liste} className="mt-4 flex min-h-14 items-center justify-center font-semibold text-violet underline underline-offset-4">
+          Voir la liste de courses
         </Link>
       )}
     </>

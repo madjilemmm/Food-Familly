@@ -15,7 +15,7 @@ export async function notifyTripStarted(familyId: string, shopperId: string, dea
   await sendPush(
     all.filter((m) => m.id !== shopperId).map((m) => m.id),
     {
-      title: `🛒 ${shopper} part faire les courses`,
+      title: `${shopper} part faire les courses`,
       body: `Dis-lui ce que tu veux manger avant ${formatTime(deadline)} !`,
       url: "/courses",
       tag: "trip",
@@ -48,6 +48,6 @@ export async function notifyMatch(familyId: string, swiperId: string, recipeId: 
   ]);
   await sendPush(
     all.filter((m) => m.id !== swiperId).map((m) => m.id),
-    { title: "🎉 Nouveau match !", body: recipe.data?.title ?? "", url: "/matchs", tag: "match" },
+    { title: "C'est un match !", body: recipe.data?.title ?? "", url: "/matchs", tag: "match" },
   );
 }

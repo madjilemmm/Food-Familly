@@ -1,20 +1,26 @@
 /** Les 3 gestes pour installer l'appli sur l'écran d'accueil d'un iPhone. */
 export function InstallHelp() {
+  const etapes = [
+    <>
+      Dans Safari, touche <strong>Partager</strong> en bas de l&apos;écran.
+    </>,
+    <>
+      Choisis <strong>« Sur l&apos;écran d&apos;accueil »</strong>.
+    </>,
+    <>
+      Touche <strong>Ajouter</strong>, puis ouvre Kaddie depuis sa nouvelle icône.
+    </>,
+  ];
   return (
-    <ol className="space-y-2 text-base">
-      <li>
-        1. Dans Safari, touchez <strong>Partager</strong>{" "}
-        <span aria-hidden className="inline-block rounded border border-current px-1 text-sm">
-          ⬆︎
-        </span>{" "}
-        en bas de l&apos;écran.
-      </li>
-      <li>
-        2. Choisissez <strong>« Sur l&apos;écran d&apos;accueil »</strong>.
-      </li>
-      <li>
-        3. Touchez <strong>Ajouter</strong>, puis ouvrez l&apos;appli depuis sa nouvelle icône.
-      </li>
+    <ol className="flex flex-col gap-3">
+      {etapes.map((e, i) => (
+        <li key={i} className="flex items-start gap-3">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-pastille bg-accent font-display text-on-accent">
+            {i + 1}
+          </span>
+          <span>{e}</span>
+        </li>
+      ))}
     </ol>
   );
 }

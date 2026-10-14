@@ -61,6 +61,6 @@ export async function middleware(req: NextRequest) {
 export const config = {
   // Tout sauf les fichiers statiques nécessaires avant connexion (PWA, icônes…).
   matcher: [
-    "/((?!_next/|icons/|sw\\.js|manifest\\.webmanifest|offline\\.html|favicon\\.ico|apple-touch-icon\\.png|robots\\.txt).*)",
+    "/((?!_next/|icons/|fonts/|brand/|sw\\.js|manifest\\.webmanifest|offline\\.html|favicon\\.ico|robots\\.txt).*)",
   ],
 };

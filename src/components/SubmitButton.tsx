@@ -3,10 +3,11 @@
 import { useFormStatus } from "react-dom";
 import { Spinner } from "./Spinner";
 
+/** Bouton d'envoi de formulaire, aux classes du kit (kd-btn…). */
 export function SubmitButton({
   children,
   pendingLabel = "Un instant…",
-  className = "",
+  className = "kd-btn kd-btn--large",
   disabled,
 }: {
   children: React.ReactNode;
@@ -16,12 +17,12 @@ export function SubmitButton({
 }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending || disabled} className={`transition-[transform,opacity] duration-150 disabled:opacity-70 ${className}`}>
+    <button type="submit" disabled={pending || disabled} className={className}>
       {pending ? (
-        <span className="inline-flex items-center justify-center gap-2">
-          <Spinner className="size-5" />
+        <>
+          <Spinner />
           {pendingLabel}
-        </span>
+        </>
       ) : (
         children
       )}

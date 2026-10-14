@@ -1,10 +1,10 @@
-/** Petit indicateur d'attente, hérite de la couleur du texte. */
-export function Spinner({ className = "size-6" }: { className?: string }) {
+import { Logo } from "@/design-system/components/Kaddie";
+
+/** Attente dans un bouton : le monogramme qui pulse, dans la couleur du texte. */
+export function Spinner({ className = "w-6" }: { className?: string }) {
   return (
-    <span
-      aria-label="Chargement"
-      role="status"
-      className={`inline-block animate-spin rounded-full border-[3px] border-current border-r-transparent align-middle ${className}`}
-    />
+    <span role="status" aria-label="Chargement" className={`kd-pulse inline-block align-middle ${className}`}>
+      <Logo variante="monogramme" width="100%" title="" />
+    </span>
   );
 }

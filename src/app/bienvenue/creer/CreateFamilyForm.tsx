@@ -4,10 +4,12 @@ import { useActionState, useState } from "react";
 import { createFamily } from "@/app/actions/auth";
 import { SubmitButton } from "@/components/SubmitButton";
 import { StylePicker } from "@/components/family/StylePicker";
+import { IconeCroix, IconePlus, MessageErreur } from "@/components/ui";
 import type { Style } from "@/lib/session";
 
 type Member = { key: number; name: string; emoji: string; style: Style };
 
+// Un emoji reste enregistré pour chaque membre (champ en base), sans être affiché.
 const EMOJIS = ["😎", "👩‍🍳", "👨‍🍳", "🤙", "🦄", "🐻", "🦊", "🐼", "🌸", "⚽", "🎮", "🎧", "👵", "👴", "🐱", "🌟"];
 let nextKey = 1;
 
@@ -20,7 +22,7 @@ export function CreateFamilyForm() {
     setMembers((ms) => ms.map((m) => (m.key === key ? { ...m, ...patch } : m)));
 
   return (
-    <form action={action} className="space-y-6">
+    <form action={action} className="flex flex-col gap-6">
       <input
         type="hidden"
         name="members"
@@ -29,39 +31,26 @@ export function CreateFamilyForm() {
       <input type="hidden" name="me" value={me} />
 
       <label className="block">
-        <span className="mb-1 block font-semibold">Nom de la famille</span>
-        <input
-          name="family_name"
-          required
-          maxLength={60}
-          placeholder="Ex : Famille Martin"
-          className="w-full rounded-2xl border-2 border-stone-200 bg-white px-4 py-3 text-xl outline-none focus:border-tomato-500"
-        />
+        <span className="kd-etiquette mb-2 block">Nom de la famille</span>
+        <input name="family_name" required maxLength={60} placeholder="Famille Martin" className="kd-champ" />
       </label>
 
       <fieldset className="min-w-0">
-        <legend className="mb-2 font-semibold">Les membres</legend>
-        <ul className="space-y-4">
+        <legend className="kd-etiquette mb-2">Les membres</legend>
+        <ul className="flex flex-col gap-4">
           {members.map((m, i) => (
-            <li key={m.key} className={`rounded-3xl bg-white p-4 shadow-sm ring-4 ${me === i ? "ring-tomato-500" : "ring-transparent"}`}>
+            <li
+              key={m.key}
+              className={`flex flex-col gap-3 rounded-carte bg-surface p-4 outline-4 ${me === i ? "outline-accent" : "outline-transparent"}`}
+            >
               <div className="flex gap-2">
-                <select
-                  aria-label="Emoji"
-                  value={m.emoji}
-                  onChange={(e) => update(m.key, { emoji: e.target.value })}
-                  className="w-16 rounded-xl border-2 border-stone-200 bg-white text-center text-2xl"
-                >
-                  {EMOJIS.map((e) => (
-                    <option key={e}>{e}</option>
-                  ))}
-                </select>
                 <input
                   aria-label="Prénom"
                   value={m.name}
                   onChange={(e) => update(m.key, { name: e.target.value })}
                   placeholder="Prénom"
                   maxLength={40}
-                  className="min-w-0 flex-1 rounded-xl border-2 border-stone-200 px-3 py-2 text-lg outline-none focus:border-tomato-500"
+                  className="kd-champ min-w-0 flex-1"
                 />
                 {members.length > 1 && (
                   <button
@@ -71,21 +60,20 @@ export function CreateFamilyForm() {
                       setMembers((ms) => ms.filter((x) => x.key !== m.key));
                       setMe((cur) => (cur === i ? 0 : cur > i ? cur - 1 : cur));
                     }}
-                    className="flex size-11 shrink-0 items-center justify-center text-xl text-stone-400"
+                    className="flex size-14 shrink-0 items-center justify-center text-encre-douce"
                   >
-                    ✕
+                    <IconeCroix />
                   </button>
                 )}
               </div>
-              <div className="mt-3">
-                <StylePicker value={m.style} onChange={(style) => update(m.key, { style })} />
-              </div>
+              <StylePicker value={m.style} onChange={(style) => update(m.key, { style })} />
               <button
                 type="button"
+                aria-pressed={me === i}
                 onClick={() => setMe(i)}
-                className={`mt-3 min-h-11 w-full rounded-xl font-semibold ${me === i ? "bg-tomato-500 text-white" : "bg-stone-100 text-stone-600"}`}
+                className={`kd-btn kd-btn--large ${me === i ? "kd-btn--like" : "kd-btn--secondaire"}`}
               >
-                {me === i ? "✓ C'est moi" : "C'est moi"}
+                C&apos;est moi
               </button>
             </li>
           ))}
@@ -93,21 +81,16 @@ export function CreateFamilyForm() {
         <button
           type="button"
           onClick={() => setMembers((ms) => [...ms, { key: nextKey++, name: "", emoji: EMOJIS[ms.length % EMOJIS.length], style: "fun" }])}
-          className="mt-3 w-full rounded-2xl border-2 border-dashed border-stone-300 py-3 font-semibold text-stone-600"
+          className="mt-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-bouton border-[3px] border-dashed border-encre-douce font-semibold text-encre-douce"
         >
-          + Ajouter un membre
+          <IconePlus className="size-6" /> Ajouter un membre
         </button>
       </fieldset>
 
-      {state.error && <p className="rounded-xl bg-tomato-50 px-4 py-3 text-tomato-700">{state.error}</p>}
+      {state.error && <MessageErreur>{state.error}</MessageErreur>}
 
-      <SubmitButton
-        pendingLabel="Création…"
-        className="w-full rounded-2xl bg-tomato-500 py-4 text-xl font-bold text-white shadow-lg active:scale-[0.98]"
-      >
-        Créer ma famille
-      </SubmitButton>
-      <p className="text-center text-sm text-stone-500">10 recettes françaises classiques sont ajoutées pour démarrer.</p>
+      <SubmitButton pendingLabel="Création…">Créer ma famille</SubmitButton>
+      <p className="kd-petit text-center">10 recettes classiques sont ajoutées pour démarrer.</p>
     </form>
   );
 }

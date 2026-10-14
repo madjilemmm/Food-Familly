@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { IconeCloche } from "@/components/ui";
 import { usePush } from "./usePush";
 import { InstallHelp } from "./InstallHelp";
 
@@ -17,71 +18,69 @@ export function NotificationsCard({ variant }: { variant: "banner" | "pill" | "f
   if (variant !== "full" && (state === "on" || state === "unsupported" || state === "denied")) return null;
 
   if (variant === "pill") {
-    const pill = "mb-3 flex min-h-12 w-full items-center gap-2 rounded-2xl bg-amber-100 px-4 py-2 text-left font-semibold text-amber-900 active:scale-[0.98]";
+    const pill = "flex min-h-14 w-full items-center gap-3 rounded-bouton bg-blanc px-4 text-left font-semibold text-aubergine active:scale-[0.98]";
     return state === "install-first" ? (
       <Link href="/reglages" className={pill}>
-        <span className="text-xl">🔔</span>
-        <span className="flex-1">Notifications : installez d&apos;abord l&apos;appli</span>
-        <span>›</span>
+        <IconeCloche className="size-6 shrink-0" />
+        <span className="flex-1">Notifs : installe d&apos;abord l&apos;appli</span>
       </Link>
     ) : (
       <button onClick={enable} className={pill}>
-        <span className="text-xl">🔔</span>
-        <span className="flex-1">Activer les notifications</span>
-        {error && <span className="text-sm text-red-700">Réessayez</span>}
+        <IconeCloche className="size-6 shrink-0" />
+        <span className="flex-1">Activer les notifs</span>
+        {error && <span className="kd-petit">Réessaie</span>}
       </button>
     );
   }
 
   return (
-    <section className={`rounded-3xl p-5 ${variant === "banner" ? "mb-5 bg-amber-100" : "mb-6 bg-white"}`}>
-      <h2 className="mb-2 flex items-center gap-2 text-xl font-bold">
-        <span className="text-2xl">🔔</span> Notifications
+    <section className="kd-carte gap-3 p-5">
+      <h2 className="kd-titre-3 flex items-center gap-2 text-aubergine">
+        <IconeCloche className="size-7 text-violet" /> Notifications
       </h2>
 
       {state === "install-first" && (
         <>
-          <p className="mb-3">Pour recevoir les notifications, ajoutez d&apos;abord l&apos;appli sur l&apos;écran d&apos;accueil :</p>
+          <p>Pour recevoir les notifs, ajoute d&apos;abord l&apos;appli sur l&apos;écran d&apos;accueil&nbsp;:</p>
           <InstallHelp />
         </>
       )}
 
-      {state === "unsupported" && <p>Ce navigateur ne permet pas les notifications.</p>}
+      {state === "unsupported" && <p>Ce navigateur ne permet pas les notifs.</p>}
 
       {state === "denied" && (
         <p>
-          Les notifications sont bloquées. Pour les autoriser : <strong>Réglages</strong> de l&apos;iPhone →{" "}
+          Les notifs sont bloquées. Pour les autoriser&nbsp;: <strong>Réglages</strong> de l&apos;iPhone →{" "}
           <strong>Notifications</strong> → <strong>Kaddie</strong>
         </p>
       )}
 
       {state === "off" && (
         <>
-          <p className="mb-3">Recevez une alerte au bon moment, sans rien surveiller.</p>
-          <button
-            onClick={enable}
-            className="w-full rounded-2xl bg-amber-500 py-4 text-xl font-bold text-white shadow active:scale-[0.98]"
-          >
-            Activer les notifications
+          <p>Une alerte quand quelqu&apos;un part en courses ou qu&apos;un plat matche.</p>
+          <button onClick={enable} className="kd-btn kd-btn--large">
+            Activer les notifs
           </button>
         </>
       )}
 
       {state === "on" && (
         <>
-          <p className="mb-3 font-semibold text-basil-600">✓ Activées sur ce téléphone</p>
+          <p className="flex items-center gap-2 font-semibold">
+            <span className="kd-pastille kd-pastille--match">Activées</span> sur ce téléphone
+          </p>
           <div className="flex gap-3">
-            <button onClick={test} className="flex-1 rounded-2xl bg-stone-100 py-3 font-semibold active:scale-[0.98]">
+            <button onClick={test} className="kd-btn kd-btn--secondaire flex-1">
               Tester
             </button>
-            <button onClick={disable} className="flex-1 rounded-2xl bg-stone-100 py-3 font-semibold text-stone-500 active:scale-[0.98]">
-              Désactiver
+            <button onClick={disable} className="kd-btn kd-btn--secondaire flex-1">
+              Couper
             </button>
           </div>
         </>
       )}
 
-      {error && <p className="mt-3 text-tomato-700">{error}</p>}
+      {error && <p className="text-encre-douce">{error}</p>}
     </section>
   );
 }

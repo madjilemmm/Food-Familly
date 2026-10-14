@@ -2,9 +2,8 @@ import Link from "next/link";
 import { requireProfile, requireUser } from "@/lib/auth";
 import { getMatches } from "@/lib/data";
 import { getTripOverview } from "@/lib/views";
-import { daysLeft } from "@/lib/domain/swipe-deck";
-import { PageHeader } from "@/components/PageHeader";
-import { RecipeVisual } from "@/components/RecipeVisual";
+import { BandeauScene, EtatVide } from "@/components/ui";
+import { MatchCards } from "@/components/MatchCards";
 import { RecipeChecklist } from "@/components/courses/RecipeChecklist";
 
 export default async function SimpleMatches() {
@@ -17,42 +16,35 @@ export default async function SimpleMatches() {
 
   return (
     <>
-      <PageHeader title="Les plats préférés" subtitle="Aimés par la majorité de la famille" />
+      <BandeauScene
+        illustration="table"
+        etiquette={`${matches.length} plat${matches.length > 1 ? "s" : ""} aimé${matches.length > 1 ? "s" : ""}`}
+        titre="Ce soir, ils veulent"
+      />
 
       {matches.length === 0 ? (
-        <p className="rounded-3xl bg-white p-6 text-xl text-stone-500">
-          Pas encore de plat aimé par la majorité. Chacun choisit sur son téléphone (onglet « J&apos;aime ») ! 😊
-        </p>
+        <EtatVide phrase="Pas encore de plat aimé par la majorité. Chacun swipe sur son téléphone.">
+          <Link href="/simple/swipe" className="kd-btn kd-btn--secondaire kd-btn--large">
+            Aller swiper
+          </Link>
+        </EtatVide>
       ) : overview?.iAmShopper ? (
         <>
-          <p className="mb-3 text-stone-500">Touchez un plat pour l&apos;ajouter aux courses.</p>
+          <p className="kd-petit mb-3">Garde les plats qui partent dans le caddie.</p>
           <RecipeChecklist recipes={overview.candidates.filter((c) => c.isMatch)} />
         </>
       ) : (
         <>
-          <ul className="space-y-3">
-            {matches.map((m) => (
-              <li key={m.id} className="flex items-center gap-4 rounded-3xl bg-white p-3">
-                <RecipeVisual recipe={m} className="size-20 shrink-0 rounded-2xl" emojiClassName="text-4xl" />
-                <span>
-                  <span className="block text-xl font-bold">{m.title}</span>
-                  <span className="text-base text-stone-500">❤️ {m.like_count} personnes · encore {daysLeft(m.expires_at)} jours</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <MatchCards matches={matches} />
           {!overview && (
-            <Link
-              href="/simple"
-              className="mt-6 block rounded-[2rem] bg-tomato-500 py-5 text-center text-2xl font-bold text-white shadow-lg active:scale-[0.98]"
-            >
-              🛒 Lancer les courses pour les choisir
+            <Link href="/simple" className="kd-btn kd-btn--large mt-6">
+              Lancer les courses
             </Link>
           )}
         </>
       )}
 
-      <Link href="/recettes" className="mt-10 block py-3 text-center text-lg text-stone-500 underline">
+      <Link href="/recettes" className="mt-8 flex min-h-14 items-center justify-center text-encre-douce underline underline-offset-4">
         Gérer mes recettes
       </Link>
     </>

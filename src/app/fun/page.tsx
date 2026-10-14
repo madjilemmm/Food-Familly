@@ -1,20 +1,23 @@
 import Link from "next/link";
 import { requireProfile, requireUser } from "@/lib/auth";
-import { getCurrentTrip, getDeck, getProfiles } from "@/lib/data";
+import { getCurrentTrip, getDeck, getMatches, getProfiles } from "@/lib/data";
 import { isPastDeadline } from "@/lib/domain/trip";
-import { PageHeader } from "@/components/PageHeader";
+import { Scene } from "@/design-system/components/Kaddie";
 import { Countdown } from "@/components/Countdown";
 import { SwipeDeck } from "@/components/SwipeDeck";
+import { IconePanier } from "@/components/ui";
+import { SwipeHeader } from "@/components/SwipeHeader";
 import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 
 export default async function FunSwipe() {
   const user = await requireUser();
-  // Profil, paquet, course en cours et membres : tout part en même temps.
-  const [me, deck, trip, members] = await Promise.all([
+  // Profil, paquet, course en cours, membres et matchs : tout part en même temps.
+  const [me, deck, trip, members, matches] = await Promise.all([
     requireProfile("fun"),
     getDeck(user.familyId, user.profileId),
     getCurrentTrip(user.familyId),
     getProfiles(user.familyId),
+    getMatches(user.familyId),
   ]);
   const iAmShopper = trip?.created_by === me.id;
   const answered = trip?.trip_requests.some((r) => r.profile_id === me.id) ?? false;
@@ -22,30 +25,30 @@ export default async function FunSwipe() {
   const who = shopper?.name ?? "Quelqu'un";
 
   return (
-    <div className="h-screen-tabbar flex flex-col">
-      <PageHeader title={`Salut ${me.name} ${me.emoji}`} />
+    <Scene duo="aubergine" seed={21} className="ecran-scene gap-4">
+      <SwipeHeader matchs={matches.length} />
       {trip && (iAmShopper || (!answered && trip.status === "open")) && (
         <Link
           href="/fun/courses"
-          className="mb-3 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-orange-500 to-fuchsia-500 px-4 py-2.5 leading-snug font-semibold text-white shadow-lg active:scale-[0.98]"
+          className="flex min-h-14 items-center gap-3 rounded-bouton bg-blanc px-4 py-2 leading-snug font-semibold text-aubergine active:scale-[0.98]"
         >
-          <span className="text-3xl">🛒</span>
+          <IconePanier className="size-7 shrink-0 text-violet" />
           <span className="flex-1">
             {iAmShopper ? (
-              "Tu fais les courses : regarde ce que la famille veut !"
+              "Tu fais les courses : regarde ce que la famille veut."
             ) : isPastDeadline(trip.deadline_at) ? (
-              `${who} fait les courses : dis-lui vite ce que tu veux !`
+              `${who} fait les courses : dis-lui vite ce que tu veux.`
             ) : (
               <>
-                {who} part dans <Countdown deadline={trip.deadline_at} /> : dis-lui ce que tu veux !
+                {who} part dans <Countdown deadline={trip.deadline_at} /> : dis-lui ce que tu veux.
               </>
             )}
           </span>
-          <span className="text-2xl">›</span>
         </Link>
       )}
       <NotificationsCard variant="pill" />
+      <h1 className="kd-titre-2">Qu&apos;est-ce qui te fait envie ce soir&nbsp;?</h1>
       <SwipeDeck initialDeck={deck} />
-    </div>
+    </Scene>
   );
 }
