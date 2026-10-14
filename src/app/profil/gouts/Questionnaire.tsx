@@ -306,8 +306,11 @@ function EtapeCartes({
 
 function NomCarte({ label, className = "h-full" }: { label: string; className?: string }) {
   return (
-    <article className={`kd-carte items-center justify-center p-6 text-center ${className}`}>
-      <p className="kd-titre-1 text-aubergine">{label}</p>
+    // Motif de fruits et légumes en fond (lilas pâle), le nom posé sur une étiquette blanche.
+    <article
+      className={`kd-carte items-center justify-center bg-[url(/brand/fonds/kaddie-motif-legumes-lilas.webp)] bg-cover bg-center p-6 text-center ${className}`}
+    >
+      <p className="kd-titre-1 rounded-carte bg-blanc px-5 py-3 text-aubergine">{label}</p>
     </article>
   );
 }
