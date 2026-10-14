@@ -2,6 +2,8 @@ import "server-only";
 import { broadcastRefresh, db } from "@/lib/supabase/server";
 import { extractRecipe, type ImportedRecipe } from "@/lib/domain/recipe-import";
 import { safeFetch } from "@/lib/safe-fetch";
+import { recipeConflicts } from "@/lib/domain/foods";
+import { getFamilyTastes } from "@/lib/data";
 
 /*
  * Recettes importées toutes seules depuis Marmiton, pour que le swipe ne
@@ -70,13 +72,17 @@ async function importer(familyId: string, combien: number): Promise<number> {
   const { data: dejaLa } = await db().from("recipes").select("source_url").eq("family_id", familyId).not("source_url", "is", null);
   const connus = new Set((dejaLa ?? []).map((r) => r.source_url as string));
   const aEssayer = melange(liens.filter((l) => !connus.has(l))).slice(0, ESSAIS_MAX);
+  // Rien que la famille ne peut pas manger (ni, en mode strict, ce que quelqu'un n'aime pas).
+  const { members, strict } = await getFamilyTastes(familyId);
+  const convient = (r: ImportedRecipe) =>
+    !recipeConflicts([r.title, ...r.ingredients.map((i) => i.name)], members, strict).familleCache;
 
   let ajoutees = 0;
   // 6 pages à la fois, jusqu'à avoir assez de plats.
   for (let i = 0; i < aEssayer.length && ajoutees < combien; i += 6) {
     const lot = await Promise.all(aEssayer.slice(i, i + 6).map(lireRecette));
     for (const [url, recette] of lot) {
-      if (ajoutees >= combien || !recette || !estUnBonPlat(recette)) continue;
+      if (ajoutees >= combien || !recette || !estUnBonPlat(recette) || !convient(recette)) continue;
       if (await enregistrer(familyId, url, recette)) ajoutees++;
     }
   }

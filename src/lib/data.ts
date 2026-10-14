@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { db } from "@/lib/supabase/server";
 import { buildDeck } from "@/lib/domain/swipe-deck";
+import { nAimePas, recipeConflicts, type Conflicts, type MemberTastes, type TasteLevel } from "@/lib/domain/foods";
 import type { Style } from "@/lib/session";
 
 /*
@@ -12,9 +13,18 @@ import type { Style } from "@/lib/session";
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
-export type Profile = { id: string; family_id: string; name: string; style: Style; emoji: string };
+export type Profile = {
+  id: string;
+  family_id: string;
+  name: string;
+  style: Style;
+  emoji: string;
+  /** Questionnaire de goûts vu (même passé avec « Plus tard ») / rempli. */
+  tastes_seen_at: string | null;
+  tastes_done_at: string | null;
+};
 
-export type Family = { id: string; name: string; join_code: string };
+export type Family = { id: string; name: string; join_code: string; strict_dislikes: boolean };
 
 export type IngredientRow = {
   id: string;
@@ -26,6 +36,8 @@ export type IngredientRow = {
 };
 
 export type Recipe = {
+  /** Pastille posée par les goûts de la famille (« Madji n'aime pas »). */
+  pastille?: string;
   id: string;
   title: string;
   emoji: string;
@@ -85,12 +97,12 @@ function check<T>(result: { data: T | null; error: { message: string } | null })
   return result.data as T;
 }
 
-const PROFILE_FIELDS = "id, family_id, name, style, emoji";
+const PROFILE_FIELDS = "id, family_id, name, style, emoji, tastes_seen_at, tastes_done_at";
 
 // ─── Familles et profils ───────────────────────────────────────────────
 
 export const getFamily = cache(async function getFamily(familyId: string): Promise<Family | null> {
-  return check(await db().from("families").select("id, name, join_code").eq("id", familyId).maybeSingle());
+  return check(await db().from("families").select("id, name, join_code, strict_dislikes").eq("id", familyId).maybeSingle());
 });
 
 export const getProfiles = cache(async function getProfiles(familyId: string): Promise<Profile[]> {
@@ -134,6 +146,56 @@ export async function getRecipesWithIngredients(familyId: string, ids: string[])
   );
 }
 
+// ─── Goûts de la famille ───────────────────────────────────────────────
+
+export type TasteContext = { strict: boolean; members: MemberTastes[]; texts: Map<string, string[]> };
+
+/** Les goûts de chaque membre et le mode strict. */
+export const getFamilyTastes = cache(async function getFamilyTastes(
+  familyId: string,
+): Promise<{ strict: boolean; members: MemberTastes[] }> {
+  const [family, rows] = await Promise.all([
+    getFamily(familyId),
+    db()
+      .from("profiles")
+      .select("id, name, profile_tastes(food, level)")
+      .eq("family_id", familyId)
+      .then((r) => check(r) as { id: string; name: string; profile_tastes: { food: string; level: TasteLevel }[] }[]),
+  ]);
+  return {
+    strict: family?.strict_dislikes ?? true,
+    members: rows.map((m) => ({
+      id: m.id,
+      name: m.name,
+      tastes: Object.fromEntries(m.profile_tastes.map((t) => [t.food, t.level])),
+    })),
+  };
+});
+
+/** Titre + noms d'ingrédients de chaque recette : de quoi y repérer les aliments. */
+export const getRecipeTexts = cache(async function getRecipeTexts(familyId: string): Promise<Map<string, string[]>> {
+  const rows = check(
+    await db().from("recipes").select("id, title, recipe_ingredients(name)").eq("family_id", familyId),
+  ) as { id: string; title: string; recipe_ingredients: { name: string }[] }[];
+  return new Map(rows.map((r) => [r.id, [r.title, ...r.recipe_ingredients.map((i) => i.name)]]));
+});
+
+export const getTasteContext = cache(async function getTasteContext(familyId: string): Promise<TasteContext> {
+  const [tastes, texts] = await Promise.all([getFamilyTastes(familyId), getRecipeTexts(familyId)]);
+  return { ...tastes, texts };
+});
+
+export function conflictsOf(ctx: TasteContext, recipe: { id: string; title: string }, meId?: string): Conflicts {
+  return recipeConflicts(ctx.texts.get(recipe.id) ?? [recipe.title], ctx.members, ctx.strict, meId);
+}
+
+/** Retire ce que la famille ne doit pas voir (interdits, et « j'aime pas » en mode strict). */
+export async function forFamily<R extends { id: string; title: string }>(familyId: string, recipes: R[]): Promise<R[]> {
+  if (recipes.length === 0) return recipes;
+  const ctx = await getTasteContext(familyId);
+  return recipes.filter((r) => !conflictsOf(ctx, r).familleCache);
+}
+
 // ─── Swipes & matchs ───────────────────────────────────────────────────
 
 export const getMatches = cache(async function getMatches(familyId: string): Promise<Match[]> {
@@ -149,18 +211,27 @@ export const getMatches = cache(async function getMatches(familyId: string): Pro
   ]);
   if (rows.length === 0) return [];
   const byId = new Map(recipes.map((r) => [r.id, r]));
-  return rows.flatMap((m) => {
+  const all = rows.flatMap((m) => {
     const recipe = byId.get(m.recipe_id);
     return recipe ? [{ ...recipe, matched_at: m.matched_at, expires_at: m.expires_at, like_count: m.like_count }] : [];
   });
+  return forFamily(familyId, all);
 });
 
+/** Mon paquet, trié selon les goûts : interdits et « j'aime pas » retirés, « j'adore » devant. */
 export async function getDeck(familyId: string, profileId: string): Promise<Recipe[]> {
-  const [recipes, swipes] = await Promise.all([
+  const [recipes, swipes, ctx] = await Promise.all([
     getRecipes(familyId),
     db().from("swipes").select("recipe_id, swiped_at").eq("profile_id", profileId).then(check),
+    getTasteContext(familyId),
   ]);
-  return buildDeck(recipes, swipes as { recipe_id: string; swiped_at: string }[]);
+  const conflicts = new Map(recipes.map((r) => [r.id, conflictsOf(ctx, r, profileId)]));
+  return buildDeck(recipes, swipes as { recipe_id: string; swiped_at: string }[], new Date(), (r) => conflicts.get(r.id)!.verdict).map(
+    (r) => {
+      const c = conflicts.get(r.id)!;
+      return c.verdict === "fin" ? { ...r, pastille: nAimePas(c.pasFanDe) } : r;
+    },
+  );
 }
 
 /** Est-ce que la majorité de la famille a liké cette recette récemment ? */

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/data";
-import { getMatches, getProfiles, getRecipes } from "@/lib/data";
+import { forFamily, getMatches, getProfiles, getRecipes } from "@/lib/data";
 import { getTripOverview, type TripOverview } from "@/lib/views";
 import { departureChoices, formatTime } from "@/lib/domain/trip";
 import { ROUTES } from "@/lib/routes";
@@ -145,7 +145,10 @@ async function ResponderView({ me, overview }: { me: Profile; overview: TripOver
   const mine = responses.find((r) => r.member.id === me.id)?.request ?? null;
   const others = responses.filter((r) => r.member.id !== me.id && r.request);
   const matchIds = new Set(matches.map((m) => m.id));
-  const choices = [...matches, ...recipes.filter((r) => mine?.recipe_ids.includes(r.id) && !matchIds.has(r.id))];
+  const choices = await forFamily(me.family_id, [
+    ...matches,
+    ...recipes.filter((r) => mine?.recipe_ids.includes(r.id) && !matchIds.has(r.id)),
+  ]);
   const who = shopper?.name ?? "Quelqu'un";
   const validated = trip.status === "validated";
 

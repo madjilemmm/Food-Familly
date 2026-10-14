@@ -3,35 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import {
-  AnimatePresence,
-  animate,
-  motion,
-  useMotionValue,
-  useReducedMotion,
-  useTransform,
-  type PanInfo,
-} from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { swipe } from "@/app/actions/swipes";
 import { Bouton, CarteRecette, IconeJenVeux, IconePasEnvie, Logo, Scene } from "@/design-system/components/Kaddie";
 import type { Recipe } from "@/lib/data";
+import { CarteGeste, PILE } from "./CarteGeste";
 
 /*
- * Le swipe Kaddie (DESIGN.md §7) : la carte suit le doigt, rotation = déplacement / 20
- * plafonnée à 15°, tampons « Miam » / « Bof » en fondu. Au-delà de 30 % de la largeur
- * ou d'un geste rapide, la carte part en 240 ms ; sinon elle revient en rebondissant.
+ * Le swipe des recettes : à droite « Miam », à gauche « Bof ».
+ * Le geste lui-même (DESIGN.md §7) est dans CarteGeste.
  */
-const SEUIL = 0.3;
-const VITESSE = 600;
-const SORTIE = 0.24;
-const REBOND = [0.34, 1.56, 0.64, 1] as const;
-
-/** Les cartes du dessous, décalées et légèrement tournées. */
-const PILE = [
-  { rotate: 0, y: 0, scale: 1 },
-  { rotate: -2, y: 8, scale: 0.96 },
-  { rotate: 5, y: 16, scale: 0.92 },
-];
 
 export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
   // L'état local n'est pas réinitialisé par les rafraîchissements de la page :
@@ -140,62 +121,25 @@ function Carte({
   onDecide: (liked: boolean) => void;
   register?: (fn: (liked: boolean) => void) => void;
 }) {
-  const calme = useReducedMotion();
-  const x = useMotionValue(0);
-  const rotateDrag = useTransform(x, (v) => (calme ? 0 : Math.max(-15, Math.min(15, v / 20))));
-  const largeur = () => pileRef.current?.offsetWidth ?? 360;
-  const miam = useTransform(x, (v) => Math.min(1, Math.max(0, v / (largeur() * SEUIL))));
-  const bof = useTransform(x, (v) => Math.min(1, Math.max(0, -v / (largeur() * SEUIL))));
-  const isTop = rang === 0;
-  const pos = PILE[rang];
-
-  const parti = useRef(false);
-  const partir = (liked: boolean) => {
-    if (parti.current) return; // un double appui ne doit pas sauter une carte
-    parti.current = true;
-    const cible = (liked ? 1 : -1) * largeur() * 1.6;
-    if (calme) {
-      onDecide(liked);
-      return;
-    }
-    animate(x, cible, { duration: SORTIE, ease: [0.22, 1, 0.36, 1] }).then(() => onDecide(liked));
-  };
-
-  useEffect(() => {
-    register?.(partir);
-  });
-
-  function onDragEnd(_: unknown, info: PanInfo) {
-    const loin = Math.abs(info.offset.x) > largeur() * SEUIL;
-    const vite = Math.abs(info.velocity.x) > VITESSE;
-    if (loin || vite) partir((loin ? info.offset.x : info.velocity.x) > 0);
-    else animate(x, 0, { duration: 0.42, ease: REBOND });
-  }
-
   return (
-    <motion.div
-      className="absolute inset-0 touch-none select-none"
-      style={{ x, rotate: isTop ? rotateDrag : pos.rotate, zIndex: PILE.length - rang }}
-      drag={isTop ? "x" : false}
-      dragMomentum={false}
-      onDragEnd={onDragEnd}
-      initial={false}
-      animate={{ y: pos.y, scale: pos.scale, rotate: isTop ? undefined : calme ? 0 : pos.rotate }}
-      exit={{ opacity: 0, transition: { duration: calme ? 0.12 : 0 } }}
-      transition={{ duration: calme ? 0.12 : 0.24, ease: [0.22, 1, 0.36, 1] }}
+    <CarteGeste
+      rang={rang}
+      pileRef={pileRef}
+      onDecide={(d) => onDecide(d === "droite")}
+      register={register ? (fn) => register((liked) => fn(liked ? "droite" : "gauche")) : undefined}
+      tampons={{
+        droite: <span className="kd-tampon kd-tampon--like">Miam</span>,
+        gauche: <span className="kd-tampon kd-tampon--nope">Bof</span>,
+      }}
     >
-      <CarteRecette className="kd-carte--pleine" titre={recipe.title} photo={recipe.photo_url} infos={recipe.source_url ? "Recette Marmiton" : undefined} />
-      {isTop && (
-        <>
-          <motion.span style={{ opacity: miam }} className="kd-tampon kd-tampon--like" aria-hidden>
-            Miam
-          </motion.span>
-          <motion.span style={{ opacity: bof }} className="kd-tampon kd-tampon--nope" aria-hidden>
-            Bof
-          </motion.span>
-        </>
-      )}
-    </motion.div>
+      <CarteRecette
+        className="kd-carte--pleine"
+        titre={recipe.title}
+        photo={recipe.photo_url}
+        pastille={recipe.pastille}
+        infos={recipe.source_url ? "Recette Marmiton" : undefined}
+      />
+    </CarteGeste>
   );
 }
 

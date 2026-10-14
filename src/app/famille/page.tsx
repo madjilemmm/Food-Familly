@@ -6,6 +6,7 @@ import { Scene } from "@/design-system/components/Kaddie";
 import { FamilyCode } from "@/components/family/FamilyCode";
 import { MembersEditor } from "@/components/family/MembersEditor";
 import { FamilyName } from "@/components/family/FamilyName";
+import { StrictToggle } from "@/components/family/StrictToggle";
 import { IconeRetour } from "@/components/ui";
 
 export const metadata = { title: "Ma famille — Kaddie" };
@@ -38,6 +39,8 @@ export default async function FamilyPage({ searchParams }: { searchParams: Promi
 
       <FamilyName name={family.name} />
       <FamilyCode code={family.join_code} familyName={family.name} />
+
+      <StrictToggle strict={family.strict_dislikes} />
 
       <section>
         <h2 className="kd-titre-2 mb-3 text-aubergine">Les membres</h2>

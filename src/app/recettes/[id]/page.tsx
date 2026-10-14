@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfile, requireUser } from "@/lib/auth";
-import { getRecipe } from "@/lib/data";
+import { getFamilyTastes, getRecipe } from "@/lib/data";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
 import { IconeRetour } from "@/components/ui";
 
@@ -9,7 +9,7 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const user = await requireUser();
-  const [, recipe] = await Promise.all([requireProfile(), getRecipe(user.familyId, id)]);
+  const [, recipe, { members }] = await Promise.all([requireProfile(), getRecipe(user.familyId, id), getFamilyTastes(user.familyId)]);
   if (!recipe) notFound();
   return (
     <>
@@ -19,7 +19,7 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
         </Link>
       </div>
       <h1 className="kd-titre-1 mb-6 text-aubergine">Modifier la recette</h1>
-      <RecipeForm recipe={recipe} />
+      <RecipeForm recipe={recipe} gouts={members} />
     </>
   );
 }

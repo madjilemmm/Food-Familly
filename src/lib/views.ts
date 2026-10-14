@@ -1,8 +1,10 @@
 import "server-only";
 import { cache } from "react";
 import {
+  conflictsOf,
   getCurrentTrip,
   getMatches,
+  getTasteContext,
   getProfiles,
   getRecipes,
   type Profile,
@@ -42,11 +44,12 @@ export const getTripOverview = cache(async function getTripOverview(
   myProfileId: string,
 ): Promise<TripOverview | null> {
   // Tout part en même temps : un seul aller-retour vers la base.
-  const [trip, members, matches, recipes] = await Promise.all([
+  const [trip, members, matches, recipes, tastes] = await Promise.all([
     getCurrentTrip(familyId),
     getProfiles(familyId),
     getMatches(familyId),
     getRecipes(familyId),
+    getTasteContext(familyId),
   ]);
   if (!trip) return null;
   const requests = trip.trip_requests;
@@ -74,6 +77,8 @@ export const getTripOverview = cache(async function getTripOverview(
 
   const candidates: CandidateRecipe[] = [...ids]
     .flatMap((id) => recipeById.get(id) ?? [])
+    // Ce qu'un membre ne peut pas manger n'est jamais proposé (ni ce qu'il n'aime pas, en mode strict).
+    .filter((recipe) => !conflictsOf(tastes, recipe).familleCache)
     .map((recipe) => ({
       ...recipe,
       checked: selection.get(recipe.id) === true,

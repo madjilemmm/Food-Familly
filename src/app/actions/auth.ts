@@ -102,7 +102,7 @@ export async function createFamily(_prev: { error?: string }, formData: FormData
 
   const me = profiles.find((p) => p.sort_order === meIndex)!;
   await setSession(newSession(familyId, me.id as string, members[meIndex].style));
-  redirect("/famille?bienvenue=1");
+  redirect(`/profil/gouts?suite=${encodeURIComponent("/famille?bienvenue=1")}`);
 }
 
 /** 10 recettes classiques pour qu'une nouvelle famille puisse swiper tout de suite. */
@@ -129,7 +129,8 @@ export async function chooseProfile(profileId: string) {
   const profile = await getProfile(session.familyId, profileId);
   if (!profile) throw new Error("Profil introuvable");
   await setSession(newSession(session.familyId, profile.id, profile.style));
-  redirect(ROUTES[profile.style].home);
+  // Première fois sur ce profil : le questionnaire de goûts d'abord.
+  redirect(profile.tastes_seen_at ? ROUTES[profile.style].home : "/profil/gouts");
 }
 
 /** « Je ne suis pas dans la liste » : on s'ajoute soi-même à la famille. */
@@ -146,7 +147,7 @@ export async function addMyself(_prev: { error?: string }, formData: FormData): 
   if (error || !data) return { error: "L'ajout a échoué. Réessayez." };
   await setSession(newSession(session.familyId, data.id as string, style));
   changed();
-  redirect(ROUTES[style].home);
+  redirect("/profil/gouts");
 }
 
 export async function forgetProfile() {

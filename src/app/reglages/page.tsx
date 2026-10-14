@@ -39,6 +39,10 @@ export default async function SettingsPage() {
       <NotificationsCard variant="full" />
 
       <div className="flex flex-col gap-3">
+        <Link href={`/profil/gouts?suite=${encodeURIComponent("/reglages")}`} className={lien}>
+          <span>Mes goûts</span>
+          <IconeRetour className="size-6 rotate-180 text-violet" />
+        </Link>
         <Link href="/famille" className={lien}>
           <span>Ma famille{family ? ` · ${family.name}` : ""}</span>
           <IconeRetour className="size-6 rotate-180 text-violet" />

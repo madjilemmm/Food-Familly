@@ -34,3 +34,14 @@ describe("buildDeck", () => {
     expect(daysLeft(daysAgo(1), now)).toBe(0);
   });
 });
+
+describe("buildDeck et les goûts", () => {
+  const now = new Date("2026-10-16T12:00:00Z");
+  const r = (id: string, created_at: string) => ({ id, created_at });
+  const recipes = [r("a", "2026-10-01"), r("b", "2026-10-02"), r("c", "2026-10-03"), r("d", "2026-10-04")];
+  const rank = (x: { id: string }) => ({ a: "tete", b: "cache", c: "fin", d: "normal" })[x.id] as "tete" | "cache" | "fin" | "normal";
+
+  it("j'adore en tête, caché retiré, « n'aime pas » à la fin", () => {
+    expect(buildDeck(recipes, [], now, rank).map((x) => x.id)).toEqual(["a", "d", "c"]);
+  });
+});

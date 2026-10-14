@@ -9,6 +9,7 @@ import { AISLES } from "@/lib/domain/aisles";
 import type { RecipeWithIngredients } from "@/lib/data";
 import { resizeImage } from "./resizeImage";
 import { IconeCroix, IconePlus, MessageErreur } from "@/components/ui";
+import { recipeConflicts, type MemberTastes } from "@/lib/domain/foods";
 
 type Row = { key: number; name: string; quantity: string; unit: string; aisle: string };
 
@@ -19,7 +20,7 @@ function emptyRow(aisle = "fruits_legumes"): Row {
   return { key: nextKey++, name: "", quantity: "", unit: "", aisle };
 }
 
-export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
+export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredients; gouts?: MemberTastes[] }) {
   const [state, action, saving] = useActionState(saveRecipe, {});
   const [deleting, startDelete] = useTransition();
   const [rows, setRows] = useState<Row[]>(() =>
@@ -62,6 +63,9 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
     }
     setServings(imported.servings);
   }
+
+  // Un aliment interdit pour quelqu'un ? On prévient tout de suite (la recette sera cachée du swipe).
+  const interditPour = recipeConflicts([title, ...rows.map((r) => r.name)], gouts, false).interditPar;
 
   const update = (key: number, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -227,6 +231,12 @@ export function RecipeForm({ recipe }: { recipe?: RecipeWithIngredients }) {
           <IconePlus className="size-6" /> Ajouter un ingrédient
         </button>
       </fieldset>
+
+      {interditPour.length > 0 && (
+        <p role="status" className="rounded-pastille bg-aubergine px-4 py-3 text-blanc">
+          Interdit pour {interditPour.join(", ")}&nbsp;: cette recette sera cachée du swipe, des matchs et des courses.
+        </p>
+      )}
 
       {state.error && <MessageErreur>{state.error}</MessageErreur>}
 
