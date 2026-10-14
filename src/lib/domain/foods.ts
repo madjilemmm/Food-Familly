@@ -17,7 +17,14 @@ export type Food = {
   words: string[];
   /** Expressions à ignorer (« lait de coco » n'est pas du lactose). */
   except?: string[];
+  /** Pour une carte : régimes qui la couvrent déjà (on ne la repose pas). */
+  dans?: string[];
 };
+
+/** Une carte déjà couverte par un régime coché n'est pas posée. */
+export function cartesPour(diets: string[]): Food[] {
+  return INGREDIENTS.filter((f) => !diets.includes(f.key) && !f.dans?.some((d) => diets.includes(d)));
+}
 
 const PORC = ["porc", "lardon", "jambon", "chorizo", "saucisse", "saucisson", "bacon", "pancetta", "rillette", "coppa", "lard", "poitrine fumee", "chair a saucisse", "andouille", "andouillette", "boudin", "cervelas", "mortadelle", "prosciutto", "speck", "travers de porc", "echine de porc", "knack", "chipolata", "salami", "rosette"];
 const PORC_SAUF = ["jambon de dinde", "jambon de poulet", "lardons de volaille", "lardons de dinde", "saucisse de volaille", "saucisse vegetale", "bacon de dinde"];
@@ -55,24 +62,60 @@ export const DIETS: Food[] = [
 
 /** Les cartes du questionnaire : « j'aime pas », « ça me va » ou « j'adore ». */
 export const INGREDIENTS: Food[] = [
-  { key: "canard", label: "Canard", words: ["canard", "magret", "aiguillette de canard", "confit de canard", "cuisse de canard"] },
+  // Viandes
+  { key: "boeuf", label: "Bœuf", words: ["boeuf", "steak", "bavette", "entrecote", "faux filet", "paleron", "macreuse", "joue de boeuf", "bourguignon", "viande hachee", "boeuf hache"], dans: ["vegetarien"] },
+  { key: "veau", label: "Veau", words: ["veau", "osso bucco", "escalope de veau", "blanquette de veau"], except: ["fond de veau"], dans: ["vegetarien"] },
+  { key: "porc", label: "Porc", words: ["porc", "filet mignon de porc", "echine de porc", "travers de porc", "cote de porc", "roti de porc"], dans: ["vegetarien", "sans_porc"] },
+  { key: "charcuterie", label: "Charcuterie", words: ["lardon", "jambon", "chorizo", "saucisse", "saucisson", "bacon", "pancetta", "rillette", "coppa", "lard", "chipolata", "knack", "salami", "mortadelle", "prosciutto", "speck", "boudin"], dans: ["vegetarien", "sans_porc"] },
+  { key: "poulet", label: "Poulet", words: ["poulet", "volaille", "dinde", "pintade", "blanc de poulet", "cuisse de poulet"], except: ["bouillon de volaille", "fond de volaille"], dans: ["vegetarien"] },
+  { key: "canard", label: "Canard", words: ["canard", "magret", "aiguillette de canard", "confit de canard", "cuisse de canard"], dans: ["vegetarien"] },
+  { key: "agneau", label: "Agneau", words: ["agneau", "mouton", "gigot", "navarin", "souris d agneau"], dans: ["vegetarien"] },
+  { key: "lapin", label: "Lapin", words: ["lapin"], dans: ["vegetarien"] },
+  { key: "abats", label: "Abats", words: ["abat", "foie", "rognon", "tripe", "cervelle", "ris de veau", "langue de boeuf", "gesier", "andouillette", "coeur de canard", "coeur de poulet"], except: ["foie gras"], dans: ["vegetarien"] },
+  // Poissons et fruits de mer
+  { key: "poisson", label: "Poisson blanc", words: ["poisson", "cabillaud", "colin", "merlu", "lieu noir", "dorade", "daurade", "bar", "sole", "lotte", "haddock", "morue", "raie", "tilapia", "pangasius", "eglefin", "brandade"], dans: ["vegetarien", "poisson"] },
+  { key: "saumon", label: "Saumon", words: ["saumon"], dans: ["vegetarien", "poisson"] },
+  { key: "thon", label: "Thon", words: ["thon"], dans: ["vegetarien", "poisson"] },
+  { key: "poissons_gras", label: "Sardines, maquereau", words: ["sardine", "maquereau", "hareng", "anchois"], dans: ["vegetarien", "poisson"] },
+  { key: "fruits_de_mer", label: "Fruits de mer", words: FRUITS_DE_MER, dans: ["vegetarien"] },
+  // Légumes
   { key: "champignons", label: "Champignons", words: ["champignon", "cepe", "girolle", "morille", "shiitake", "pleurote", "chanterelle", "trompette de la mort"] },
-  { key: "poisson", label: "Poisson", words: POISSON },
-  { key: "fruits_de_mer", label: "Fruits de mer", words: FRUITS_DE_MER },
+  { key: "courgette", label: "Courgette", words: ["courgette"] },
+  { key: "aubergine", label: "Aubergine", words: ["aubergine", "moussaka", "caviar d aubergine"] },
+  { key: "poivron", label: "Poivron", words: ["poivron", "piperade"] },
   { key: "epinards", label: "Épinards", words: ["epinard"] },
   { key: "chou", label: "Chou", words: ["chou", "chou fleur", "chou rouge", "chou vert", "chou de bruxelles", "choucroute", "chou chinois"], except: ["chou a la creme", "pate a chou"] },
   { key: "brocoli", label: "Brocoli", words: ["brocoli"] },
-  { key: "aubergine", label: "Aubergine", words: ["aubergine", "moussaka", "caviar d aubergine"] },
-  { key: "poivron", label: "Poivron", words: ["poivron", "piperade"] },
-  { key: "coriandre", label: "Coriandre", words: ["coriandre"] },
-  { key: "piment", label: "Piment", words: ["piment", "harissa", "tabasco", "jalapeno", "sriracha", "chili", "pili pili"] },
-  { key: "fromage_fort", label: "Fromage fort", words: ["fromage fort", "roquefort", "gorgonzola", "munster", "maroilles", "livarot", "epoisse", "fourme d ambert", "bleu d auvergne", "stilton", "bleu"] },
-  { key: "olives", label: "Olives", words: ["olive", "tapenade"], except: ["huile d olive"] },
-  { key: "abats", label: "Abats", words: ["abat", "foie", "rognon", "tripe", "cervelle", "ris de veau", "langue de boeuf", "gesier", "andouillette", "coeur de canard", "coeur de poulet"], except: ["foie gras"] },
-  { key: "lapin", label: "Lapin", words: ["lapin"] },
-  { key: "agneau", label: "Agneau", words: ["agneau", "mouton", "gigot", "navarin", "souris d agneau"] },
+  { key: "carotte", label: "Carottes cuites", words: ["carotte"] },
+  { key: "haricots_verts", label: "Haricots verts", words: ["haricot vert"] },
+  { key: "petits_pois", label: "Petits pois", words: ["petit pois"] },
+  { key: "poireau", label: "Poireau", words: ["poireau"] },
+  { key: "celeri", label: "Céleri", words: ["celeri", "celeri rave", "celeri branche"] },
+  { key: "fenouil", label: "Fenouil", words: ["fenouil"] },
+  { key: "artichaut", label: "Artichaut", words: ["artichaut"] },
+  { key: "asperges", label: "Asperges", words: ["asperge"] },
+  { key: "endives", label: "Endives", words: ["endive", "chicon"] },
+  { key: "courge", label: "Potiron, courge", words: ["potiron", "courge", "butternut", "potimarron", "citrouille"] },
+  { key: "patate_douce", label: "Patate douce", words: ["patate douce"] },
   { key: "betterave", label: "Betterave", words: ["betterave"] },
   { key: "avocat", label: "Avocat", words: ["avocat", "guacamole"] },
+  // Légumineuses et autres
+  { key: "lentilles", label: "Lentilles", words: ["lentille"] },
+  { key: "pois_chiches", label: "Pois chiches", words: ["pois chiche", "houmous", "falafel"], except: ["farine de pois chiche"] },
+  { key: "tofu", label: "Tofu", words: ["tofu"] },
+  // Fromages
+  { key: "chevre", label: "Chèvre", words: ["chevre", "fromage de chevre", "buche de chevre", "crottin"] },
+  { key: "fromage_fort", label: "Fromage fort", words: ["fromage fort", "roquefort", "gorgonzola", "munster", "maroilles", "livarot", "epoisse", "fourme d ambert", "bleu d auvergne", "stilton", "bleu"] },
+  // Saveurs
+  { key: "olives", label: "Olives", words: ["olive", "tapenade"], except: ["huile d olive"] },
+  { key: "capres_cornichons", label: "Câpres, cornichons", words: ["capre", "cornichon"] },
+  { key: "coriandre", label: "Coriandre", words: ["coriandre"] },
+  { key: "menthe", label: "Menthe", words: ["menthe"] },
+  { key: "piment", label: "Piment", words: ["piment", "harissa", "tabasco", "jalapeno", "sriracha", "chili", "pili pili"] },
+  { key: "curry", label: "Curry", words: ["curry", "pate de curry", "massala", "masala", "garam masala"] },
+  { key: "gingembre", label: "Gingembre", words: ["gingembre"] },
+  { key: "coco", label: "Noix de coco", words: ["coco", "lait de coco", "creme de coco", "noix de coco"] },
+  { key: "sucre_sale", label: "Sucré-salé", words: ["pruneau", "raisin sec", "abricot sec", "figue seche", "datte", "tajine aux pruneaux"] },
 ];
 
 const ALL: Food[] = [...DIETS, ...INGREDIENTS.filter((f) => !DIETS.some((d) => d.key === f.key))];

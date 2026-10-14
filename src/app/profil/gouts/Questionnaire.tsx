@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence } from "motion/react";
 import { Bouton, IconeJenVeux, IconePasEnvie, Logo, Scene } from "@/design-system/components/Kaddie";
 import { saveTastes, skipTastes, type CardAnswer } from "@/app/actions/tastes";
-import { DIETS, INGREDIENTS, compatibility, type TasteLevel } from "@/lib/domain/foods";
+import { DIETS, cartesPour, compatibility, type TasteLevel } from "@/lib/domain/foods";
 import { CarteGeste, PILE, type Direction } from "@/components/CarteGeste";
 import { IconeCoeur, IconeCroix, MessageErreur } from "@/components/ui";
 import { Spinner } from "@/components/Spinner";
@@ -32,7 +32,7 @@ export function Questionnaire({ style, suite, initial, others }: { style: Style;
   const [pending, startTransition] = useTransition();
 
   // Une carte déjà couverte par un régime coché (poisson, fruits de mer) n'est pas reposée.
-  const deck = useMemo(() => INGREDIENTS.filter((f) => !diets.includes(f.key)), [diets]);
+  const deck = useMemo(() => cartesPour(diets), [diets]);
 
   const partir = () => {
     router.push(suite);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AUTRE, compatibility, foodsIn, nAimePas, recipeConflicts, type MemberTastes } from "./foods";
+import { AUTRE, INGREDIENTS, cartesPour, compatibility, foodsIn, nAimePas, recipeConflicts, type MemberTastes } from "./foods";
 
 const has = (lines: string[], key: string) => foodsIn(lines, [key]).has(key);
 
@@ -84,7 +84,8 @@ describe("recipeConflicts", () => {
 describe("compatibility", () => {
   it("part des cartes où les deux sont du même avis", () => {
     expect(compatibility({}, {})).toBe(100);
-    expect(compatibility({ canard: "pas_fan" }, { canard: "adore" })).toBe(94); // 17/18
+    const n = INGREDIENTS.length;
+    expect(compatibility({ canard: "pas_fan" }, { canard: "adore" })).toBe(Math.round(((n - 1) / n) * 100));
     expect(compatibility({ canard: "pas_fan" }, { canard: "pas_fan" })).toBe(100);
   });
 });
@@ -92,5 +93,26 @@ describe("compatibility", () => {
 describe("nAimePas", () => {
   it("accorde au pluriel", () => {
     expect(nAimePas(["Madji", "Léo"])).toBe("Madji et Léo n'aiment pas");
+  });
+});
+
+describe("les cartes du questionnaire", () => {
+  it("assez de cartes, et pas de doublon", () => {
+    expect(INGREDIENTS.length).toBeGreaterThanOrEqual(40);
+    expect(new Set(INGREDIENTS.map((f) => f.key)).size).toBe(INGREDIENTS.length);
+  });
+  it("un régime coché retire les cartes qu'il couvre", () => {
+    const keys = (d: string[]) => cartesPour(d).map((f) => f.key);
+    expect(keys(["sans_porc"])).not.toContain("charcuterie");
+    expect(keys(["sans_porc"])).toContain("poulet");
+    expect(keys(["vegetarien"])).not.toContain("saumon");
+    expect(keys(["vegetarien"])).toContain("lentilles");
+  });
+  it("les nouvelles cartes reconnaissent leurs ingrédients", () => {
+    expect(foodsIn(["200 g de lardons"], ["charcuterie"]).has("charcuterie")).toBe(true);
+    expect(foodsIn(["Bouillon de volaille"], ["poulet"]).has("poulet")).toBe(false);
+    expect(foodsIn(["400 g de haricots verts"], ["haricots_verts"]).has("haricots_verts")).toBe(true);
+    expect(foodsIn(["Haricots rouges"], ["haricots_verts"]).has("haricots_verts")).toBe(false);
+    expect(foodsIn(["Tajine aux pruneaux"], ["sucre_sale"]).has("sucre_sale")).toBe(true);
   });
 });
