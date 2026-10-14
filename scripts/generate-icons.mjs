@@ -19,12 +19,21 @@ const maskable = async (size, file) => {
     .toFile(file);
 };
 
+// Icône d'onglet Safari : coins arrondis transparents, pour épouser la pastille
+// que Safari dessine derrière (sinon un liseré blanc apparaît autour).
+const tab = async (size, file) => {
+  const r = Math.round(size * 0.22);
+  const mask = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${r}" ry="${r}"/></svg>`);
+  await sharp(SOURCE).resize(size, size).composite([{ input: mask, blend: "dest-in" }]).png().toFile(file);
+};
+
 // (badge-96.png, la petite icône des notifications Android, garde son dessin.)
 await Promise.all([
   render(192, `${OUT}/icon-192.png`),
   render(512, `${OUT}/icon-512.png`),
   maskable(512, `${OUT}/icon-maskable-512.png`),
-  render(32, `${OUT}/favicon-32.png`),
+  tab(32, `${OUT}/favicon-32.png`),
+  tab(192, `${OUT}/favicon-192.png`),
   render(180, "public/apple-touch-icon.png"),
 ]);
 console.log("Icônes générées dans", OUT);
