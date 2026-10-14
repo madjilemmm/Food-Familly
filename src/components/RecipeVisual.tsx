@@ -9,7 +9,7 @@ export function RecipeVisual({
   className?: string;
 }) {
   if (recipe.photo_url) {
-    return <img src={recipe.photo_url} alt="" draggable={false} className={`bg-trait object-cover ${className}`} />;
+    return <img src={recipe.photo_url} alt="" loading="lazy" decoding="async" draggable={false} className={`bg-trait object-cover ${className}`} />;
   }
   return <div aria-hidden className={`bg-trait ${className}`} />;
 }

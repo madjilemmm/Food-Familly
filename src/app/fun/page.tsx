@@ -9,7 +9,6 @@ import { Countdown } from "@/components/Countdown";
 import { SwipeDeck } from "@/components/SwipeDeck";
 import { IconePanier } from "@/components/ui";
 import { SwipeHeader } from "@/components/SwipeHeader";
-import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 
 // Laisse le temps à l'import Marmiton (lancé après l'affichage) de finir.
 export const maxDuration = 60;
@@ -54,7 +53,6 @@ export default async function FunSwipe() {
           </span>
         </Link>
       )}
-      <NotificationsCard variant="pill" />
       <h1 className="kd-titre-2">Qu&apos;est-ce qui te fait envie ce soir&nbsp;?</h1>
       <SwipeDeck initialDeck={deck} />
     </Scene>

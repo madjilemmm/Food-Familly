@@ -60,7 +60,7 @@ export function StartTrip({
                 if (res?.error) setError(res.error);
               });
             }}
-            className={`kd-btn min-h-20 ${chosen === c.id ? "" : "kd-btn--secondaire"} ${
+            className={`kd-btn min-h-20 px-3 whitespace-nowrap ${chosen === c.id ? "" : "kd-btn--secondaire"} ${
               pending && chosen !== c.id ? "opacity-40" : ""
             } ${choices.length % 2 === 1 && c === choices[choices.length - 1] ? "col-span-2" : ""}`}
           >

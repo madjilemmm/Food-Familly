@@ -3,6 +3,7 @@ import { Rubik } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { AutoUpdate } from "@/components/pwa/AutoUpdate";
+import { Mouvement } from "@/components/Mouvement";
 
 const rubik = Rubik({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-rubik", display: "swap" });
 
@@ -43,7 +44,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)] bg-violet" />
         <ServiceWorkerRegister />
         <AutoUpdate />
-        {children}
+        <Mouvement>{children}</Mouvement>
       </body>
     </html>
   );

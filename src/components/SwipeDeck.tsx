@@ -213,6 +213,11 @@ function PileVide() {
 
 /** « C'est un match » : monogramme qui éclot, puis la carte qui monte (120 ms après). */
 function EcranMatch({ recipe, onClose }: { recipe: Recipe; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
     <motion.div
       className="fixed inset-0 z-50"

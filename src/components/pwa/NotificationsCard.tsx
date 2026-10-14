@@ -9,13 +9,32 @@ import { InstallHelp } from "./InstallHelp";
  * - variant "banner" : n'apparaît que s'il reste quelque chose à faire
  *   (sur l'écran d'accueil de chacun) ;
  * - variant "pill" : une seule ligne, pour les écrans où la place compte (swipe) ;
+ * - variant "icone" : un rond avec une cloche, dans un en-tête (ne pousse rien en apparaissant) ;
  * - variant "full" : toujours visible (dans les réglages).
  */
-export function NotificationsCard({ variant }: { variant: "banner" | "pill" | "full" }) {
+export function NotificationsCard({ variant }: { variant: "banner" | "pill" | "icone" | "full" }) {
   const { state, error, enable, disable, test } = usePush();
 
-  if (state === "loading") return null;
+  // Pendant la vérification, la carte des réglages garde sa place (pas de saut de mise en page).
+  if (state === "loading")
+    return variant === "full" ? <section aria-busy="true" className="kd-carte min-h-48" aria-label="Notifications" /> : null;
   if (variant !== "full" && (state === "on" || state === "unsupported" || state === "denied")) return null;
+
+  if (variant === "icone") {
+    const rond = "relative flex size-14 shrink-0 items-center justify-center rounded-full bg-blanc text-aubergine active:scale-95";
+    const point = <span aria-hidden className="absolute top-2.5 right-2.5 size-3 rounded-full bg-accent outline-2 outline-blanc" />;
+    return state === "install-first" ? (
+      <Link href="/reglages" aria-label="Notifs : installe d'abord l'appli" className={rond}>
+        <IconeCloche className="size-7" />
+        {point}
+      </Link>
+    ) : (
+      <button onClick={enable} aria-label="Activer les notifs" className={rond}>
+        <IconeCloche className="size-7" />
+        {point}
+      </button>
+    );
+  }
 
   if (variant === "pill") {
     const pill = "flex min-h-14 w-full items-center gap-3 rounded-bouton bg-blanc px-4 text-left font-semibold text-aubergine active:scale-[0.98]";
