@@ -1,7 +1,14 @@
 import "server-only";
+import { cache } from "react";
 import { db } from "@/lib/supabase/server";
 import { buildDeck } from "@/lib/domain/swipe-deck";
 import type { Style } from "@/lib/session";
+
+/*
+ * Les lectures appelées par plusieurs composants d'une même page (mise en page,
+ * page, en-tête…) passent par cache() : une seule requête par affichage.
+ * isMatch n'en profite pas : il est relu juste après une écriture.
+ */
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -76,25 +83,25 @@ const PROFILE_FIELDS = "id, family_id, name, style, emoji";
 
 // ─── Familles et profils ───────────────────────────────────────────────
 
-export async function getFamily(familyId: string): Promise<Family | null> {
+export const getFamily = cache(async function getFamily(familyId: string): Promise<Family | null> {
   return check(await db().from("families").select("id, name, join_code").eq("id", familyId).maybeSingle());
-}
+});
 
-export async function getProfiles(familyId: string): Promise<Profile[]> {
+export const getProfiles = cache(async function getProfiles(familyId: string): Promise<Profile[]> {
   return check(
     await db().from("profiles").select(PROFILE_FIELDS).eq("family_id", familyId).order("sort_order").order("created_at"),
   );
-}
+});
 
-export async function getProfile(familyId: string, id: string): Promise<Profile | null> {
+export const getProfile = cache(async function getProfile(familyId: string, id: string): Promise<Profile | null> {
   return check(await db().from("profiles").select(PROFILE_FIELDS).eq("family_id", familyId).eq("id", id).maybeSingle());
-}
+});
 
 // ─── Recettes ──────────────────────────────────────────────────────────
 
-export async function getRecipes(familyId: string): Promise<Recipe[]> {
+export const getRecipes = cache(async function getRecipes(familyId: string): Promise<Recipe[]> {
   return check(await db().from("recipes").select(RECIPE_FIELDS).eq("family_id", familyId).order("title"));
-}
+});
 
 export async function getRecipe(familyId: string, id: string): Promise<RecipeWithIngredients | null> {
   return check(
@@ -123,7 +130,7 @@ export async function getRecipesWithIngredients(familyId: string, ids: string[])
 
 // ─── Swipes & matchs ───────────────────────────────────────────────────
 
-export async function getMatches(familyId: string): Promise<Match[]> {
+export const getMatches = cache(async function getMatches(familyId: string): Promise<Match[]> {
   const rows = check(
     await db()
       .from("active_matches")
@@ -140,7 +147,7 @@ export async function getMatches(familyId: string): Promise<Match[]> {
     const recipe = byId.get(m.recipe_id);
     return recipe ? [{ ...recipe, matched_at: m.matched_at, expires_at: m.expires_at, like_count: m.like_count }] : [];
   });
-}
+});
 
 export async function getDeck(familyId: string, profileId: string): Promise<Recipe[]> {
   const [recipes, swipes] = await Promise.all([
@@ -161,7 +168,7 @@ export async function isMatch(familyId: string, recipeId: string): Promise<boole
 // ─── Courses ───────────────────────────────────────────────────────────
 
 /** La session de courses en cours de la famille (ouverte ou validée, pas trop ancienne). */
-export async function getCurrentTrip(familyId: string): Promise<Trip | null> {
+export const getCurrentTrip = cache(async function getCurrentTrip(familyId: string): Promise<Trip | null> {
   const since = new Date(Date.now() - TRIP_MAX_AGE_MS).toISOString();
   return check(
     await db()
@@ -174,9 +181,9 @@ export async function getCurrentTrip(familyId: string): Promise<Trip | null> {
       .limit(1)
       .maybeSingle(),
   );
-}
+});
 
-export async function getTripRequests(tripId: string): Promise<TripRequest[]> {
+export const getTripRequests = cache(async function getTripRequests(tripId: string): Promise<TripRequest[]> {
   return check(
     await db()
       .from("trip_requests")
@@ -184,7 +191,7 @@ export async function getTripRequests(tripId: string): Promise<TripRequest[]> {
       .eq("trip_id", tripId)
       .order("updated_at"),
   );
-}
+});
 
 export async function getTripSelection(tripId: string): Promise<Map<string, boolean>> {
   const rows = check(

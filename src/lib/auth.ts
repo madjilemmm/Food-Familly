@@ -1,14 +1,15 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/data";
 import { ROUTES } from "@/lib/routes";
 import { SESSION_COOKIE, cookieOptions, decodeSession, encodeSession, type Session, type Style } from "@/lib/session";
 
-export async function getSession(): Promise<Session | null> {
+export const getSession = cache(async function getSession(): Promise<Session | null> {
   const store = await cookies();
   return decodeSession(store.get(SESSION_COOKIE)?.value);
-}
+});
 
 export async function setSession(session: Session) {
   const store = await cookies();

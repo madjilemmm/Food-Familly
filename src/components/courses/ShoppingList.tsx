@@ -103,7 +103,11 @@ export function ShoppingList({
         onSubmit={(e) => {
           e.preventDefault();
           add(inputRef.current?.value ?? "", "manual");
-          if (inputRef.current) inputRef.current.value = "";
+          // Le clavier reste ouvert pour enchaîner les articles.
+          if (inputRef.current) {
+            inputRef.current.value = "";
+            inputRef.current.focus();
+          }
         }}
       >
         <input
