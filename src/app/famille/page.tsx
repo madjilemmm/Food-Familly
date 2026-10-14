@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, requireUser } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
 import { getFamily, getProfiles } from "@/lib/data";
 import { FamilyCode } from "@/components/family/FamilyCode";
@@ -9,8 +9,13 @@ import { FamilyName } from "@/components/family/FamilyName";
 export const metadata = { title: "Ma famille — À table !" };
 
 export default async function FamilyPage({ searchParams }: { searchParams: Promise<{ bienvenue?: string }> }) {
-  const me = await requireProfile();
-  const [family, members, params] = await Promise.all([getFamily(me.family_id), getProfiles(me.family_id), searchParams]);
+  const user = await requireUser();
+  const [me, family, members, params] = await Promise.all([
+    requireProfile(),
+    getFamily(user.familyId),
+    getProfiles(user.familyId),
+    searchParams,
+  ]);
   if (!family) return null;
   const welcome = params.bienvenue === "1";
 

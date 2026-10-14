@@ -6,12 +6,13 @@ import { createClient } from "@supabase/supabase-js";
 import { normalizeSupabaseUrl } from "@/lib/supabase/url";
 
 const EVENT = "refresh";
-const FALLBACK_INTERVAL_MS = 30_000;
+// Filet de sécurité si le temps réel est coupé (chaque rafraîchissement vide le cache des onglets).
+const FALLBACK_INTERVAL_MS = 120_000;
 
 /**
  * Recharge les données de la page dès qu'un autre membre de la famille
  * change quelque chose (signal Supabase Realtime, sans aucune donnée),
- * quand l'appli revient au premier plan, et toutes les 30 s par sécurité.
+ * quand l'appli revient au premier plan, et toutes les 2 min par sécurité.
  */
 export function RealtimeRefresher({ familyId }: { familyId: string }) {
   const router = useRouter();
@@ -20,7 +21,11 @@ export function RealtimeRefresher({ familyId }: { familyId: string }) {
   useEffect(() => {
     const refresh = () => {
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => router.refresh(), 250);
+      timer.current = setTimeout(() => {
+        router.refresh();
+        // Les onglets préchargés ont été vidés : on les reprépare.
+        window.dispatchEvent(new Event("atable:refreshed"));
+      }, 250);
     };
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL ? normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL) : "";

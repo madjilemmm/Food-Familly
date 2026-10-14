@@ -1,12 +1,12 @@
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, requireUser } from "@/lib/auth";
 import { getMatches } from "@/lib/data";
 import { daysLeft } from "@/lib/domain/swipe-deck";
 import { PageHeader } from "@/components/PageHeader";
 import { RecipeVisual } from "@/components/RecipeVisual";
 
 export default async function FunMatches() {
-  const me = await requireProfile("fun");
-  const matches = await getMatches(me.family_id);
+  const user = await requireUser();
+  const [, matches] = await Promise.all([requireProfile("fun"), getMatches(user.familyId)]);
   return (
     <>
       <PageHeader title="Les matchs 💞" subtitle="Les plats que la majorité de la famille aime" />

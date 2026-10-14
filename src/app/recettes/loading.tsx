@@ -1,5 +1,5 @@
 import { Skeleton } from "@/components/Skeleton";
 
 export default function Loading() {
-  return <Skeleton variant="list" header={false} />;
+  return <Skeleton variant="list" />;
 }

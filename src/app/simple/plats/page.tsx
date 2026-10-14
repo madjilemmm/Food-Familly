@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, requireUser } from "@/lib/auth";
 import { getMatches } from "@/lib/data";
 import { getTripOverview } from "@/lib/views";
 import { daysLeft } from "@/lib/domain/swipe-deck";
@@ -8,8 +8,12 @@ import { RecipeVisual } from "@/components/RecipeVisual";
 import { RecipeChecklist } from "@/components/courses/RecipeChecklist";
 
 export default async function SimpleMatches() {
-  const me = await requireProfile("simple");
-  const [overview, matches] = await Promise.all([getTripOverview(me.family_id, me.id), getMatches(me.family_id)]);
+  const user = await requireUser();
+  const [, overview, matches] = await Promise.all([
+    requireProfile("simple"),
+    getTripOverview(user.familyId, user.profileId),
+    getMatches(user.familyId),
+  ]);
 
   return (
     <>

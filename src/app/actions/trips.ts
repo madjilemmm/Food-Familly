@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireUser, type CurrentUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
-import { getCurrentTrip, getRecipesWithIngredients, getListItems, getProfile } from "@/lib/data";
+import { getCurrentTrip, getRecipesWithIngredients, getProfile } from "@/lib/data";
 import { deadlineFor, type DepartureChoice } from "@/lib/domain/trip";
 import { mergeIngredients, itemKey } from "@/lib/domain/shopping-list";
 import { notifyTripStarted, notifyRequestReceived } from "@/lib/notifications";
@@ -99,23 +99,19 @@ export async function validateTrip() {
   const user = await requireUser();
   const trip = await myTripOrThrow(user);
 
-  const { data: selection, error } = await db()
-    .from("trip_recipes")
-    .select("recipe_id")
-    .eq("trip_id", trip.id)
-    .eq("selected", true);
-  if (error) throw new Error(error.message);
-
+  // Plats cochés et liste actuelle arrivent avec la course : pas de requête en plus.
+  const selection = trip.trip_recipes.filter((r) => r.selected);
   const recipes = await getRecipesWithIngredients(user.familyId, selection.map((s) => s.recipe_id));
   const merged = mergeIngredients(recipes.map((r) => ({ recipeTitle: r.title, ingredients: r.recipe_ingredients })));
 
-  const previous = await getListItems(trip.id);
+  const previous = trip.shopping_list_items;
   const wasChecked = new Set(
     previous.filter((i) => i.source === "recipe" && i.checked).map((i) => itemKey(i.name, i.unit)),
   );
 
-  await db().from("shopping_list_items").delete().eq("trip_id", trip.id).eq("source", "recipe");
-  if (merged.length > 0) {
+  const replaceItems = async () => {
+    await db().from("shopping_list_items").delete().eq("trip_id", trip.id).eq("source", "recipe");
+    if (merged.length === 0) return;
     const { error: insertError } = await db().from("shopping_list_items").insert(
       merged.map((m) => ({
         trip_id: trip.id,
@@ -129,12 +125,11 @@ export async function validateTrip() {
       })),
     );
     if (insertError) throw new Error(insertError.message);
-  }
-
-  await db()
-    .from("shopping_trips")
-    .update({ status: "validated", validated_at: new Date().toISOString() })
-    .eq("id", trip.id);
+  };
+  await Promise.all([
+    replaceItems(),
+    db().from("shopping_trips").update({ status: "validated", validated_at: new Date().toISOString() }).eq("id", trip.id),
+  ]);
 
   changed();
   redirect(ROUTES[user.style].liste);
@@ -157,24 +152,25 @@ export async function submitRequest(
     return { error: "Écris quelque chose ou choisis au moins un plat." };
   }
 
-  const { error } = await db()
-    .from("trip_requests")
-    .upsert(
-      { trip_id: trip.id, profile_id: user.profileId, free_text: freeText, recipe_ids: recipeIds },
-      { onConflict: "trip_id,profile_id" },
-    );
-  if (error) return { error: "Oups, l'envoi a échoué. Réessaie." };
-
-  // Les plats demandés sont pré-cochés pour la personne qui fait les courses
-  // (sans annuler un plat qu'elle aurait volontairement décoché).
-  if (recipeIds.length > 0) {
-    await db()
-      .from("trip_recipes")
+  // La demande et le pré-cochage des plats demandés partent en même temps
+  // (sans annuler un plat que la personne aurait volontairement décoché).
+  const [{ error }] = await Promise.all([
+    db()
+      .from("trip_requests")
       .upsert(
-        recipeIds.map((id) => ({ trip_id: trip.id, recipe_id: id, selected: true })),
-        { onConflict: "trip_id,recipe_id", ignoreDuplicates: true },
-      );
-  }
+        { trip_id: trip.id, profile_id: user.profileId, free_text: freeText, recipe_ids: recipeIds },
+        { onConflict: "trip_id,profile_id" },
+      ),
+    recipeIds.length > 0
+      ? db()
+          .from("trip_recipes")
+          .upsert(
+            recipeIds.map((id) => ({ trip_id: trip.id, recipe_id: id, selected: true })),
+            { onConflict: "trip_id,recipe_id", ignoreDuplicates: true },
+          )
+      : Promise.resolve(),
+  ]);
+  if (error) return { error: "Oups, l'envoi a échoué. Réessaie." };
 
   changed(() => notifyRequestReceived(user.familyId, trip.created_by, user.profileId, freeText, recipeIds.length));
   return { ok: true };

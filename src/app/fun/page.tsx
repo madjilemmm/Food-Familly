@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { requireProfile } from "@/lib/auth";
-import { getCurrentTrip, getDeck, getProfile, getTripRequests } from "@/lib/data";
+import { requireProfile, requireUser } from "@/lib/auth";
+import { getCurrentTrip, getDeck, getProfiles } from "@/lib/data";
 import { isPastDeadline } from "@/lib/domain/trip";
 import { PageHeader } from "@/components/PageHeader";
 import { Countdown } from "@/components/Countdown";
@@ -8,15 +8,17 @@ import { SwipeDeck } from "@/components/SwipeDeck";
 import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 
 export default async function FunSwipe() {
-  const me = await requireProfile("fun");
-  const [deck, trip] = await Promise.all([getDeck(me.family_id, me.id), getCurrentTrip(me.family_id)]);
+  const user = await requireUser();
+  // Profil, paquet, course en cours et membres : tout part en même temps.
+  const [me, deck, trip, members] = await Promise.all([
+    requireProfile("fun"),
+    getDeck(user.familyId, user.profileId),
+    getCurrentTrip(user.familyId),
+    getProfiles(user.familyId),
+  ]);
   const iAmShopper = trip?.created_by === me.id;
-  const [answered, shopper] = trip
-    ? await Promise.all([
-        getTripRequests(trip.id).then((rs) => rs.some((r) => r.profile_id === me.id)),
-        trip.created_by ? getProfile(me.family_id, trip.created_by) : null,
-      ])
-    : [false, null];
+  const answered = trip?.trip_requests.some((r) => r.profile_id === me.id) ?? false;
+  const shopper = members.find((m) => m.id === trip?.created_by) ?? null;
   const who = shopper?.name ?? "Quelqu'un";
 
   return (

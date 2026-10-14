@@ -1,12 +1,13 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/data";
-import { getCurrentTrip, getListItems, getProfiles, getTripRequests } from "@/lib/data";
+import { getCurrentTrip, getProfiles } from "@/lib/data";
 import { ROUTES } from "@/lib/routes";
 import { ShoppingList } from "./ShoppingList";
 
 /** La liste de la course en cours, que tout le monde peut consulter et compléter. */
 export async function ListScreen({ me }: { me: Profile }) {
-  const trip = await getCurrentTrip(me.family_id);
+  // Course, réponses et articles arrivent en une seule requête, en parallèle des membres.
+  const [trip, profiles] = await Promise.all([getCurrentTrip(me.family_id), getProfiles(me.family_id)]);
 
   if (!trip) {
     return (
@@ -20,10 +21,9 @@ export async function ListScreen({ me }: { me: Profile }) {
     );
   }
 
-  const [items, requests, profiles] = await Promise.all([getListItems(trip.id), getTripRequests(trip.id), getProfiles(me.family_id)]);
   const names = new Map(profiles.map((p) => [p.id, p.name]));
   const shopper = trip.created_by ? names.get(trip.created_by) : null;
-  const textRequests = requests
+  const textRequests = trip.trip_requests
     .filter((r) => r.free_text)
     .map((r) => ({ id: r.id, from: names.get(r.profile_id) ?? "", text: r.free_text! }));
 
@@ -34,7 +34,7 @@ export async function ListScreen({ me }: { me: Profile }) {
           🛒 C&apos;est <strong>{shopper}</strong> qui fait ces courses. Tu peux ajouter des articles ou cocher ce qui est déjà pris.
         </p>
       )}
-      <ShoppingList items={items} requests={textRequests} />
+      <ShoppingList items={trip.shopping_list_items} requests={textRequests} />
     </>
   );
 }

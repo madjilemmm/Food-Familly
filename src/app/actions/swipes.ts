@@ -8,11 +8,13 @@ import { changed } from "./_shared";
 
 export async function swipe(recipeId: string, liked: boolean): Promise<{ match: boolean }> {
   const user = await requireUser();
-  const { data: recipe } = await db().from("recipes").select("id").eq("id", recipeId).eq("family_id", user.familyId).maybeSingle();
+  // Vérification de la recette et « était-ce déjà un match ? » en même temps
+  // (on ne prévient les autres que pour les nouveaux matchs).
+  const [{ data: recipe }, wasMatch] = await Promise.all([
+    db().from("recipes").select("id").eq("id", recipeId).eq("family_id", user.familyId).maybeSingle(),
+    liked ? isMatch(user.familyId, recipeId) : Promise.resolve(false),
+  ]);
   if (!recipe) throw new Error("Recette inconnue");
-
-  // Était-ce déjà un match avant ce like ? On ne prévient les autres que pour les nouveaux.
-  const wasMatch = liked && (await isMatch(user.familyId, recipeId));
   const { error } = await db()
     .from("swipes")
     .upsert(

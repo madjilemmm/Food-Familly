@@ -47,6 +47,10 @@ export type Trip = {
   status: TripStatus;
   validated_at: string | null;
   created_at: string;
+  /** Chargés avec la course, en une seule requête. */
+  trip_requests: TripRequest[];
+  trip_recipes: { recipe_id: string; selected: boolean }[];
+  shopping_list_items: ListItem[];
 };
 
 export type TripRequest = {
@@ -131,17 +135,17 @@ export async function getRecipesWithIngredients(familyId: string, ids: string[])
 // ─── Swipes & matchs ───────────────────────────────────────────────────
 
 export const getMatches = cache(async function getMatches(familyId: string): Promise<Match[]> {
-  const rows = check(
-    await db()
+  // Les recettes viennent de getRecipes (en parallèle, et partagé avec le reste de la page).
+  const [rows, recipes] = await Promise.all([
+    db()
       .from("active_matches")
       .select("recipe_id, matched_at, expires_at, like_count")
       .eq("family_id", familyId)
-      .order("matched_at", { ascending: false }),
-  ) as { recipe_id: string; matched_at: string; expires_at: string; like_count: number }[];
+      .order("matched_at", { ascending: false })
+      .then((r) => check(r) as { recipe_id: string; matched_at: string; expires_at: string; like_count: number }[]),
+    getRecipes(familyId),
+  ]);
   if (rows.length === 0) return [];
-  const recipes = check(
-    await db().from("recipes").select(RECIPE_FIELDS).eq("family_id", familyId).in("id", rows.map((r) => r.recipe_id)),
-  ) as Recipe[];
   const byId = new Map(recipes.map((r) => [r.id, r]));
   return rows.flatMap((m) => {
     const recipe = byId.get(m.recipe_id);
@@ -173,40 +177,20 @@ export const getCurrentTrip = cache(async function getCurrentTrip(familyId: stri
   return check(
     await db()
       .from("shopping_trips")
-      .select("id, created_by, departs_at, deadline_at, status, validated_at, created_at")
+      .select(
+        `id, created_by, departs_at, deadline_at, status, validated_at, created_at,
+         trip_requests(id, profile_id, free_text, recipe_ids, updated_at),
+         trip_recipes(recipe_id, selected),
+         shopping_list_items(id, name, quantity, unit, aisle, source, for_recipes, checked, created_at)`,
+      )
       .eq("family_id", familyId)
       .neq("status", "done")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
+      .order("updated_at", { referencedTable: "trip_requests" })
+      .order("created_at", { referencedTable: "shopping_list_items" })
+      .order("name", { referencedTable: "shopping_list_items" })
       .limit(1)
       .maybeSingle(),
   );
 });
-
-export const getTripRequests = cache(async function getTripRequests(tripId: string): Promise<TripRequest[]> {
-  return check(
-    await db()
-      .from("trip_requests")
-      .select("id, profile_id, free_text, recipe_ids, updated_at")
-      .eq("trip_id", tripId)
-      .order("updated_at"),
-  );
-});
-
-export async function getTripSelection(tripId: string): Promise<Map<string, boolean>> {
-  const rows = check(
-    await db().from("trip_recipes").select("recipe_id, selected").eq("trip_id", tripId),
-  ) as { recipe_id: string; selected: boolean }[];
-  return new Map(rows.map((r) => [r.recipe_id, r.selected]));
-}
-
-export async function getListItems(tripId: string): Promise<ListItem[]> {
-  return check(
-    await db()
-      .from("shopping_list_items")
-      .select("id, name, quantity, unit, aisle, source, for_recipes, checked, created_at")
-      .eq("trip_id", tripId)
-      .order("created_at")
-      .order("name"),
-  );
-}

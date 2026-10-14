@@ -1,11 +1,10 @@
 import "server-only";
+import { cache } from "react";
 import {
   getCurrentTrip,
   getMatches,
   getProfiles,
   getRecipes,
-  getTripRequests,
-  getTripSelection,
   type Profile,
   type Recipe,
   type Trip,
@@ -38,17 +37,20 @@ export type TripOverview = {
  * des autres et les plats proposés (demandés, matchés ou déjà cochés).
  * Le dépassement de l'heure limite est calculé ici, à l'affichage.
  */
-export async function getTripOverview(familyId: string, myProfileId: string): Promise<TripOverview | null> {
-  const trip = await getCurrentTrip(familyId);
-  if (!trip) return null;
-
-  const [members, requests, selection, matches, recipes] = await Promise.all([
+export const getTripOverview = cache(async function getTripOverview(
+  familyId: string,
+  myProfileId: string,
+): Promise<TripOverview | null> {
+  // Tout part en même temps : un seul aller-retour vers la base.
+  const [trip, members, matches, recipes] = await Promise.all([
+    getCurrentTrip(familyId),
     getProfiles(familyId),
-    getTripRequests(trip.id),
-    getTripSelection(trip.id),
     getMatches(familyId),
     getRecipes(familyId),
   ]);
+  if (!trip) return null;
+  const requests = trip.trip_requests;
+  const selection = new Map(trip.trip_recipes.map((r) => [r.recipe_id, r.selected]));
   const recipeById = new Map(recipes.map((r) => [r.id, r]));
   const shopper = members.find((m) => m.id === trip.created_by) ?? null;
 
@@ -96,4 +98,4 @@ export async function getTripOverview(familyId: string, myProfileId: string): Pr
     pastDeadline: isPastDeadline(trip.deadline_at),
     nobodyAnswered: requests.length === 0,
   };
-}
+});

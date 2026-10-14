@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { PrefetchKind } from "next/dist/client/components/router-reducer/router-reducer-types";
 
 export type Tab = { href: string; label: string; icon: string; badge?: number };
 
@@ -11,6 +12,25 @@ export function TabBar({ tabs, variant }: { tabs: Tab[]; variant: "parent" | "ch
   // L'onglet touché s'allume tout de suite, sans attendre la page suivante.
   const [pressed, setPressed] = useState<string | null>(null);
   useEffect(() => setPressed(null), [pathname]);
+
+  // Précharge tous les onglets (données comprises) pour qu'ils s'ouvrent instantanément,
+  // à l'arrivée sur un écran et après chaque rafraîchissement en temps réel.
+  const router = useRouter();
+  const hrefs = tabs.map((t) => t.href).join("|");
+  useEffect(() => {
+    const prefetchAll = () => {
+      for (const href of hrefs.split("|")) {
+        if (href !== pathname) router.prefetch(href, { kind: PrefetchKind.FULL });
+      }
+    };
+    const idle = setTimeout(prefetchAll, 300);
+    const onRefresh = () => setTimeout(prefetchAll, 1500);
+    window.addEventListener("atable:refreshed", onRefresh);
+    return () => {
+      clearTimeout(idle);
+      window.removeEventListener("atable:refreshed", onRefresh);
+    };
+  }, [router, pathname, hrefs]);
 
   const matches = (href: string, path: string) =>
     href === tabs[0].href ? path === href : path === href || path.startsWith(`${href}/`);
@@ -29,6 +49,7 @@ export function TabBar({ tabs, variant }: { tabs: Tab[]; variant: "parent" | "ch
             <li key={tab.href} className="flex-1">
               <Link
                 href={tab.href}
+                prefetch={true}
                 aria-current={active ? "page" : undefined}
                 onClick={(e) => {
                   // Retoucher l'onglet de la page affichée : retour en haut, en douceur.

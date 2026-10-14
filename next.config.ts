@@ -29,6 +29,10 @@ const nextConfig: NextConfig = {
     ];
   },
   experimental: {
+    // Les écrans déjà vus ou préchargés restent en mémoire sur le téléphone :
+    // changer d'onglet est instantané. Le temps réel les rafraîchit dès que
+    // quelqu'un de la famille modifie quelque chose.
+    staleTimes: { dynamic: 60, static: 180 },
     // Les photos sont réduites dans le navigateur avant l'envoi (~300 Ko) ;
     // cette limite reste sous celle de Vercel (4,5 Mo).
     serverActions: { bodySizeLimit: "4mb" },

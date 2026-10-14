@@ -1,15 +1,26 @@
 import Link from "next/link";
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, requireUser } from "@/lib/auth";
+import { ROUTES } from "@/lib/routes";
 import { getRecipes } from "@/lib/data";
 import { RecipeVisual } from "@/components/RecipeVisual";
 
 export const metadata = { title: "Recettes — À table !" };
 
 export default async function RecipesPage() {
-  const me = await requireProfile();
-  const recipes = await getRecipes(me.family_id);
+  const user = await requireUser();
+  const [me, recipes] = await Promise.all([requireProfile(), getRecipes(user.familyId)]);
   return (
     <>
+      {/* En style simple, les recettes ne sont pas un onglet : on garde un retour vers les plats. */}
+      {me.style === "simple" ? (
+        <div className="pt-safe">
+          <Link href={ROUTES.simple.matchs} className="inline-flex min-h-11 items-center font-semibold text-tomato-600">
+            ‹ Les plats
+          </Link>
+        </div>
+      ) : (
+        <div className="pt-safe" />
+      )}
       <div className="mb-5 flex items-center justify-between gap-3">
         <h1 className="text-3xl font-extrabold">Les recettes</h1>
         <Link href="/recettes/nouvelle" className="rounded-full bg-tomato-500 px-5 py-3 text-lg font-bold text-white shadow active:scale-95">

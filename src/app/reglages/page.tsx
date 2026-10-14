@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, requireUser } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
 import { getFamily } from "@/lib/data";
 import { forgetProfile, leaveFamily } from "@/app/actions/auth";
@@ -9,8 +9,8 @@ import { MyStyle } from "@/components/family/MyStyle";
 export const metadata = { title: "Réglages — À table !" };
 
 export default async function SettingsPage() {
-  const me = await requireProfile();
-  const family = await getFamily(me.family_id);
+  const user = await requireUser();
+  const [me, family] = await Promise.all([requireProfile(), getFamily(user.familyId)]);
   return (
     <main className="pt-safe pb-safe mx-auto max-w-xl px-5 pb-16 text-lg">
       <Link href={ROUTES[me.style].home} className="inline-flex py-2 font-semibold text-tomato-600">
