@@ -3,7 +3,7 @@ import { Logo, Scene } from "@/design-system/components/Kaddie";
 import { requireFamily } from "@/lib/auth";
 import { getFamily, getProfiles } from "@/lib/data";
 import { chooseProfile, leaveFamily } from "@/app/actions/auth";
-import { illustrationDe } from "@/components/ui";
+import { IconeRetour, illustrationDe } from "@/components/ui";
 import { ConfirmButton } from "@/components/courses/ConfirmButton";
 
 export const metadata = { title: "C'est qui ? — Kaddie" };
@@ -21,19 +21,15 @@ export default async function ProfilePage() {
         <h1 className="kd-titre-1 text-aubergine">C&apos;est qui&nbsp;?</h1>
         {family && <p className="mt-2 text-encre-douce">{family.name}</p>}
       </div>
-      <ul className="flex flex-col gap-4">
+      {/* Une liste, comme les recettes : une vignette de la scène, le prénom, un filet. */}
+      <ul className="kd-liste border-t-2 border-trait">
         {profiles.map((p, i) => (
           <li key={p.id}>
             <form action={chooseProfile.bind(null, p.id)}>
-              <button type="submit" className="block w-full rounded-carte text-left active:scale-[0.98]">
-                <Scene
-                  duo="aubergine"
-                  illustration={illustrationDe(i)}
-                  format="paysage"
-                  className="flex min-h-36 items-end rounded-carte p-5"
-                >
-                  <span className="kd-titre-2">{p.name}</span>
-                </Scene>
+              <button type="submit" className="flex w-full items-center gap-4 border-b-2 border-trait py-3 text-left active:bg-trait/40">
+                <Scene duo="aubergine" illustration={illustrationDe(i)} format="carre" className="size-16 shrink-0 rounded-pastille" />
+                <span className="kd-titre-2 min-w-0 flex-1 text-aubergine">{p.name}</span>
+                <IconeRetour className="size-6 shrink-0 rotate-180 text-violet" />
               </button>
             </form>
           </li>

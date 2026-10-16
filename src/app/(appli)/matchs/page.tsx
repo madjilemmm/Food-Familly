@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { requireProfile, requireUser } from "@/lib/auth";
 import { forFamily, getMatches, getMyLikes } from "@/lib/data";
-import { BandeauScene, EtatVide, IconeRetour } from "@/components/ui";
+import { BandeauScene, EtatVide } from "@/components/ui";
 import { MatchCards } from "@/components/MatchCards";
-import { RecipeVisual } from "@/components/RecipeVisual";
+import { LigneRecette } from "@/components/LigneRecette";
 
 /**
  * Les envies en commun (au moins deux personnes), puis les miennes : de quoi retrouver
@@ -37,13 +37,7 @@ export default async function Matchs() {
           <p className="kd-petit mb-2">Elles arrivent toutes seules à la personne qui fait les courses. Touche un plat pour changer d&apos;avis.</p>
           <ul className="kd-liste border-t-2 border-trait">
             {seules.map((r) => (
-              <li key={r.id}>
-                <Link href={`/recettes/${r.id}`} className="flex items-center gap-4 border-b-2 border-trait py-2 active:bg-trait/40">
-                  <RecipeVisual recipe={r} className="size-12 shrink-0 rounded-pastille" />
-                  <span className="min-w-0 flex-1 font-semibold">{r.title}</span>
-                  <IconeRetour className="size-5 shrink-0 rotate-180 text-violet" />
-                </Link>
-              </li>
+              <LigneRecette key={r.id} recipe={r} infos={r.total_minutes ? `${r.total_minutes} min` : undefined} />
             ))}
           </ul>
         </section>

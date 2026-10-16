@@ -10,6 +10,7 @@ import { Bouton, CarteRecette, IconeJenVeux, IconePasEnvie, Logo, Scene } from "
 import type { Recipe } from "@/lib/data";
 import { listeDeNoms } from "@/lib/domain/convives";
 import { CarteGeste, PILE } from "./CarteGeste";
+import { RecipeVisual } from "./RecipeVisual";
 
 /*
  * Le swipe des recettes : à droite « Miam », à gauche « Bof ».
@@ -201,11 +202,11 @@ function EcranMatch({ recipe, avec, onClose }: { recipe: Recipe; avec: string[];
           <h2 className="kd-display text-[56px]!">C&apos;est un match&nbsp;!</h2>
           <p className="kd-titre-3">{avec.length ? `${listeDeNoms(avec)} et toi en avez envie.` : "Vous êtes plusieurs à en avoir envie."}</p>
         </div>
-        <CarteRecette
-          className="kd-monte min-h-0 text-left [animation-delay:120ms] [&_.kd-carte__photo]:max-h-[30dvh]"
-          titre={recipe.title}
-          photo={recipe.photo_url}
-        />
+        {/* La carte du plat, à hauteur fixe : le nom reste visible et tout tient sur l'écran. */}
+        <div className="kd-carte kd-monte shrink-0 text-left [animation-delay:120ms]">
+          <RecipeVisual recipe={recipe} className="h-[22dvh] w-full" />
+          <p className="kd-titre-2 p-5 text-aubergine">{recipe.title}</p>
+        </div>
         <div className="pb-4">
           <Bouton variante="like" large onClick={onClose} autoFocus>
             Continuer

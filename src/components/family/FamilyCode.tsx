@@ -26,7 +26,16 @@ export function FamilyCode({ code, familyName }: { code: string; familyName: str
   return (
     <section className="flex flex-col gap-3">
       <p className="kd-etiquette">Code pour rejoindre la famille</p>
-      <p data-code className="font-display text-titre-2 tracking-[0.04em] break-all text-aubergine select-all">{code}</p>
+      {/* Coupé aux tirets si besoin (« cassoulet-1752- / galette »), jamais au milieu d'un mot. */}
+      <p data-code className="font-display text-titre-2 tracking-[0.04em] break-words text-aubergine select-all">
+        {code.split("-").map((part, i) => (
+          <span key={i}>
+            {i > 0 && "-"}
+            {i > 0 && <wbr />}
+            {part}
+          </span>
+        ))}
+      </p>
       <button onClick={share} className="kd-btn kd-btn--large">
         {copied ? "Copié" : "Partager le code"}
       </button>

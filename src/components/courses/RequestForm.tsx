@@ -63,7 +63,7 @@ export function RequestForm({
   );
 }
 
-/** Une grille de plats à cocher : mes envies (pour moi) ou les matchs (pour tous). */
+/** Des plats à cocher, en liste comme les recettes : vignette, nom, case à droite. */
 function Plats({ legende, detail, recettes, initialRecipeIds }: { legende: string; detail: string; recettes: Recipe[]; initialRecipeIds: string[] }) {
   if (recettes.length === 0) return null;
   return (
@@ -71,22 +71,25 @@ function Plats({ legende, detail, recettes, initialRecipeIds }: { legende: strin
       <legend className="kd-etiquette mb-2">
         {legende} <span className="normal-case text-encre-douce">· {detail}</span>
       </legend>
-      <div className="grid grid-cols-2 gap-3">
+      <ul className="kd-liste border-t-2 border-trait">
         {recettes.map((r) => (
-          <label key={r.id} className="group relative cursor-pointer">
-            <input type="checkbox" name="recipe_ids" value={r.id} defaultChecked={initialRecipeIds.includes(r.id)} className="peer sr-only" />
-            <div className="kd-carte outline-4 -outline-offset-4 outline-transparent transition duration-150 group-active:scale-95 peer-checked:outline-accent peer-focus-visible:outline-focus">
-              <RecipeVisual recipe={r} className="aspect-[4/3] w-full" />
-              <p className="p-3 text-petit leading-tight font-semibold">{r.title}</p>
-            </div>
-            <span className="absolute top-2 right-2 hidden size-9 items-center justify-center rounded-pastille bg-accent text-on-accent peer-checked:flex">
-              <svg viewBox="0 0 24 24" className="size-6" aria-hidden="true">
-                <path fill="none" stroke="currentColor" strokeWidth={3.4} strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.5l5 5L19.5 7" />
-              </svg>
-            </span>
-          </label>
+          <li key={r.id}>
+            <label className="group flex cursor-pointer items-center gap-4 border-b-2 border-trait py-2 active:bg-trait/40">
+              <RecipeVisual recipe={r} className="size-14 shrink-0 rounded-pastille" />
+              <span className="min-w-0 flex-1 font-semibold">{r.title}</span>
+              <input type="checkbox" name="recipe_ids" value={r.id} defaultChecked={initialRecipeIds.includes(r.id)} className="sr-only" />
+              <span
+                aria-hidden
+                className="grid size-7 shrink-0 place-content-center rounded-pastille border-[3px] border-aubergine bg-surface transition-[background-color,transform] duration-200 ease-rebond group-has-[:checked]:scale-108 group-has-[:checked]:bg-accent group-has-[:checked]:text-on-accent group-has-[:focus-visible]:outline-3 group-has-[:focus-visible]:outline-focus"
+              >
+                <svg viewBox="0 0 24 24" className="hidden size-5 group-has-[:checked]:block" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" strokeWidth={3.4} strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.5l5 5L19.5 7" />
+                </svg>
+              </span>
+            </label>
+          </li>
         ))}
-      </div>
+      </ul>
     </fieldset>
   );
 }
