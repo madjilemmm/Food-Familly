@@ -2,13 +2,13 @@ import Link from "next/link";
 import type { Profile } from "@/lib/data";
 import { forFamily, getMatches, getMyLikes, getPlatsAimes, getProfiles, getRecipes } from "@/lib/data";
 import { getTripOverview, type TripOverview } from "@/lib/views";
-import { departureChoices, formatTime } from "@/lib/domain/trip";
+import { deadlineFor, departureChoices, formatTime } from "@/lib/domain/trip";
 import { ROUTES } from "@/lib/routes";
 import { cancelTrip, takeOverTrip, validateTrip } from "@/app/actions/trips";
-import { Logo, Scene } from "@/design-system/components/Kaddie";
 import { Countdown } from "@/components/Countdown";
 import { SubmitButton } from "@/components/SubmitButton";
-import { BandeauScene, FondCourses, LienReglages } from "@/components/ui";
+import { BandeauScene } from "@/components/ui";
+import { LigneRecette } from "@/components/LigneRecette";
 import { StartTrip } from "./StartTrip";
 import { RecipeChecklist } from "./RecipeChecklist";
 import { listeDeNoms } from "@/lib/domain/convives";
@@ -27,25 +27,46 @@ export async function CoursesScreen({ me, vue, notifications }: { me: Profile; v
   const overview = await getTripOverview(me.family_id, me.id);
 
   if (!overview) {
-    const others = (await getProfiles(me.family_id)).filter((p) => p.id !== me.id).map((p) => p.name);
+    // Personne n'y va : le même langage que Recettes et la liste (bandeau, puis des lignes),
+    // avec ce qui fait envie en ce moment, pour savoir à quoi s'attendre.
+    const [profiles, matches] = await Promise.all([getProfiles(me.family_id), getMatches(me.family_id)]);
+    const others = profiles.filter((p) => p.id !== me.id).map((p) => p.name);
+    // Dans l'ordre des heures de départ (« ce soir » peut tomber avant « dans 2 heures »).
+    const choices = departureChoices()
+      .map((c) => ({ ...c, depart: deadlineFor(c.id) }))
+      .sort((a, b) => a.depart.getTime() - b.depart.getTime())
+      .map(({ depart, ...c }) => ({ ...c, heure: formatTime(depart) }));
     return (
-      <Scene duo="aubergine" seed={4} className="ecran-scene justify-between gap-6">
-        <FondCourses />
-        <div className="flex flex-col gap-4 pt-6">
-          {/* La cloche des notifs rejoint les réglages : rien entre le titre et le grand bouton. */}
-          <div className="flex items-start justify-between">
-            <Logo width={120} />
-            <span className="flex gap-2">
-              {notifications}
-              <LienReglages surScene />
-            </span>
+      <>
+        <BandeauScene fond="courses" illustration="courses" etiquette={`Salut ${me.name}`} titre="On y va ?" actions={notifications} />
+        <StartTrip choices={choices} others={others} />
+        <section className="mt-10">
+          <div className="mb-2 flex items-baseline justify-between gap-4">
+            <h2 className="kd-etiquette">Ce qui fait envie</h2>
+            {matches.length > 3 && (
+              <Link href={ROUTES.matchs} className="font-semibold text-violet underline underline-offset-4">
+                Tout voir
+              </Link>
+            )}
           </div>
-          <h1 className="kd-titre-1">Salut {me.name}&nbsp;!</h1>
-        </div>
-        <StartTrip choices={departureChoices()} others={others} />
-      </Scene>
+          {matches.length > 0 ? (
+            <ul className="kd-liste border-t-2 border-trait">
+              {matches.slice(0, 3).map((m) => (
+                <LigneRecette
+                  key={m.id}
+                  recipe={m}
+                  infos={`Envie de ${listeDeNoms(m.avec, me.name).replace(/^Toi\b/, "toi")}`}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className="text-encre-douce">Rien en commun pour l&apos;instant. Swipe dans Envies : Kaddie préparera les plats d&apos;elle-même.</p>
+          )}
+        </section>
+      </>
     );
   }
+
   const validated = overview.trip.status === "validated";
   if (overview.iAmShopper) {
     // Liste faite : au magasin, on ne voit qu'elle (les plats restent à un appui).

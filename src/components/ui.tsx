@@ -151,6 +151,7 @@ export function BandeauScene({
   etiquette,
   reglages = true,
   fond,
+  actions,
   children,
 }: {
   illustration: Illustration;
@@ -159,6 +160,8 @@ export function BandeauScene({
   titre: string;
   etiquette?: React.ReactNode;
   reglages?: boolean;
+  /** Boutons ronds à côté des réglages (la cloche des notifs, par exemple). */
+  actions?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   return (
@@ -176,7 +179,12 @@ export function BandeauScene({
           {etiquette && <p className="kd-etiquette mb-2 text-blanc">{etiquette}</p>}
           <h1 className="kd-titre-1">{titre}</h1>
         </div>
-        {reglages && <LienReglages surScene />}
+        {(actions || reglages) && (
+          <span className="flex shrink-0 gap-2">
+            {actions}
+            {reglages && <LienReglages surScene />}
+          </span>
+        )}
       </div>
       {children}
     </Scene>
