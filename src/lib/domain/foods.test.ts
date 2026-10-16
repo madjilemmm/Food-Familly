@@ -116,3 +116,12 @@ describe("les cartes du questionnaire", () => {
     expect(foodsIn(["Tajine aux pruneaux"], ["sucre_sale"]).has("sucre_sale")).toBe(true);
   });
 });
+
+describe("ordre des cartes", () => {
+  it("les plus départageantes d'abord", () => {
+    const keys = cartesPour([]).map((f) => f.key);
+    expect(keys[0]).toBe("champignons");
+    expect(keys.indexOf("poisson")).toBeLessThan(keys.indexOf("boeuf"));
+    expect(keys).toHaveLength(INGREDIENTS.length);
+  });
+});

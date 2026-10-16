@@ -1,16 +1,15 @@
 import Link from "next/link";
 import { requireProfile, requireUser } from "@/lib/auth";
-import { ROUTES } from "@/lib/routes";
 import { conflictsOf, getRecipes, getTasteContext } from "@/lib/data";
 import { nAimePas } from "@/lib/domain/foods";
 import { RecipeVisual } from "@/components/RecipeVisual";
-import { BandeauScene, IconeRetour } from "@/components/ui";
+import { BandeauScene } from "@/components/ui";
 
 export const metadata = { title: "Recettes — Kaddie" };
 
 export default async function RecipesPage() {
   const user = await requireUser();
-  const [me, all, tastes] = await Promise.all([requireProfile(), getRecipes(user.familyId), getTasteContext(user.familyId)]);
+  const [, all, tastes] = await Promise.all([requireProfile(), getRecipes(user.familyId), getTasteContext(user.familyId)]);
   // Les recettes de la famille d'abord, puis celles importées de Marmiton.
   const recipes = [...all.filter((r) => !r.source_url), ...all.filter((r) => r.source_url)];
   const auto = all.length - recipes.filter((r) => !r.source_url).length;
@@ -20,14 +19,7 @@ export default async function RecipesPage() {
         illustration="marche"
         etiquette={`${recipes.length} recette${recipes.length > 1 ? "s" : ""}`}
         titre="Les recettes"
-      >
-        {/* En style simple, les recettes ne sont pas un onglet : on garde un retour vers les plats. */}
-        {me.style === "simple" && (
-          <Link href={ROUTES.simple.matchs} className="-ml-2 mt-2 inline-flex min-h-14 items-center gap-1 font-semibold text-blanc">
-            <IconeRetour className="size-6" /> Les plats
-          </Link>
-        )}
-      </BandeauScene>
+      />
       <Link href="/recettes/nouvelle" className="kd-btn kd-btn--large mb-6">
         Ajouter une recette
       </Link>

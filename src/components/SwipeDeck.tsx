@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { swipe } from "@/app/actions/swipes";
+import { swipe, undoSwipe } from "@/app/actions/swipes";
+import { useAnnuler } from "@/components/Annuler";
 import { Bouton, CarteRecette, IconeJenVeux, IconePasEnvie, Logo, Scene } from "@/design-system/components/Kaddie";
 import type { Recipe } from "@/lib/data";
 import { CarteGeste, PILE } from "./CarteGeste";
@@ -33,12 +34,20 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
   useEffect(() => setMonte(true), []);
   const top = deck[0];
 
+  const proposer = useAnnuler();
   function decide(liked: boolean) {
     if (!top) return;
+    const carte = top;
     setDeck((d) => d.slice(1));
-    swipe(top.id, liked)
-      .then((res) => res.match && setMatch(top))
+    const envoi = swipe(carte.id, liked)
+      .then((res) => res.match && setMatch(carte))
       .catch(() => setError(true));
+    // Un doigt qui glisse trop vite : la carte peut revenir.
+    proposer(`${liked ? "Miam" : "Bof"} : ${carte.title}`, () => {
+      setMatch((m) => (m?.id === carte.id ? null : m));
+      setDeck((d) => [carte, ...d.filter((r) => r.id !== carte.id)]);
+      envoi.then(() => undoSwipe(carte.id));
+    });
   }
 
   // Boutons et clavier : la carte du dessus part comme avec le doigt.

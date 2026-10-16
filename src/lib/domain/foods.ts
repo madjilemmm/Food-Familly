@@ -36,9 +36,26 @@ export const CARTES_AJOUTEES = [
 /** A rempli le questionnaire avant l'arrivée des nouvelles cartes ? */
 export const doitVoirNouvellesCartes = (doneAt: string | null) => Boolean(doneAt && doneAt < CARTES_DEPUIS);
 
-/** Une carte déjà couverte par un régime coché n'est pas posée. */
+/**
+ * L'ordre des cartes : celles qui départagent le plus (souvent pas aimées) d'abord,
+ * pour que même ceux qui s'arrêtent tôt donnent l'essentiel.
+ */
+const ORDRE = [
+  "champignons", "poisson", "fruits_de_mer", "abats", "chou", "epinards", "brocoli", "olives", "fromage_fort",
+  "coriandre", "aubergine", "poivron", "betterave", "avocat", "chevre", "poissons_gras", "lapin", "canard", "agneau",
+  "curry", "gingembre", "coco", "sucre_sale", "capres_cornichons", "menthe", "celeri", "fenouil", "endives",
+  "artichaut", "asperges", "courge", "patate_douce", "lentilles", "pois_chiches", "tofu",
+];
+const rang = (key: string) => {
+  const i = ORDRE.indexOf(key);
+  return i === -1 ? ORDRE.length : i;
+};
+
+/** Une carte déjà couverte par un régime coché n'est pas posée ; les plus utiles d'abord. */
 export function cartesPour(diets: string[]): Food[] {
-  return INGREDIENTS.filter((f) => !diets.includes(f.key) && !f.dans?.some((d) => diets.includes(d)));
+  return INGREDIENTS.filter((f) => !diets.includes(f.key) && !f.dans?.some((d) => diets.includes(d))).sort(
+    (a, b) => rang(a.key) - rang(b.key),
+  );
 }
 
 const PORC = ["porc", "lardon", "jambon", "chorizo", "saucisse", "saucisson", "bacon", "pancetta", "rillette", "coppa", "lard", "poitrine fumee", "chair a saucisse", "andouille", "andouillette", "boudin", "cervelas", "mortadelle", "prosciutto", "speck", "travers de porc", "echine de porc", "knack", "chipolata", "salami", "rosette"];

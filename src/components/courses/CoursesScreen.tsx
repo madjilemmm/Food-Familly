@@ -135,7 +135,9 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
       <div className="mt-6 text-center">
         <ConfirmButton
           action={cancelTrip}
-          question="Annuler ces courses ? Les réponses et la liste seront effacées."
+          question="Annuler ces courses ?"
+          detail="Les réponses de la famille et la liste seront effacées."
+          confirmLabel="Oui, annuler les courses"
           className="min-h-14 px-2 text-encre-douce underline underline-offset-4"
         >
           Annuler ces courses

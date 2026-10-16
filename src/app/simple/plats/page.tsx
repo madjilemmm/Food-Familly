@@ -19,7 +19,7 @@ export default async function SimpleMatches() {
       <BandeauScene
         illustration="table"
         etiquette={`${matches.length} plat${matches.length > 1 ? "s" : ""} aimé${matches.length > 1 ? "s" : ""}`}
-        titre="Les plats préférés"
+        titre="Les matchs de la famille"
       />
 
       {matches.length === 0 ? (
@@ -44,9 +44,6 @@ export default async function SimpleMatches() {
         </>
       )}
 
-      <Link href="/recettes" className="mt-8 flex min-h-14 items-center justify-center text-encre-douce underline underline-offset-4">
-        Gérer mes recettes
-      </Link>
     </>
   );
 }

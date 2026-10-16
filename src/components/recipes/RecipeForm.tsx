@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- aperçu local de la photo */
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useState } from "react";
 import { deleteRecipe, saveRecipe } from "@/app/actions/recipes";
 import type { ImportedRecipe } from "@/lib/domain/recipe-import";
 import { ImportFromUrl } from "./ImportFromUrl";
@@ -9,6 +9,7 @@ import { AISLES } from "@/lib/domain/aisles";
 import type { RecipeWithIngredients } from "@/lib/data";
 import { resizeImage } from "./resizeImage";
 import { IconeCroix, IconePlus, MessageErreur } from "@/components/ui";
+import { ConfirmButton } from "@/components/courses/ConfirmButton";
 import { recipeConflicts, type MemberTastes } from "@/lib/domain/foods";
 
 type Row = { key: number; name: string; quantity: string; unit: string; aisle: string };
@@ -22,7 +23,6 @@ function emptyRow(aisle = "fruits_legumes"): Row {
 
 export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredients; gouts?: MemberTastes[] }) {
   const [state, action, saving] = useActionState(saveRecipe, {});
-  const [deleting, startDelete] = useTransition();
   const [rows, setRows] = useState<Row[]>(() =>
     recipe?.recipe_ingredients.length
       ? recipe.recipe_ingredients.map((i) => ({
@@ -277,21 +277,23 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
 
       <button
         type="submit"
-        disabled={saving || photoBusy || deleting}
+        disabled={saving || photoBusy}
         className="kd-btn kd-btn--large"
       >
         {saving ? "Enregistrement…" : "Enregistrer"}
       </button>
 
       {recipe && (
-        <button
-          type="button"
-          disabled={saving || deleting}
-          onClick={() => confirm(`Supprimer « ${recipe.title} » ?`) && startDelete(() => deleteRecipe(recipe.id))}
-          className="min-h-14 w-full text-encre-douce underline underline-offset-4 disabled:opacity-50"
+        <ConfirmButton
+          action={() => deleteRecipe(recipe.id)}
+          question={`Supprimer « ${recipe.title} » ?`}
+          detail="Elle disparaît des swipes, des matchs et des courses de toute la famille."
+          confirmLabel="Oui, supprimer"
+          disabled={saving}
+          className="min-h-14 w-full text-encre-douce underline underline-offset-4"
         >
-          {deleting ? "Suppression…" : "Supprimer cette recette"}
-        </button>
+          Supprimer cette recette
+        </ConfirmButton>
       )}
     </form>
   );

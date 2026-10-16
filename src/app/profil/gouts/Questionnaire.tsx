@@ -388,6 +388,17 @@ function EtapeCartes({
           {nouvelles ? "Nouvelles cartes" : "Étape 3 sur 4"} · carte {Math.min(index + 1, deck.length)} sur {deck.length}
         </p>
         <h1 className="kd-titre-2 mt-2">{nouvelles ? "De nouvelles cartes à swiper" : "Et ça, tu aimes\u00a0?"}</h1>
+        {/* Où on en est : on voit que ça avance, et qu'on peut s'arrêter. */}
+        <div
+          role="progressbar"
+          aria-label="Cartes répondues"
+          aria-valuemin={0}
+          aria-valuemax={deck.length}
+          aria-valuenow={Math.min(index, deck.length)}
+          className="mt-3 h-2.5 overflow-hidden rounded-full bg-aubergine"
+        >
+          <div className="h-full rounded-full bg-accent transition-[width] duration-240" style={{ width: `${(Math.min(index, deck.length) / Math.max(1, deck.length)) * 100}%` }} />
+        </div>
       </div>
 
       {style === "fun" ? (
@@ -464,11 +475,9 @@ function EtapeCartes({
           <Spinner className="w-7 text-blanc" />
         ) : (
           // S'arrêter quand on veut : les cartes restantes comptent comme « ça me va ».
-          index >= 5 && (
-            <button onClick={onFini} className="min-h-14 px-1 font-semibold text-blanc underline underline-offset-4">
-              J&apos;ai fini
-            </button>
-          )
+          <button onClick={onFini} className="kd-btn kd-btn--secondaire min-h-12 px-5">
+            J&apos;ai fini
+          </button>
         )}
       </div>
     </div>

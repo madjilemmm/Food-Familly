@@ -27,3 +27,10 @@ export async function swipe(recipeId: string, liked: boolean): Promise<{ match: 
   changed(match && !wasMatch ? () => notifyMatch(user.familyId, user.profileId, recipeId) : undefined);
   return { match };
 }
+
+/** « Annuler » juste après un swipe : la recette revient dans mon paquet. */
+export async function undoSwipe(recipeId: string) {
+  const user = await requireUser();
+  await db().from("swipes").delete().eq("profile_id", user.profileId).eq("recipe_id", recipeId);
+  changed();
+}

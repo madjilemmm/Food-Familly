@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { removeMember, saveMember } from "@/app/actions/auth";
 import type { Profile } from "@/lib/data";
 import { IconeCroix, IconePlus } from "@/components/ui";
 import { MemberForm } from "./MemberForm";
+import { ConfirmButton } from "@/components/courses/ConfirmButton";
 
 export function MembersEditor({ members, myId }: { members: Profile[]; myId: string }) {
   const [editing, setEditing] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   return (
     <>
@@ -29,17 +29,16 @@ export function MembersEditor({ members, myId }: { members: Profile[]; myId: str
                   Modifier
                 </button>
                 {m.id !== myId && (
-                  <button
-                    disabled={pending}
+                  <ConfirmButton
                     aria-label={`Retirer ${m.name}`}
-                    onClick={() =>
-                      confirm(`Retirer ${m.name} de la famille ? Ses likes et ses demandes seront effacés.`) &&
-                      startTransition(() => removeMember(m.id))
-                    }
+                    action={() => removeMember(m.id)}
+                    question={`Retirer ${m.name} de la famille ?`}
+                    detail="Ses likes, ses goûts et ses demandes seront effacés."
+                    confirmLabel={`Oui, retirer ${m.name}`}
                     className="flex size-14 shrink-0 items-center justify-center text-encre-douce"
                   >
                     <IconeCroix className="size-6" />
-                  </button>
+                  </ConfirmButton>
                 )}
               </div>
             )}

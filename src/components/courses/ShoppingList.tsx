@@ -10,6 +10,7 @@ import { formatQuantity } from "@/lib/domain/shopping-list";
 import type { ListItem } from "@/lib/data";
 import { IconeCroix, IconePlus } from "@/components/ui";
 import { ConfirmButton } from "./ConfirmButton";
+import { useAnnuler } from "@/components/Annuler";
 
 type Action =
   | { type: "check"; id: string; checked: boolean }
@@ -24,6 +25,7 @@ export function ShoppingList({
   requests: { id: string; from: string; text: string }[];
 }) {
   const [, startTransition] = useTransition();
+  const proposer = useAnnuler();
   const inputRef = useRef<HTMLInputElement>(null);
   const [list, apply] = useOptimistic(items, (state, action: Action) => {
     switch (action.type) {
@@ -180,6 +182,8 @@ export function ShoppingList({
                         startTransition(async () => {
                           apply({ type: "delete", id: item.id });
                           if (!item.id.startsWith("tmp-")) await deleteItem(item.id);
+                          // Retiré par erreur ? Il revient d'un geste.
+                          if (item.source !== "recipe") proposer(`${item.name} retiré`, () => add(item.name, item.source as "manual" | "request"));
                         })
                       }
                       className="flex size-14 shrink-0 items-center justify-center text-encre-douce"
@@ -198,7 +202,9 @@ export function ShoppingList({
         <div className="mt-8">
           <ConfirmButton
             action={finishTrip}
-            question="Les courses sont terminées ? La liste sera effacée."
+            question="Les courses sont finies ?"
+            detail="La liste sera effacée pour toute la famille."
+            confirmLabel="Oui, c'est fini"
             className="kd-btn kd-btn--large"
           >
             J&apos;ai fini les courses

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { regenerateJoinCode } from "@/app/actions/auth";
+import { ConfirmButton } from "@/components/courses/ConfirmButton";
 
 /** Le code pour rejoindre la famille, à partager aux autres membres. */
 export function FamilyCode({ code, familyName }: { code: string; familyName: string }) {
   const [copied, setCopied] = useState(false);
-  const [pending, startTransition] = useTransition();
 
   async function share() {
     const message = `Rejoins « ${familyName} » sur Kaddie\n${location.origin}\nCode famille : ${code}`;
@@ -30,16 +30,15 @@ export function FamilyCode({ code, familyName }: { code: string; familyName: str
       <button onClick={share} className="kd-btn kd-btn--large">
         {copied ? "Copié" : "Partager le code"}
       </button>
-      <button
-        disabled={pending}
-        onClick={() =>
-          confirm("Changer le code ? L'ancien ne marchera plus pour rejoindre la famille (les téléphones déjà connectés le restent).") &&
-          startTransition(() => regenerateJoinCode())
-        }
-        className="min-h-14 w-full text-encre-douce underline underline-offset-4 disabled:opacity-50"
+      <ConfirmButton
+        action={regenerateJoinCode}
+        question="Changer le code ?"
+        detail="L'ancien ne marchera plus pour rejoindre la famille. Les téléphones déjà connectés le restent."
+        confirmLabel="Oui, changer le code"
+        className="min-h-14 w-full text-encre-douce underline underline-offset-4"
       >
         Changer le code
-      </button>
+      </ConfirmButton>
     </section>
   );
 }
