@@ -6,7 +6,10 @@ import { setTripRecipe } from "@/app/actions/trips";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import type { CandidateRecipe } from "@/lib/views";
 
-/** Les plats proposés pour les courses : « Valider » ou « Pas cette fois ». */
+/**
+ * Les plats proposés pour les courses, en simple liste à cocher (comme la liste
+ * de courses) : un appui sur la ligne garde ou retire le plat ; la photo ouvre la recette.
+ */
 export function RecipeChecklist({ recipes, disabled = false }: { recipes: CandidateRecipe[]; disabled?: boolean }) {
   const [, startTransition] = useTransition();
   const [optimistic, setOptimistic] = useOptimistic(
@@ -21,52 +24,42 @@ export function RecipeChecklist({ recipes, disabled = false }: { recipes: Candid
     });
 
   return (
-    <ul className="flex flex-col gap-4">
-      {optimistic.map((r) => (
-        <li
-          key={r.id}
-          className={`kd-carte outline-4 -outline-offset-4 transition-[outline-color] duration-150 ${r.checked ? "outline-accent" : "outline-transparent"}`}
-        >
-          <div className="flex gap-4 p-4 pb-0">
-            <Link href={`/recettes/${r.id}`} aria-label={`La recette : ${r.title}`} className="shrink-0">
-              <RecipeVisual recipe={r} className="size-20 rounded-pastille" />
+    <ul className="kd-liste">
+      {optimistic.map((r) => {
+        const pourquoi = [...r.wantedBy.map((n) => `${n} le veut`), r.isMatch && "match"].filter(Boolean).join(" · ");
+        return (
+          <li key={r.id} className="flex items-center gap-3 border-b-2 border-trait py-2">
+            <Link href={`/recettes/${r.id}`} aria-label={`La recette : ${r.title}`} className="shrink-0 active:scale-95">
+              <RecipeVisual recipe={r} className="size-14 rounded-pastille" />
             </Link>
-            <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <Link href={`/recettes/${r.id}`} className="font-display text-titre-3 text-aubergine">
-                {r.title}
-              </Link>
-              <p className="flex flex-wrap gap-1.5">
-                {r.wantedBy.map((name) => (
-                  <span key={name} className="kd-pastille">
-                    {name} le veut
-                  </span>
-                ))}
-                {r.isMatch && <span className="kd-pastille kd-pastille--match">Match</span>}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 p-4">
             <button
               type="button"
               disabled={disabled}
               aria-pressed={r.checked}
-              aria-label={`Valider ${r.title}`}
+              aria-label={`Garder ${r.title}`}
               onClick={() => set(r.id, !r.checked)}
-              className={`kd-btn ${r.checked ? "kd-btn--like" : "kd-btn--secondaire"}`}
+              className="flex min-h-14 min-w-0 flex-1 items-center gap-3 text-left"
             >
-              {r.checked ? "Validé" : "Valider"}
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">{r.title}</span>
+                {pourquoi && <span className="kd-petit block">{pourquoi}</span>}
+              </span>
+              <span
+                aria-hidden
+                className={`grid size-7 shrink-0 place-content-center rounded-pastille border-[3px] border-aubergine transition-[background-color,transform] duration-200 ease-rebond ${
+                  r.checked ? "scale-108 bg-accent text-on-accent" : "bg-surface"
+                }`}
+              >
+                {r.checked && (
+                  <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
+                    <path fill="none" stroke="currentColor" strokeWidth={3.4} strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.5l5 5L19.5 7" />
+                  </svg>
+                )}
+              </span>
             </button>
-            <button
-              type="button"
-              disabled={disabled || !r.checked}
-              onClick={() => set(r.id, false)}
-              className="kd-btn kd-btn--secondaire"
-            >
-              Pas cette fois
-            </button>
-          </div>
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ul>
   );
 }

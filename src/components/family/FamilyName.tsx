@@ -11,7 +11,7 @@ export function FamilyName({ name }: { name: string }) {
   if (!editing) {
     return (
       <div className="flex items-center justify-between gap-3">
-        <h1 className="kd-titre-1 min-w-0 text-aubergine">{name}</h1>
+        <h1 className="kd-titre-2 min-w-0 text-aubergine">{name}</h1>
         <button onClick={() => setEditing(true)} className="min-h-14 shrink-0 px-1 text-encre-douce underline underline-offset-4">
           Renommer
         </button>

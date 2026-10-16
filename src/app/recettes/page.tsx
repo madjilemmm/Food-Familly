@@ -28,13 +28,14 @@ export default async function RecipesPage() {
           Dont {auto} trouvée{auto > 1 ? "s" : ""} sur Marmiton, renouvelée{auto > 1 ? "s" : ""} toute{auto > 1 ? "s" : ""} seule{auto > 1 ? "s" : ""} pour le swipe.
         </p>
       )}
-      <ul className="flex flex-col gap-3">
+      {/* Une liste, pas une pile de cartes : photo, nom, et l'étiquette s'il y a lieu. */}
+      <ul className="kd-liste border-t-2 border-trait">
         {recipes.map((r) => (
           <li key={r.id}>
-            <Link href={`/recettes/${r.id}`} className="kd-carte flex-row items-center gap-4 p-3 active:scale-[0.99]">
-              <RecipeVisual recipe={r} className="size-16 shrink-0 rounded-pastille" />
+            <Link href={`/recettes/${r.id}`} className="flex items-center gap-4 border-b-2 border-trait py-2 active:bg-trait/40">
+              <RecipeVisual recipe={r} className="size-14 shrink-0 rounded-pastille" />
               <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-                <span className="font-display text-titre-3 text-aubergine">{r.title}</span>
+                <span className="font-semibold">{r.title}</span>
                 <Etiquettes conflits={conflictsOf(tastes, r)} />
               </span>
             </Link>

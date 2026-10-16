@@ -43,7 +43,7 @@ export default async function FamilyPage({ searchParams }: { searchParams: Promi
       <StrictToggle strict={family.strict_dislikes} />
 
       <section>
-        <h2 className="kd-titre-2 mb-3 text-aubergine">Les membres</h2>
+        <h2 className="kd-etiquette mb-1">Les membres</h2>
         <MembersEditor members={members} myId={me.id} />
       </section>
 

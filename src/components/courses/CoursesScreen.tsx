@@ -67,13 +67,7 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
         illustration="table"
         etiquette={<Depart overview={overview} />}
         titre={answered > 0 || candidates.length > 0 ? "Ce soir, la famille veut" : "Les courses"}
-      >
-        {candidates.length > 0 && (
-          <span className="kd-pastille kd-pastille--match mt-3">
-            {candidates.length} plat{candidates.length > 1 ? "s" : ""}
-          </span>
-        )}
-      </BandeauScene>
+      />
 
       {validated && (
         <Link href={ROUTES[me.style].liste} className="kd-btn kd-btn--like kd-btn--large mb-6">
@@ -88,12 +82,10 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
         ) : (
           <ul className="kd-liste">
             {responses.map(({ member, request, recipes }) => (
-              <li key={member.id} className="flex flex-col justify-center gap-1 border-b-2 border-trait py-3">
-                <p className="flex items-center gap-3">
-                  <span className="font-display text-titre-3 text-aubergine">{member.name}</span>
-                  <span className={`ml-auto ${request ? "kd-pastille kd-pastille--match" : "kd-petit"}`}>
-                    {request ? "a répondu" : "pas encore répondu"}
-                  </span>
+              <li key={member.id} className="flex min-h-14 flex-col justify-center gap-0.5 border-b-2 border-trait py-2">
+                <p className="flex items-baseline gap-3">
+                  <span className="font-semibold">{member.name}</span>
+                  <span className="kd-petit ml-auto">{request ? "a répondu" : "pas encore répondu"}</span>
                 </p>
                 {request?.free_text && <p>« {request.free_text} »</p>}
                 {recipes.length > 0 && (
@@ -109,11 +101,9 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
 
       <section className="mb-8">
         <h2 className="kd-etiquette">Les plats</h2>
-        <p className="kd-petit mb-3">
-          {pastDeadline && nobodyAnswered
-            ? "Personne n'a répondu ? Voici les plats que la famille aime. Garde ceux qui te tentent."
-            : "Garde les plats qui partent dans le caddie."}
-        </p>
+        {pastDeadline && nobodyAnswered && (
+          <p className="kd-petit">Personne n&apos;a répondu : voici les plats que la famille aime.</p>
+        )}
         {candidates.length > 0 ? (
           <RecipeChecklist recipes={candidates} />
         ) : (

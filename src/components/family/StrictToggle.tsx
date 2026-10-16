@@ -8,10 +8,10 @@ export function StrictToggle({ strict }: { strict: boolean }) {
   const [, startTransition] = useTransition();
   const [on, setOn] = useOptimistic(strict);
   return (
-    <section className="kd-carte gap-3 p-5">
+    <section className="flex flex-col gap-2 border-y-2 border-trait py-4">
       <div className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
-          <h2 className="kd-titre-3 text-aubergine">Mode strict</h2>
+          <h2 className="font-semibold">Mode strict</h2>
           <p className="kd-petit mt-1">
             {on
               ? "Ce qu'un membre n'aime pas disparaît du swipe de toute la famille."

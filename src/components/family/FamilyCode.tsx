@@ -24,7 +24,7 @@ export function FamilyCode({ code, familyName }: { code: string; familyName: str
   }
 
   return (
-    <section className="kd-carte gap-3 p-5">
+    <section className="flex flex-col gap-3">
       <p className="kd-etiquette">Code pour rejoindre la famille</p>
       <p data-code className="font-display text-titre-2 tracking-[0.04em] break-all text-aubergine select-all">{code}</p>
       <button onClick={share} className="kd-btn kd-btn--large">

@@ -17,7 +17,7 @@ export function NotificationsCard({ variant }: { variant: "banner" | "pill" | "i
 
   // Pendant la vérification, la carte des réglages garde sa place (pas de saut de mise en page).
   if (state === "loading")
-    return variant === "full" ? <section aria-busy="true" className="kd-carte min-h-48" aria-label="Notifications" /> : null;
+    return variant === "full" ? <section aria-busy="true" className="min-h-40" aria-label="Notifications" /> : null;
   if (variant !== "full" && (state === "on" || state === "unsupported" || state === "denied")) return null;
 
   if (variant === "icone") {
@@ -53,9 +53,10 @@ export function NotificationsCard({ variant }: { variant: "banner" | "pill" | "i
   }
 
   return (
-    <section className="kd-carte gap-3 p-5">
-      <h2 className="kd-titre-3 flex items-center gap-2 text-aubergine">
-        <IconeCloche className="size-7 text-violet" /> Notifications
+    // Dans les réglages : une section comme les autres, pas une carte de plus.
+    <section className={variant === "full" ? "flex flex-col gap-3" : "kd-carte gap-3 p-5"}>
+      <h2 className="kd-etiquette flex items-center gap-2">
+        <IconeCloche className="size-5 text-violet" /> Notifications
       </h2>
 
       {state === "install-first" && (

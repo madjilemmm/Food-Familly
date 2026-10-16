@@ -12,20 +12,20 @@ export function MembersEditor({ members, myId }: { members: Profile[]; myId: str
 
   return (
     <>
-      <ul className="flex flex-col gap-3">
+      <ul className="kd-liste">
         {members.map((m) => (
-          <li key={m.id} className="rounded-carte bg-surface p-4">
+          <li key={m.id} className="border-b-2 border-trait py-2">
             {editing === m.id ? (
               <MemberForm action={saveMember} member={m} onDone={() => setEditing(null)} />
             ) : (
               <div className="flex items-center gap-3">
                 <span className="min-w-0 flex-1">
-                  <span className="block font-display text-titre-3 text-aubergine">
-                    {m.name} {m.id === myId && <span className="font-sans text-petit text-encre-douce">(moi)</span>}
+                  <span className="block font-semibold">
+                    {m.name} {m.id === myId && <span className="text-petit font-normal text-encre-douce">(moi)</span>}
                   </span>
                   <span className="kd-petit">Style {m.style === "simple" ? "simple" : "fun"}</span>
                 </span>
-                <button onClick={() => setEditing(m.id)} className="kd-btn kd-btn--secondaire px-4 text-bouton">
+                <button onClick={() => setEditing(m.id)} className="min-h-14 px-2 font-semibold text-violet underline underline-offset-4">
                   Modifier
                 </button>
                 {m.id !== myId && (
@@ -47,7 +47,7 @@ export function MembersEditor({ members, myId }: { members: Profile[]; myId: str
       </ul>
 
       {editing === "new" ? (
-        <div className="mt-3 flex flex-col gap-2 rounded-carte bg-surface p-4">
+        <div className="mt-3 flex flex-col gap-2">
           <MemberForm action={saveMember} submitLabel="Ajouter" onDone={() => setEditing(null)} />
           <button onClick={() => setEditing(null)} className="min-h-14 w-full text-encre-douce underline underline-offset-4">
             Annuler

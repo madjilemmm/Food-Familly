@@ -25,7 +25,7 @@ export function RequestForm({
   return (
     <form action={action} className="flex flex-col gap-6">
       <label className="block">
-        <span className="kd-titre-3 mb-3 block text-aubergine">Écris ce que tu veux</span>
+        <span className="kd-etiquette mb-2 block">Écris ce que tu veux</span>
         <textarea
           name="free_text"
           defaultValue={initialText}
@@ -37,7 +37,7 @@ export function RequestForm({
       </label>
 
       <fieldset className="min-w-0">
-        <legend className="kd-titre-3 mb-3 text-aubergine">Ou pioche dans les matchs</legend>
+        <legend className="kd-etiquette mb-2">Ou choisis parmi les matchs</legend>
         {choices.length === 0 ? (
           <p className="text-encre-douce">Pas encore de match. Swipe avec ta famille pour en trouver.</p>
         ) : (
@@ -52,8 +52,8 @@ export function RequestForm({
                   className="peer sr-only"
                 />
                 <div className="kd-carte outline-4 -outline-offset-4 outline-transparent transition duration-150 group-active:scale-95 peer-checked:outline-accent peer-focus-visible:outline-focus">
-                  <RecipeVisual recipe={r} className="aspect-square w-full" />
-                  <p className="p-3 font-display text-bouton leading-tight text-aubergine">{r.title}</p>
+                  <RecipeVisual recipe={r} className="aspect-[4/3] w-full" />
+                  <p className="p-3 text-petit leading-tight font-semibold">{r.title}</p>
                 </div>
                 <span className="absolute top-2 right-2 hidden size-9 items-center justify-center rounded-pastille bg-accent text-on-accent peer-checked:flex">
                   <svg viewBox="0 0 24 24" className="size-6" aria-hidden="true">

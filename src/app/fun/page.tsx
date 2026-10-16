@@ -27,6 +27,7 @@ export default async function FunSwipe() {
   const answered = trip?.trip_requests.some((r) => r.profile_id === me.id) ?? false;
   const shopper = members.find((m) => m.id === trip?.created_by) ?? null;
   const who = shopper?.name ?? "Quelqu'un";
+  const bandeauCourse = Boolean(trip && (iAmShopper || (!answered && trip.status === "open")));
 
   // Presque plus rien à découvrir : de nouvelles recettes arrivent de Marmiton, sans rien faire.
   after(() => remplirSiBesoin(user.familyId, deck.length));
@@ -34,12 +35,13 @@ export default async function FunSwipe() {
   return (
     <Scene duo="aubergine" seed={21} className="ecran-scene gap-4">
       <SwipeHeader matchs={matches.length} />
-      {trip && (iAmShopper || (!answered && trip.status === "open")) && (
+      {/* Un seul bandeau à la fois : la course en cours d'abord, sinon le questionnaire. */}
+      {bandeauCourse && trip && (
         <Link
           href="/fun/courses"
-          className="flex min-h-14 items-center gap-3 rounded-bouton bg-blanc px-4 py-2 leading-snug font-semibold text-aubergine active:scale-[0.98]"
+          className="flex min-h-14 items-center gap-3 rounded-bouton bg-blanc px-4 py-2 text-petit leading-snug font-semibold text-aubergine active:scale-[0.98]"
         >
-          <IconePanier className="size-7 shrink-0 text-violet" />
+          <IconePanier className="size-6 shrink-0 text-violet" />
           <span className="flex-1">
             {iAmShopper ? (
               "Tu fais les courses : regarde ce que la famille veut."
@@ -53,7 +55,7 @@ export default async function FunSwipe() {
           </span>
         </Link>
       )}
-      {!me.tastes_done_at && <CarteGouts retour="/fun" />}
+      {!bandeauCourse && !me.tastes_done_at && <CarteGouts retour="/fun" />}
       <h1 className="kd-titre-2">Qu&apos;est-ce qui te fait envie ce soir&nbsp;?</h1>
       <SwipeDeck initialDeck={deck} />
     </Scene>
