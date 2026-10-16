@@ -13,11 +13,11 @@ import { CarteGouts, SwipeHeader } from "@/components/SwipeHeader";
 // Laisse le temps à l'import Marmiton (lancé après l'affichage) de finir.
 export const maxDuration = 60;
 
-export default async function FunSwipe() {
+export default async function Envies() {
   const user = await requireUser();
   // Profil, paquet, course en cours, membres et matchs : tout part en même temps.
   const [me, deck, trip, members, matches] = await Promise.all([
-    requireProfile("fun"),
+    requireProfile(),
     getDeck(user.familyId, user.profileId),
     getCurrentTrip(user.familyId),
     getProfiles(user.familyId),
@@ -38,7 +38,7 @@ export default async function FunSwipe() {
       {/* Un seul bandeau à la fois : la course en cours d'abord, sinon le questionnaire. */}
       {bandeauCourse && trip && (
         <Link
-          href="/fun/courses"
+          href="/courses"
           className="flex min-h-14 items-center gap-3 rounded-bouton bg-blanc px-4 py-2 text-petit leading-snug font-semibold text-aubergine active:scale-[0.98]"
         >
           <IconePanier className="size-6 shrink-0 text-violet" />
@@ -55,7 +55,7 @@ export default async function FunSwipe() {
           </span>
         </Link>
       )}
-      {!bandeauCourse && !me.tastes_done_at && <CarteGouts retour="/fun" />}
+      {!bandeauCourse && !me.tastes_done_at && <CarteGouts retour="/envies" />}
       <h1 className="kd-titre-2">Qu&apos;est-ce qui te fait envie ce soir&nbsp;?</h1>
       <SwipeDeck initialDeck={deck} />
     </Scene>

@@ -66,7 +66,8 @@ export function ShoppingList({
   const pendingRequests = requests
     .map((r) => ({ ...r, articles: articlesDe(r.text) }))
     .filter((r) => r.articles.some((a) => !alreadyAdded.has(a.name.toLowerCase())));
-  const restants = list.length - list.filter((i) => i.checked).length;
+  // Demandés ou ajoutés à la main et pas pris : reportés sur les prochaines courses.
+  const restants = list.filter((i) => !i.checked && i.source !== "recipe").length;
   const done = list.filter((i) => i.checked).length;
   // Les rayons dans l'ordre du parcours en magasin ; un rayon terminé passe en bas.
   // Dans chaque rayon, ce qui reste à prendre en haut, ce qui est pris en bas.

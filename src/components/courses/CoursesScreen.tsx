@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/data";
-import { forFamily, getMatches, getProfiles, getRecipes } from "@/lib/data";
+import { forFamily, getMatches, getMyLikes, getProfiles, getRecipes } from "@/lib/data";
 import { getTripOverview, type TripOverview } from "@/lib/views";
 import { departureChoices, formatTime } from "@/lib/domain/trip";
 import { ROUTES } from "@/lib/routes";
-import { cancelTrip, validateTrip } from "@/app/actions/trips";
+import { cancelTrip, takeOverTrip, validateTrip } from "@/app/actions/trips";
 import { Logo, Scene } from "@/design-system/components/Kaddie";
 import { Countdown } from "@/components/Countdown";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -13,15 +13,16 @@ import { StartTrip } from "./StartTrip";
 import { RecipeChecklist } from "./RecipeChecklist";
 import { ConfirmButton } from "./ConfirmButton";
 import { RequestForm } from "./RequestForm";
-import { PourCombien } from "./PourCombien";
+import { ListScreen } from "./ListScreen";
 
 /**
- * L'écran « Courses », le même pour tout le monde :
- * - personne ne fait les courses → une scène, un seul grand bouton « Je pars… » ;
- * - c'est moi qui les fais → réponses de la famille, plats à valider, liste ;
- * - quelqu'un d'autre les fait → je lui dis ce que je veux.
+ * L'écran « Courses » change avec le moment, pas avec la personne :
+ * - personne n'y va → « Je pars dans… » (un appui et c'est moi qui les fais) ;
+ * - j'y vais, je prépare → qui mange quoi, puis « Faire ma liste » ;
+ * - j'y vais, la liste est faite → le magasin : rien que la liste ;
+ * - quelqu'un d'autre y va → je dis ce que je veux, ou je prends le relais.
  */
-export async function CoursesScreen({ me, notifications }: { me: Profile; notifications?: React.ReactNode }) {
+export async function CoursesScreen({ me, vue, notifications }: { me: Profile; vue?: string; notifications?: React.ReactNode }) {
   const overview = await getTripOverview(me.family_id, me.id);
 
   if (!overview) {
@@ -44,7 +45,16 @@ export async function CoursesScreen({ me, notifications }: { me: Profile; notifi
       </Scene>
     );
   }
-  return overview.iAmShopper ? <ShopperView me={me} overview={overview} /> : <ResponderView me={me} overview={overview} />;
+  const validated = overview.trip.status === "validated";
+  if (overview.iAmShopper) {
+    // Liste faite : au magasin, on ne voit qu'elle (les plats restent à un appui).
+    if (validated && vue !== "plats") {
+      return <ListScreen me={me} retour={{ href: "/courses?vue=plats", label: "Revoir les plats" }} />;
+    }
+    return <PreparerView me={me} overview={overview} />;
+  }
+  if (validated && vue === "liste") return <ListScreen me={me} retour={{ href: "/courses", label: "Mes envies" }} />;
+  return <ResponderView me={me} overview={overview} />;
 }
 
 function Depart({ overview, qui }: { overview: TripOverview; qui?: string }) {
@@ -57,58 +67,63 @@ function Depart({ overview, qui }: { overview: TripOverview; qui?: string }) {
   );
 }
 
-function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) {
-  const { trip, responses, candidates, pastDeadline, nobodyAnswered, members } = overview;
+/** J'y vais, je prépare : pour qui est chaque plat, ce qu'on m'a demandé en plus. */
+function PreparerView({ me, overview }: { me: Profile; overview: TripOverview }) {
+  const { trip, responses, candidates, pastDeadline, nobodyAnswered } = overview;
   const validated = trip.status === "validated";
   const checkedCount = candidates.filter((c) => c.checked).length;
   const answered = responses.filter((r) => r.request).length;
+  const enAttente = responses.filter((r) => !r.request).map((r) => r.member.name);
+  const enPlus = responses.filter((r) => r.request?.free_text);
+  // Déjà sur la liste avant de la faire : les articles pas pris la dernière fois, ou ajoutés à la main.
+  const dejaSurLaListe = trip.shopping_list_items.filter((i) => i.source === "manual" || i.source === "request").map((i) => i.name);
+  const noms = (l: string[]) => (l.length > 1 ? `${l.slice(0, -1).join(", ")} et ${l[l.length - 1]}` : l[0]);
 
   return (
     <>
       <BandeauScene
         fond="courses"
         illustration="table"
-        etiquette={<Depart overview={overview} />}
-        titre={answered > 0 || candidates.length > 0 ? "Ce soir, la famille veut" : "Les courses"}
+        etiquette={
+          <>
+            <Depart overview={overview} />
+            {responses.length > 0 && ` · ${answered} sur ${responses.length} ont répondu`}
+          </>
+        }
+        titre="Qui mange quoi ?"
       />
 
       <section className="mb-8">
-        <h2 className="kd-etiquette mb-2">La famille</h2>
-        {responses.length === 0 ? (
-          <p className="text-encre-douce">Personne d&apos;autre dans la famille pour l&apos;instant.</p>
+        {pastDeadline && nobodyAnswered && (
+          <p className="kd-petit mb-2">Personne n&apos;a répondu : voici les plats que la famille aime, et tes envies.</p>
+        )}
+        {candidates.length > 0 ? (
+          <RecipeChecklist recipes={candidates} moi={me.name} />
         ) : (
+          <p className="text-encre-douce">Pas encore de plat proposé. Swipe tes envies, ou fais ta liste quand même.</p>
+        )}
+      </section>
+
+      {enPlus.length > 0 && (
+        <section className="mb-8">
+          <h2 className="kd-etiquette">Demandé en plus</h2>
           <ul className="kd-liste">
-            {responses.map(({ member, request, recipes }) => (
-              <li key={member.id} className="flex min-h-14 flex-col justify-center gap-0.5 border-b-2 border-trait py-2">
-                <p className="flex items-baseline gap-3">
-                  <span className="font-semibold">{member.name}</span>
-                  <span className="kd-petit ml-auto">{request ? "a répondu" : "pas encore répondu"}</span>
-                </p>
-                {request?.free_text && <p>« {request.free_text} »</p>}
-                {recipes.length > 0 && (
-                  <p className="text-encre-douce">
-                    Veut&nbsp;: <strong className="text-encre">{recipes.map((r) => r.title).join(", ")}</strong>
-                  </p>
-                )}
+            {enPlus.map(({ member, request }) => (
+              <li key={member.id} className="kd-liste__article">
+                <span>
+                  <strong>{member.name}</strong>&nbsp;: « {request!.free_text} »
+                </span>
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
 
-      <section className="mb-8">
-        <h2 className="kd-etiquette">Les plats</h2>
-        {pastDeadline && nobodyAnswered && (
-          <p className="kd-petit">Personne n&apos;a répondu : voici les plats que la famille aime.</p>
-        )}
-        {candidates.length > 0 ? (
-          <RecipeChecklist recipes={candidates} />
-        ) : (
-          <p className="text-encre-douce">Pas encore de plat proposé. Tu peux quand même faire ta liste.</p>
-        )}
-      </section>
+      {!validated && dejaSurLaListe.length > 0 && (
+        <p className="kd-petit mb-4">Déjà sur ta liste&nbsp;: {noms(dejaSurLaListe.slice(0, 6))}{dejaSurLaListe.length > 6 ? "…" : ""}</p>
+      )}
 
-      <PourCombien people={trip.people ?? Math.max(1, members.length)} />
+      {enAttente.length > 0 && <p className="kd-petit mb-8">Pas encore répondu : {noms(enAttente)}</p>}
 
       {/* Collé au-dessus des onglets, sur une bande lilas : le contenu passe dessous proprement. */}
       <form action={validateTrip} className="sticky bottom-[calc(4.25rem+max(env(safe-area-inset-bottom),0.75rem))] z-20 -mx-5 border-t-2 border-trait bg-fond px-5 pt-3 pb-3">
@@ -135,15 +150,24 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
   );
 }
 
+/** Quelqu'un d'autre y va : mes envies (pour moi), les matchs (pour tous), ou je prends le relais. */
 async function ResponderView({ me, overview }: { me: Profile; overview: TripOverview }) {
   const { trip, shopper, responses } = overview;
-  const [matches, recipes] = await Promise.all([getMatches(me.family_id), getRecipes(me.family_id)]);
+  const [matches, recipes, likes] = await Promise.all([
+    getMatches(me.family_id),
+    getRecipes(me.family_id),
+    getMyLikes(me.family_id, me.id),
+  ]);
   const mine = responses.find((r) => r.member.id === me.id)?.request ?? null;
   const others = responses.filter((r) => r.member.id !== me.id && r.request);
   const matchIds = new Set(matches.map((m) => m.id));
-  const choices = await forFamily(me.family_id, [
-    ...matches,
-    ...recipes.filter((r) => mine?.recipe_ids.includes(r.id) && !matchIds.has(r.id)),
+  const likeIds = new Set(likes.map((r) => r.id));
+  const [envies, partages] = await Promise.all([
+    forFamily(me.family_id, [
+      ...likes.filter((r) => !matchIds.has(r.id)),
+      ...recipes.filter((r) => mine?.recipe_ids.includes(r.id) && !matchIds.has(r.id) && !likeIds.has(r.id)),
+    ]),
+    forFamily(me.family_id, matches),
   ]);
   const who = shopper?.name ?? "Quelqu'un";
   const validated = trip.status === "validated";
@@ -157,6 +181,12 @@ async function ResponderView({ me, overview }: { me: Profile; overview: TripOver
         titre={validated ? "Encore une envie ?" : "Tu veux quoi ?"}
       />
 
+      {validated && (
+        <Link href={ROUTES.liste} className="kd-btn kd-btn--secondaire kd-btn--large mb-6">
+          Voir la liste de {who}
+        </Link>
+      )}
+
       {others.length > 0 && (
         <ul className="mb-6 flex flex-col gap-2">
           {others.map(({ member, request, recipes: wanted }) => (
@@ -169,18 +199,26 @@ async function ResponderView({ me, overview }: { me: Profile; overview: TripOver
       )}
 
       <RequestForm
-        choices={choices}
+        envies={envies}
+        matchs={partages}
         initialText={mine?.free_text ?? ""}
         initialRecipeIds={mine?.recipe_ids ?? []}
         alreadySent={mine != null}
         shopperName={who}
       />
 
-      {validated && (
-        <Link href={ROUTES[me.style].liste} className="mt-4 flex min-h-14 items-center justify-center font-semibold text-violet underline underline-offset-4">
-          Voir la liste de courses
-        </Link>
-      )}
+      {/* Les rôles s'échangent : qui veut peut faire les courses à la place. */}
+      <div className="mt-8 text-center">
+        <ConfirmButton
+          action={takeOverTrip}
+          question={`Tu y vas à la place de ${who} ?`}
+          detail={`Les demandes et la liste passent sur ton téléphone. On prévient ${who}.`}
+          confirmLabel="Oui, j'y vais"
+          className="min-h-14 px-2 text-encre-douce underline underline-offset-4"
+        >
+          {who} ne peut plus ? Je prends le relais
+        </ConfirmButton>
+      </div>
     </>
   );
 }

@@ -73,7 +73,8 @@ export type Trip = {
   created_at: string;
   /** Chargés avec la course, en une seule requête. */
   trip_requests: TripRequest[];
-  trip_recipes: { recipe_id: string; selected: boolean }[];
+  /** people : nombre de personnes corrigé à la main pour ce plat (null = déduit). */
+  trip_recipes: { recipe_id: string; selected: boolean; people?: number | null }[];
   shopping_list_items: ListItem[];
 };
 
@@ -263,6 +264,17 @@ export async function isMatch(familyId: string, recipeId: string): Promise<boole
   return row != null;
 }
 
+/** Les plats que j'ai likés ces 14 derniers jours : mes envies à moi, matchées ou non. */
+export const getMyLikes = cache(async function getMyLikes(familyId: string, profileId: string): Promise<Recipe[]> {
+  const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
+  const [rows, recipes] = await Promise.all([
+    db().from("swipes").select("recipe_id").eq("profile_id", profileId).eq("liked", true).gte("swiped_at", since).order("swiped_at", { ascending: false }),
+    getRecipes(familyId),
+  ]);
+  const byId = new Map(recipes.map((r) => [r.id, r]));
+  return (check(rows) as { recipe_id: string }[]).flatMap((r) => byId.get(r.recipe_id) ?? []);
+});
+
 // ─── Courses ───────────────────────────────────────────────────────────
 
 /** La session de courses en cours de la famille (ouverte ou validée, pas trop ancienne). */
@@ -277,7 +289,7 @@ export async function loadCurrentTrip(familyId: string): Promise<Trip | null> {
       .select(
         `id, created_by, departs_at, deadline_at, status, validated_at, created_at, people,
          trip_requests(id, profile_id, free_text, recipe_ids, updated_at),
-         trip_recipes(recipe_id, selected),
+         trip_recipes(*),
          shopping_list_items(id, name, quantity, unit, aisle, source, for_recipes, checked, created_at)`,
       )
       .eq("family_id", familyId)

@@ -4,6 +4,7 @@ import {
   conflictsOf,
   getCurrentTrip,
   getMatches,
+  getMyLikes,
   getTasteContext,
   getProfiles,
   getRecipes,
@@ -13,12 +14,43 @@ import {
   type TripRequest,
 } from "@/lib/data";
 import { isPastDeadline } from "@/lib/domain/trip";
+import { convivesDe, type Convives } from "@/lib/domain/convives";
 
 export type CandidateRecipe = Recipe & {
   checked: boolean;
   isMatch: boolean;
   wantedBy: string[];
+  /** Une envie (un like) de la personne qui fait les courses. */
+  envieDuShopper: boolean;
+  /** Pour qui est ce plat, et pour combien. */
+  convives: Convives;
 };
+
+/**
+ * Pour qui est chaque plat de la course (voir convivesDe) : sert à l'affichage
+ * et au calcul des quantités de la liste.
+ */
+export function convivesDesPlats(
+  trip: Trip,
+  members: Profile[],
+  matchIds: Set<string>,
+  likesDuShopper: Set<string>,
+): (recipeId: string) => Convives {
+  const noms = new Map(members.map((m) => [m.id, m.name]));
+  const shopper = (trip.created_by && noms.get(trip.created_by)) || "";
+  const corrections = new Map(trip.trip_recipes.map((r) => [r.recipe_id, r.people ?? null]));
+  return (recipeId) =>
+    convivesDe({
+      isMatch: matchIds.has(recipeId),
+      demandePar: trip.trip_requests
+        .filter((r) => r.profile_id !== trip.created_by && r.recipe_ids.includes(recipeId))
+        .flatMap((r) => noms.get(r.profile_id) ?? []),
+      envieDuShopper: likesDuShopper.has(recipeId),
+      shopper,
+      famille: trip.people ?? Math.max(1, members.length),
+      corrige: corrections.get(recipeId),
+    });
+}
 
 export type TripOverview = {
   trip: Trip;
@@ -52,6 +84,7 @@ export const getTripOverview = cache(async function getTripOverview(
     getTasteContext(familyId),
   ]);
   if (!trip) return null;
+  const likes = trip.created_by ? await getMyLikes(familyId, trip.created_by) : [];
   const requests = trip.trip_requests;
   const selection = new Map(trip.trip_recipes.map((r) => [r.recipe_id, r.selected]));
   const recipeById = new Map(recipes.map((r) => [r.id, r]));
@@ -69,10 +102,14 @@ export const getTripOverview = cache(async function getTripOverview(
     });
 
   const matchIds = new Set(matches.map((m) => m.id));
+  const likeIds = new Set(likes.map((r) => r.id));
+  const pourQui = convivesDesPlats(trip, members, matchIds, likeIds);
+  // Demandes, matchs, déjà cochés, et les envies à elle de la personne qui fait les courses.
   const ids = new Set<string>([
     ...responses.flatMap((r) => r.recipes.map((x) => x.id)),
     ...matches.map((m) => m.id),
     ...selection.keys(),
+    ...likeIds,
   ]);
 
   const candidates: CandidateRecipe[] = [...ids]
@@ -84,12 +121,15 @@ export const getTripOverview = cache(async function getTripOverview(
       checked: selection.get(recipe.id) === true,
       isMatch: matchIds.has(recipe.id),
       wantedBy: responses.filter((r) => r.request?.recipe_ids.includes(recipe.id)).map((r) => r.member.name),
+      envieDuShopper: likeIds.has(recipe.id),
+      convives: pourQui(recipe.id),
     }))
-    // Les plats demandés d'abord, puis les matchs, puis le reste
+    // Les plats demandés d'abord, puis les matchs, puis ses envies à soi, puis le reste
     .sort(
       (a, b) =>
         b.wantedBy.length - a.wantedBy.length ||
         Number(b.isMatch) - Number(a.isMatch) ||
+        Number(b.envieDuShopper) - Number(a.envieDuShopper) ||
         a.title.localeCompare(b.title, "fr"),
     );
 

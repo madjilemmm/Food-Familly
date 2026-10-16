@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { requireProfile, requireUser } from "@/lib/auth";
-import { ROUTES } from "@/lib/routes";
 import { getFamily } from "@/lib/data";
 import { forgetProfile, leaveFamily } from "@/app/actions/auth";
 import { NotificationsCard } from "@/components/pwa/NotificationsCard";
-import { MyStyle } from "@/components/family/MyStyle";
 import { IconeRetour } from "@/components/ui";
 import { ConfirmButton } from "@/components/courses/ConfirmButton";
 
@@ -21,7 +19,7 @@ export default async function SettingsPage() {
   return (
     <main className="pt-safe pb-safe mx-auto flex max-w-xl flex-col gap-10 px-5 pb-16">
       <div>
-        <Link href={ROUTES[me.style].home} className="-ml-2 inline-flex min-h-14 items-center gap-1 font-semibold text-violet">
+        <Link href={"/"} className="-ml-2 inline-flex min-h-14 items-center gap-1 font-semibold text-violet">
           <IconeRetour className="size-6" /> Retour
         </Link>
         <h1 className="kd-titre-1 mt-2 text-aubergine">Réglages</h1>
@@ -32,7 +30,6 @@ export default async function SettingsPage() {
           <p className="kd-etiquette">Ce téléphone est celui de</p>
           <p className="kd-titre-2 mt-1 text-aubergine">{me.name}</p>
         </div>
-        <MyStyle me={me} />
         <form action={forgetProfile}>
           <button className="min-h-14 text-encre-douce underline underline-offset-4">Ce n&apos;est pas moi</button>
         </form>

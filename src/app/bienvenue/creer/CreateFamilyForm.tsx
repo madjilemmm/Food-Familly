@@ -3,7 +3,6 @@
 import { useActionState, useState } from "react";
 import { createFamily } from "@/app/actions/auth";
 import { SubmitButton } from "@/components/SubmitButton";
-import { StylePicker } from "@/components/family/StylePicker";
 import { IconeCroix, IconePlus, MessageErreur } from "@/components/ui";
 import type { Style } from "@/lib/session";
 
@@ -37,7 +36,7 @@ export function CreateFamilyForm() {
 
       <fieldset className="min-w-0">
         <legend className="kd-etiquette mb-2">Les membres</legend>
-        {/* Une ligne par membre : prénom, style, et qui je suis. */}
+        {/* Une ligne par membre : prénom, et qui je suis. */}
         <ul className="kd-liste border-t-2 border-trait">
           {members.map((m, i) => (
             <li key={m.key} className="flex flex-col gap-2 border-b-2 border-trait py-3">
@@ -65,9 +64,6 @@ export function CreateFamilyForm() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <StylePicker compact value={m.style} onChange={(style) => update(m.key, { style })} />
-                </div>
                 <button
                   type="button"
                   aria-pressed={me === i}

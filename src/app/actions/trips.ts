@@ -3,10 +3,20 @@
 import { redirect } from "next/navigation";
 import { requireUser, type CurrentUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
-import { getCurrentTrip, getRecipesWithIngredients, getProfile, getProfiles, loadCurrentTrip, type Trip } from "@/lib/data";
+import {
+  getCurrentTrip,
+  getMatches,
+  getMyLikes,
+  getRecipesWithIngredients,
+  getProfile,
+  getProfiles,
+  loadCurrentTrip,
+  type Trip,
+} from "@/lib/data";
+import { convivesDesPlats } from "@/lib/views";
 import { deadlineFor, type DepartureChoice } from "@/lib/domain/trip";
 import { mergeIngredients, itemKey, scaleIngredients } from "@/lib/domain/shopping-list";
-import { notifyTripStarted, notifyRequestReceived } from "@/lib/notifications";
+import { notifyTripStarted, notifyRequestReceived, notifyTakeOver } from "@/lib/notifications";
 import { ROUTES } from "@/lib/routes";
 import { changed, cleanText } from "./_shared";
 
@@ -42,11 +52,12 @@ export async function startTrip(choice: DepartureChoice) {
   if (current && current.created_by !== user.profileId) {
     const shopper = current.created_by ? await getProfile(user.familyId, current.created_by) : null;
     // L'écran des courses montre alors qui les fait déjà.
-    if (shopper) redirect(ROUTES[user.style].courses);
+    if (shopper) redirect(ROUTES.courses);
   }
 
   const deadline = deadlineFor(choice);
-  // Ce qui n'a pas été pris la dernière fois (moins de 2 semaines) passe dans la nouvelle liste.
+  // Ce qui a été demandé ou ajouté à la main et pas pris la dernière fois (moins de 2 semaines)
+  // passe dans la nouvelle liste. Les ingrédients des recettes, eux, suivent les plats choisis.
   const { data: dernier } = await db()
     .from("shopping_trips")
     .select("id, shopping_list_items(name, quantity, unit, aisle, source, for_recipes, checked)")
@@ -56,7 +67,7 @@ export async function startTrip(choice: DepartureChoice) {
     .limit(1)
     .maybeSingle();
   const restes = ((dernier?.shopping_list_items ?? []) as Omit<Trip["shopping_list_items"][number], "id" | "created_at">[]).filter(
-    (i) => !i.checked && i.source !== "maison",
+    (i) => !i.checked && (i.source === "manual" || i.source === "request"),
   );
   // Une seule session à la fois par famille : les anciennes sont closes.
   await db().from("shopping_trips").update({ status: "done" }).eq("family_id", user.familyId).neq("status", "done");
@@ -74,13 +85,13 @@ export async function startTrip(choice: DepartureChoice) {
   if (restes.length > 0) {
     await db()
       .from("shopping_list_items")
-      .insert(restes.map((i) => ({ trip_id: trip.id, name: i.name, quantity: i.quantity, unit: i.unit, aisle: i.aisle, for_recipes: i.for_recipes, source: "manual" })));
+      .insert(restes.map((i) => ({ trip_id: trip.id, name: i.name, quantity: i.quantity, unit: i.unit, aisle: i.aisle, source: i.source })));
   }
 
   changed(() => notifyTripStarted(user.familyId, user.profileId, trip.deadline_at));
   // Une redirection plutôt qu'un rafraîchissement sur place : l'écran suit même si
   // les onglets sont encore en train de se précharger.
-  redirect(ROUTES[user.style].courses);
+  redirect(ROUTES.courses);
 }
 
 export async function cancelTrip() {
@@ -90,13 +101,24 @@ export async function cancelTrip() {
   changed();
 }
 
+/** « Je prends le relais » : la course (demandes, plats, liste) passe à moi. */
+export async function takeOverTrip() {
+  const user = await requireUser();
+  const trip = await currentTripOrThrow(user);
+  if (trip.created_by === user.profileId) redirect(ROUTES.courses);
+  const ancien = trip.created_by;
+  await db().from("shopping_trips").update({ created_by: user.profileId }).eq("id", trip.id);
+  changed(() => notifyTakeOver(user.familyId, user.profileId, ancien));
+  redirect(ROUTES.courses);
+}
+
 /** N'importe qui peut clore des courses terminées (par exemple si on les a faites à deux). */
 export async function finishTrip() {
   const user = await requireUser();
   const trip = await currentTripOrThrow(user);
   await db().from("shopping_trips").update({ status: "done" }).eq("id", trip.id);
   changed();
-  redirect(ROUTES[user.style].courses);
+  redirect(ROUTES.courses);
 }
 
 export async function setTripRecipe(recipeId: string, selected: boolean) {
@@ -111,13 +133,15 @@ export async function setTripRecipe(recipeId: string, selected: boolean) {
   changed();
 }
 
-/** Pour combien de personnes sont ces courses (la liste en tient compte). */
-export async function setTripPeople(people: number) {
+/** Corrige pour combien de personnes est un plat (la liste en tient compte). */
+export async function setTripRecipePeople(recipeId: string, people: number) {
   const user = await requireUser();
   const trip = await myTripOrThrow(user);
   const n = Math.round(Number(people));
   if (!Number.isFinite(n) || n < 1 || n > 30) throw new Error("Nombre invalide");
-  await db().from("shopping_trips").update({ people: n }).eq("id", trip.id);
+  const { error } = await db().from("trip_recipes").update({ people: n }).eq("trip_id", trip.id).eq("recipe_id", recipeId);
+  // Base pas encore migrée (colonne absente) : le nombre reste celui déduit, sans casser l'écran.
+  if (error) return;
   if (trip.status === "validated") await rebuildList(user.familyId);
   changed();
 }
@@ -135,7 +159,7 @@ export async function validateTrip() {
     db().from("shopping_trips").update({ status: "validated", validated_at: new Date().toISOString() }).eq("id", trip.id),
   ]);
   changed();
-  redirect(ROUTES[user.style].liste);
+  redirect(ROUTES.liste);
 }
 
 /** Recalcule les ingrédients des recettes de la liste (relue sans cache si besoin). */
@@ -144,16 +168,18 @@ async function rebuildList(familyId: string, known?: Trip) {
   if (!trip) return;
   // Plats cochés et liste actuelle arrivent avec la course : pas de requête en plus.
   const selection = trip.trip_recipes.filter((r) => r.selected);
-  const [recipes, members] = await Promise.all([
+  const [recipes, members, matches, likes] = await Promise.all([
     getRecipesWithIngredients(familyId, selection.map((s) => s.recipe_id)),
     getProfiles(familyId),
+    getMatches(familyId),
+    trip.created_by ? getMyLikes(familyId, trip.created_by) : Promise.resolve([]),
   ]);
-  // Quantités recalculées pour le nombre de personnes (toute la famille par défaut).
-  const people = trip.people ?? Math.max(1, members.length);
+  // Quantités recalculées plat par plat : pour celles et ceux qui le mangent.
+  const pourQui = convivesDesPlats(trip, members, new Set(matches.map((m) => m.id)), new Set(likes.map((r) => r.id)));
   const previous = trip.shopping_list_items;
   const aLaMaison = new Set(previous.filter((i) => i.source === "maison").map((i) => itemKey(i.name, i.unit)));
   const merged = mergeIngredients(
-    recipes.map((r) => ({ recipeTitle: r.title, ingredients: scaleIngredients(r.recipe_ingredients, r.servings, people) })),
+    recipes.map((r) => ({ recipeTitle: r.title, ingredients: scaleIngredients(r.recipe_ingredients, r.servings, pourQui(r.id).n) })),
   ).filter((m) => !aLaMaison.has(m.key));
   const wasChecked = new Set(
     previous.filter((i) => i.source === "recipe" && i.checked).map((i) => itemKey(i.name, i.unit)),

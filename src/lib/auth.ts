@@ -3,7 +3,6 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/data";
-import { ROUTES } from "@/lib/routes";
 import { SESSION_COOKIE, cookieOptions, decodeSession, encodeSession, type Session, type Style } from "@/lib/session";
 
 export const getSession = cache(async function getSession(): Promise<Session | null> {
@@ -37,12 +36,11 @@ export async function requireUser(): Promise<CurrentUser> {
 }
 
 /** Le profil connecté (pour les pages). Renvoie au choix du profil s'il a disparu. */
-export async function requireProfile(style?: Style) {
+export async function requireProfile() {
   const user = await requireUser();
   const profile = await getProfile(user.familyId, user.profileId);
   if (!profile) redirect("/profil");
   // Style changé depuis un autre appareil : on resynchronise le cookie.
   if (profile.style !== user.style) redirect("/api/session/refresh?next=/");
-  if (style && profile.style !== style) redirect(ROUTES[profile.style].home);
   return profile;
 }

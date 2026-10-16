@@ -1,6 +1,5 @@
 import { requireProfile } from "@/lib/auth";
 import { getFamilyTastes, getProfiles } from "@/lib/data";
-import { ROUTES } from "@/lib/routes";
 import { AUTRE, DIETS, doitVoirNouvellesCartes } from "@/lib/domain/foods";
 import { lireEnvies } from "@/lib/domain/envies";
 import { Questionnaire } from "./Questionnaire";
@@ -22,7 +21,6 @@ export default async function TastesPage({ searchParams }: { searchParams: Promi
 
   return (
     <Questionnaire
-      style={me.style}
       nouvelles={params.nouvelles === "1" && doitVoirNouvellesCartes(me.tastes_done_at)}
       enviesSeules={params.envies === "1" && Boolean(me.tastes_done_at) && !me.envies_done_at}
       commencerParEnvies={!me.envies_done_at}
@@ -32,7 +30,7 @@ export default async function TastesPage({ searchParams }: { searchParams: Promi
         ...(!me.envies_done_at && mine.piment === "pas_fan" ? { piquant: "non" as const } : {}),
         ...(!me.envies_done_at && mine.piment === "adore" ? { piquant: "oui" as const } : {}),
       }}
-      suite={safeNext(params.suite, ROUTES[me.style].home)}
+      suite={safeNext(params.suite, "/")}
       initial={{
         diets: Object.entries(mine).filter(([k, l]) => l === "interdit" && dietKeys.has(k)).map(([k]) => k),
         autres: Object.keys(mine).filter((k) => k.startsWith(AUTRE)).map((k) => k.slice(AUTRE.length)),

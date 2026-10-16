@@ -23,7 +23,6 @@ export function MembersEditor({ members, myId }: { members: Profile[]; myId: str
                   <span className="block font-semibold">
                     {m.name} {m.id === myId && <span className="text-petit font-normal text-encre-douce">(moi)</span>}
                   </span>
-                  <span className="kd-petit">Style {m.style === "simple" ? "simple" : "fun"}</span>
                 </span>
                 <button onClick={() => setEditing(m.id)} className="min-h-14 px-2 font-semibold text-violet underline underline-offset-4">
                   Modifier

@@ -23,6 +23,19 @@ export async function notifyTripStarted(familyId: string, shopperId: string, dea
   );
 }
 
+/** Quelqu'un prend le relais : la personne qui devait y aller est prévenue. */
+export async function notifyTakeOver(familyId: string, newShopperId: string, oldShopperId: string | null) {
+  if (!oldShopperId) return;
+  const all = await members(familyId);
+  const name = all.find((m) => m.id === newShopperId)?.name ?? "Quelqu'un";
+  await sendPush([oldShopperId], {
+    title: `${name} fait les courses à ta place`,
+    body: "Tu n'as plus rien à faire. Merci qui ?",
+    url: "/courses",
+    tag: "trip",
+  });
+}
+
 /** Un membre a répondu : on prévient la personne qui fait les courses. */
 export async function notifyRequestReceived(
   familyId: string,

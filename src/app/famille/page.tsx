@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { requireProfile, requireUser } from "@/lib/auth";
-import { ROUTES } from "@/lib/routes";
 import { getFamily, getProfiles } from "@/lib/data";
 import { Scene } from "@/design-system/components/Kaddie";
 import { FamilyCode } from "@/components/family/FamilyCode";
@@ -32,7 +31,7 @@ export default async function FamilyPage({ searchParams }: { searchParams: Promi
           </p>
         </Scene>
       ) : (
-        <Link href={ROUTES[me.style].home} className="-ml-2 inline-flex min-h-14 items-center gap-1 self-start font-semibold text-violet">
+        <Link href={"/"} className="-ml-2 inline-flex min-h-14 items-center gap-1 self-start font-semibold text-violet">
           <IconeRetour className="size-6" /> Retour
         </Link>
       )}
@@ -48,7 +47,7 @@ export default async function FamilyPage({ searchParams }: { searchParams: Promi
       </section>
 
       {welcome && (
-        <Link href={ROUTES[me.style].home} className="kd-btn kd-btn--large">
+        <Link href={"/"} className="kd-btn kd-btn--large">
           C&apos;est parti
         </Link>
       )}

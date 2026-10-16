@@ -3,16 +3,15 @@ import Link from "next/link";
 import { IconeCoeur, IconeRetour, LienReglages } from "@/components/ui";
 import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 
-/** En-tête du swipe : monogramme, pastille des matchs, notifs, réglages. */
+/** En-tête des envies : monogramme, pastille des matchs, notifs, réglages. */
 export function SwipeHeader({ matchs }: { matchs: number }) {
   return (
     <header className="flex items-center gap-3 pt-2">
       <Logo variante="monogramme" width={34} />
-      {matchs > 0 && (
-        <span className="kd-pastille kd-pastille--match">
-          {matchs} match{matchs > 1 ? "s" : ""}
-        </span>
-      )}
+      {/* Les matchs de la famille, à un appui (ils n'ont plus d'onglet à eux). */}
+      <Link href="/matchs" className="kd-pastille kd-pastille--match flex min-h-11 items-center px-4 active:scale-95">
+        {matchs > 0 ? `${matchs} match${matchs > 1 ? "s" : ""}` : "Matchs"}
+      </Link>
       <span className="ml-auto flex gap-2">
         <NotificationsCard variant="icone" />
         <LienReglages surScene />

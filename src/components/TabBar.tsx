@@ -33,9 +33,9 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
     };
   }, [router, pathname, hrefs]);
 
-  // Un onglet qui en contient d'autres (« /fun » contient « /fun/matchs ») ne s'allume que sur sa page.
+  // Les matchs font partie des envies : l'onglet Envies reste allumé.
   const matches = (href: string, path: string) =>
-    tabs.some((t) => t.href.startsWith(`${href}/`)) ? path === href : path === href || path.startsWith(`${href}/`);
+    path === href || path.startsWith(`${href}/`) || (href === "/envies" && path === "/matchs");
   const isActive = (href: string) => (pressed ? pressed === href : matches(href, pathname));
 
   return (

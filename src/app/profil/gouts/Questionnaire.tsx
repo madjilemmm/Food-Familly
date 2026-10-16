@@ -10,7 +10,6 @@ import { STYLES, type Envies, type Piquant, type Temps } from "@/lib/domain/envi
 import { CarteGeste, PILE, type Direction } from "@/components/CarteGeste";
 import { IconeCoeur, IconeCroix, MessageErreur } from "@/components/ui";
 import { Spinner } from "@/components/Spinner";
-import type { Style } from "@/lib/session";
 
 type Initial = { diets: string[]; autres: string[]; cards: Record<string, "pas_fan" | "adore"> };
 type Other = { name: string; done: boolean; tastes: Record<string, TasteLevel> };
@@ -24,7 +23,6 @@ const REPONSE: Record<Direction, CardAnswer> = { gauche: "pas_fan", droite: "ok"
  * d'ingrédients (on s'arrête quand on veut), 4. la compatibilité avec la famille.
  */
 export function Questionnaire({
-  style,
   suite,
   initial,
   others,
@@ -33,7 +31,6 @@ export function Questionnaire({
   commencerParEnvies = false,
   initialEnvies,
 }: {
-  style: Style;
   suite: string;
   initial: Initial;
   others: Other[];
@@ -137,7 +134,6 @@ export function Questionnaire({
 
       {etape === "cartes" && (
         <EtapeCartes
-          style={style}
           deck={deck}
           index={index}
           pending={pending}
@@ -358,7 +354,6 @@ function EtapeEnvies({
 // ─── 3. Les cartes d'ingrédients ───────────────────────────────────────
 
 function EtapeCartes({
-  style,
   deck,
   index,
   pending,
@@ -369,7 +364,6 @@ function EtapeCartes({
 }: {
   nouvelles: boolean;
   onFini: () => void;
-  style: Style;
   deck: { key: string; label: string }[];
   index: number;
   pending: boolean;
@@ -401,71 +395,46 @@ function EtapeCartes({
         </div>
       </div>
 
-      {style === "fun" ? (
-        <>
-          <div ref={pileRef} className="relative min-h-[14rem] flex-1">
-            <AnimatePresence initial={false}>
-              {deck
-                .slice(index, index + PILE.length)
-                .map((f, i) => (
-                  <CarteGeste
-                    key={f.key}
-                    rang={i}
-                    pileRef={pileRef}
-                    haut
-                    onDecide={(d) => onAnswer(f.key, REPONSE[d])}
-                    register={i === 0 ? (fn) => (lancer.current = fn) : undefined}
-                    tampons={{
-                      gauche: <span className="kd-tampon kd-tampon--nope">J&apos;aime pas</span>,
-                      droite: <span className="kd-tampon kd-tampon--like">Ça me va</span>,
-                      // En bas de la carte : elle part vers le haut, le tampon reste visible.
-                      haut: <span className="kd-tampon top-auto bottom-6 left-1/2 -translate-x-1/2 bg-aubergine text-blanc">J&apos;adore</span>,
-                    }}
-                  >
-                    <NomCarte label={f.label} />
-                  </CarteGeste>
-                ))
-                .reverse()}
-            </AnimatePresence>
-          </div>
-          <p className="kd-petit text-center text-blanc">Gauche : j&apos;aime pas · droite : ça me va · haut : j&apos;adore</p>
-          <div className="flex items-center justify-center gap-6">
-            <Bouton variante="nope" rond aria-label="J'aime pas" disabled={pending} onClick={() => appuyer("gauche")}>
-              <IconePasEnvie />
-            </Bouton>
-            <Bouton variante="secondaire" rond aria-label="Ça me va" disabled={pending} onClick={() => appuyer("droite")}>
-              <IconeJenVeux />
-            </Bouton>
-            <Bouton variante="like" rond aria-label="J'adore" disabled={pending} onClick={() => appuyer("haut")}>
-              <IconeCoeur className="size-8" />
-            </Bouton>
-          </div>
-        </>
-      ) : (
-        courant && (
-          <div className="flex flex-1 flex-col gap-3">
-            <div key={courant.key} className="kd-monte flex min-h-40 flex-1">
-              <NomCarte label={courant.label} className="flex-1" />
-            </div>
-            {(
-              [
-                ["pas_fan", "J'aime pas", "kd-btn--nope"],
-                ["ok", "Ça me va", "kd-btn--secondaire"],
-                ["adore", "J'adore", "kd-btn--like"],
-              ] as const
-            ).map(([r, label, variante]) => (
-              <button
-                key={r}
-                disabled={pending}
-                onClick={() => onAnswer(courant.key, r)}
-                className={`kd-btn kd-btn--large ${variante} min-h-20 text-titre-3`}
+      {/* Pour tout le monde : la carte se glisse, ou les trois boutons dessous. */}
+
+      <div ref={pileRef} className="relative min-h-[14rem] flex-1">
+        <AnimatePresence initial={false}>
+          {deck
+            .slice(index, index + PILE.length)
+            .map((f, i) => (
+              <CarteGeste
+                key={f.key}
+                rang={i}
+                pileRef={pileRef}
+                haut
+                onDecide={(d) => onAnswer(f.key, REPONSE[d])}
+                register={i === 0 ? (fn) => (lancer.current = fn) : undefined}
+                tampons={{
+                  gauche: <span className="kd-tampon kd-tampon--nope">J&apos;aime pas</span>,
+                  droite: <span className="kd-tampon kd-tampon--like">Ça me va</span>,
+                  // En bas de la carte : elle part vers le haut, le tampon reste visible.
+                  haut: <span className="kd-tampon top-auto bottom-6 left-1/2 -translate-x-1/2 bg-aubergine text-blanc">J&apos;adore</span>,
+                }}
               >
-                {label}
-              </button>
-            ))}
-          </div>
-        )
-      )}
+                <NomCarte label={f.label} />
+              </CarteGeste>
+            ))
+            .reverse()}
+        </AnimatePresence>
+      </div>
+      <p className="kd-petit text-center text-blanc">Gauche : j&apos;aime pas · droite : ça me va · haut : j&apos;adore</p>
+      <div className="flex items-center justify-center gap-6">
+        <Bouton variante="nope" rond aria-label="J'aime pas" disabled={pending} onClick={() => appuyer("gauche")}>
+          <IconePasEnvie />
+        </Bouton>
+        <Bouton variante="secondaire" rond aria-label="Ça me va" disabled={pending} onClick={() => appuyer("droite")}>
+          <IconeJenVeux />
+        </Bouton>
+        <Bouton variante="like" rond aria-label="J'adore" disabled={pending} onClick={() => appuyer("haut")}>
+          <IconeCoeur className="size-8" />
+        </Bouton>
+      </div>
+    
 
       <div className="flex items-center justify-between pb-4">
         <button onClick={onBack} disabled={pending} className="min-h-14 px-1 text-blanc underline underline-offset-4">

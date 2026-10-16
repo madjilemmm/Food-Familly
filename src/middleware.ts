@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, cookieOptions, decodeAnySession, encodeSession } from "@/lib/session";
-import { equivalentFor, resolveAlias } from "@/lib/routes";
+import { resolveAlias } from "@/lib/routes";
 
 const WEEK = 7 * 24 * 60 * 60;
 /** Accessibles sans famille : rejoindre ou créer une famille. */
@@ -46,10 +46,8 @@ export async function middleware(req: NextRequest) {
 
   if (PUBLIC.includes(pathname)) return redirect(req, "/");
 
-  const alias = resolveAlias(pathname, session.style);
-  if (alias && alias !== pathname) return redirect(req, alias);
-  const equivalent = equivalentFor(pathname, session.style);
-  if (equivalent) return redirect(req, equivalent);
+  const alias = resolveAlias(pathname);
+  if (alias) return redirect(req, alias);
 
   const res = NextResponse.next();
   // Prolonge la session des appareils utilisés régulièrement.

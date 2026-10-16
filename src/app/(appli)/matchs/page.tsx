@@ -4,9 +4,9 @@ import { getMatches } from "@/lib/data";
 import { BandeauScene, EtatVide } from "@/components/ui";
 import { MatchCards } from "@/components/MatchCards";
 
-export default async function FunMatches() {
+export default async function Matchs() {
   const user = await requireUser();
-  const [, matches] = await Promise.all([requireProfile("fun"), getMatches(user.familyId)]);
+  const [, matches] = await Promise.all([requireProfile(), getMatches(user.familyId)]);
   return (
     <>
       <BandeauScene
@@ -16,7 +16,7 @@ export default async function FunMatches() {
       />
       {matches.length === 0 ? (
         <EtatVide phrase="Pas encore de match. Quand la majorité like le même plat, il arrive ici.">
-          <Link href="/fun" className="kd-btn kd-btn--secondaire kd-btn--large">
+          <Link href="/envies" className="kd-btn kd-btn--secondaire kd-btn--large">
             Aller swiper
           </Link>
         </EtatVide>

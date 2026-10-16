@@ -7,7 +7,6 @@ import { db } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/data";
 import { requireFamily, requireUser, setSession } from "@/lib/auth";
 import { SESSION_COOKIE, newSession, type Style } from "@/lib/session";
-import { ROUTES } from "@/lib/routes";
 import { STARTER_RECIPES } from "@/lib/starter-recipes";
 import { cleanText, changed } from "./_shared";
 
@@ -130,7 +129,7 @@ export async function chooseProfile(profileId: string) {
   if (!profile) throw new Error("Profil introuvable");
   await setSession(newSession(session.familyId, profile.id, profile.style));
   // Première fois sur ce profil : le questionnaire de goûts d'abord.
-  redirect(profile.tastes_seen_at ? ROUTES[profile.style].home : "/profil/gouts");
+  redirect(profile.tastes_seen_at ? "/" : "/profil/gouts");
 }
 
 /** « Je ne suis pas dans la liste » : on s'ajoute soi-même à la famille. */

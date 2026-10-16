@@ -5,7 +5,7 @@ Chaque famille crée son espace, ajoute ses membres et partage un code. Ensuite,
 
 - **Celui ou celle qui part** l'annonce en 2 taps. Les autres sont prévenus, il voit leurs réponses en direct, coche les plats, et la liste de courses se fait toute seule, triée par rayon.
 - **Tout le monde** swipe des recettes comme sur une appli de rencontre. Quand la **majorité de la famille** like le même plat, c'est un **match**. Quand quelqu'un part, les autres répondent avec du texte libre et/ou des matchs.
-- Chacun choisit son **style d'interface** : **simple** (très gros boutons, l'essentiel) ou **fun** (animé).
+- Une seule appli pour tout le monde, trois onglets : **Envies** (swipe, matchs), **Courses**, **Recettes**. Ce n'est pas le profil qui décide de l'écran, c'est le moment : celle ou celui qui touche « Je pars » fait les courses (préparation « Qui mange quoi ? », puis le magasin avec rien que la liste) ; les autres disent ce qu'ils veulent, ou **prennent le relais**. Chaque plat sait pour qui il est (un match → toute la famille, une demande → qui l'a demandé, son envie → soi), et les quantités suivent.
 
 Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres, Realtime, Storage), Web Push (VAPID), hébergement sur Vercel (gratuit).
 
@@ -29,7 +29,7 @@ Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres,
 
 | Règle | Détail |
 |---|---|
-| Familles | Au premier lancement : **« Créer ma famille »** (nom, membres, style de chacun) ou **« J'ai un code famille »**. Chaque famille a ses propres membres, recettes, matchs et listes, invisibles des autres. Une nouvelle famille reçoit 10 recettes de départ. |
+| Familles | Au premier lancement : **« Créer ma famille »** (nom et prénoms des membres) ou **« J'ai un code famille »**. Chaque famille a ses propres membres, recettes, matchs et listes, invisibles des autres. Une nouvelle famille reçoit 10 recettes de départ. |
 | Connexion | Le code famille est saisi une seule fois, puis on choisit son prénom (ou « Je ne suis pas dans la liste »). C'est retenu sur le téléphone pendant plus d'un an. |
 | Qui fait les courses | N'importe quel membre. Une seule course à la fois par famille : les autres voient « X part dans… » et lui envoient leurs demandes. Tout le monde peut consulter et compléter la liste. |
 | Départ en courses | Choix : 30 min, 1 h, 2 h ou « ce soir, 18 h ». Ce dernier choix disparaît après 17 h. |
@@ -64,7 +64,9 @@ Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres,
    [`supabase/migrations/20261016000002_envies_recettes_relance.sql`](supabase/migrations/20261016000002_envies_recettes_relance.sql)
    (envies, recette complète, nombre de personnes, et la relance « plus que 10 minutes » appelée chaque minute par Supabase), puis
    [`supabase/migrations/20261017000001_deja_a_la_maison.sql`](supabase/migrations/20261017000001_deja_a_la_maison.sql)
-   (« j'en ai déjà » : un ingrédient de recette retiré de la liste ne revient pas).
+   (« j'en ai déjà » : un ingrédient de recette retiré de la liste ne revient pas), puis
+   [`supabase/migrations/20261017000002_qui_mange_quoi.sql`](supabase/migrations/20261017000002_qui_mange_quoi.sql)
+   (nombre de personnes par plat, et majorité comptée parmi celles et ceux qui swipent).
    Chaque fichier se lance dans cet ordre ; on peut les relancer sans risque.
 
    Pas besoin de données de départ : on crée sa famille directement dans l'appli. (Le fichier facultatif
@@ -190,7 +192,7 @@ Points importants sur iPhone :
 
 ### Remplacer les recettes d'exemple
 
-Depuis l'appli, dans l'onglet **Recettes** (style fun) ou **Plats → Gérer mes recettes** (style simple), vous pouvez :
+Depuis l'appli, dans l'onglet **Recettes**, vous pouvez :
 - **ajouter** une recette (nom, emoji, photo, ingrédients avec quantité, unité et rayon) ;
 - **modifier** une recette ;
 - **supprimer** une recette.
@@ -201,14 +203,13 @@ Conseils pour une liste de courses bien fusionnée :
 - Utilisez les mêmes noms d'une recette à l'autre (« Oignon » et « Oignons » sont reconnus comme le même article).
 - Les unités `g`/`kg` et `ml`/`cl`/`l` s'additionnent entre elles. Laissez l'unité vide pour compter à la pièce.
 
-### Gérer les membres, le style et le code
+### Gérer les membres et le code
 
 Tout se fait dans l'appli, ⚙️ → **Ma famille** :
-- ajouter, modifier (prénom, emoji, style) ou retirer un membre ;
+- ajouter, modifier (prénom) ou retirer un membre ;
 - renommer la famille ;
 - **partager** le code, ou en **changer** (l'ancien ne permet plus de rejoindre la famille ; les téléphones déjà connectés le restent).
 
-Chacun peut aussi changer son propre style dans ⚙️ → **Style de l'appli** : l'interface bascule tout de suite.
 
 ---
 
@@ -241,11 +242,10 @@ npm run icons      # régénère les icônes depuis scripts/generate-icons.mjs
 
 ```
 src/
-  middleware.ts          # famille rejointe, profil choisi, style simple/fun
+  middleware.ts          # famille rejointe, profil choisi, anciennes adresses
   app/
     bienvenue/ profil/   # saisie du code puis choix du profil
-    simple/              # style simple : Courses · Plats · Liste · J'aime
-    fun/                 # style fun : Swipe · Matchs · Courses · Liste
+    (appli)/             # Envies (swipe) · Courses (préparer, magasin) · Matchs
     famille/             # membres, code de la famille
     bienvenue/creer/     # création d'une famille
     recettes/            # liste + formulaire de recette
@@ -271,7 +271,7 @@ supabase/
 
 - `families` : chaque famille et son code pour la rejoindre
 - `families.strict_dislikes` : le mode strict des goûts (vrai par défaut)
-- `profiles` : les membres d'une famille, avec leur style `simple` ou `fun` et les dates du questionnaire de goûts (`tastes_seen_at`, `tastes_done_at`)
+- `profiles` : les membres d'une famille, avec les dates du questionnaire de goûts (`tastes_seen_at`, `tastes_done_at`)
 - `profile_tastes` : les goûts de chacun (`food` = clé de `src/lib/domain/foods.ts` ou `autre:…`, `level` = `interdit` / `pas_fan` / `adore`)
 - `recipes`, `recipe_ingredients` : nom, quantité, unité, rayon ; `recipes.source_url` pour les recettes importées de Marmiton
 - `swipes` : un swipe par profil et par recette, daté (expiration après 14 jours)

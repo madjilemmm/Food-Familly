@@ -1,37 +1,33 @@
-import type { Style } from "@/lib/session";
-
-/** Les écrans de chaque style d'interface. */
-export const ROUTES: Record<Style, { home: string; courses: string; matchs: string; liste: string }> = {
-  simple: { home: "/simple", courses: "/simple", matchs: "/simple/plats", liste: "/simple/liste" },
-  fun: { home: "/fun", courses: "/fun/courses", matchs: "/fun/matchs", liste: "/fun/liste" },
-};
+/** Les écrans de l'appli : les mêmes pour tout le monde. */
+export const ROUTES = {
+  envies: "/envies",
+  courses: "/courses",
+  matchs: "/matchs",
+  liste: "/courses?vue=liste",
+} as const;
 
 /**
- * Adresses neutres (utilisées par les notifications) et anciennes adresses
- * de la première version, traduites vers l'écran du bon style.
+ * Anciennes adresses (styles « simple » et « fun », première version),
+ * encore dans les notifications et les applis installées.
  */
-const ALIASES: Record<string, keyof (typeof ROUTES)["simple"]> = {
-  "/": "home",
-  "/courses": "courses",
-  "/matchs": "matchs",
-  "/liste": "liste",
-  "/maman": "courses",
-  "/maman/plats": "matchs",
-  "/maman/liste": "liste",
-  "/enfant": "home",
-  "/enfant/courses": "courses",
-  "/enfant/matchs": "matchs",
+const ANCIENNES: Record<string, string> = {
+  "/simple": ROUTES.courses,
+  "/simple/swipe": ROUTES.envies,
+  "/simple/plats": ROUTES.matchs,
+  "/simple/liste": ROUTES.liste,
+  "/fun": ROUTES.envies,
+  "/fun/courses": ROUTES.courses,
+  "/fun/matchs": ROUTES.matchs,
+  "/fun/liste": ROUTES.liste,
+  "/liste": ROUTES.liste,
+  "/maman": ROUTES.courses,
+  "/maman/plats": ROUTES.matchs,
+  "/maman/liste": ROUTES.liste,
+  "/enfant": ROUTES.envies,
+  "/enfant/courses": ROUTES.courses,
+  "/enfant/matchs": ROUTES.matchs,
 };
 
-export function resolveAlias(pathname: string, style: Style): string | null {
-  const key = ALIASES[pathname.replace(/\/$/, "") || "/"];
-  return key ? ROUTES[style][key] : null;
-}
-
-/** /simple/plats vu par quelqu'un en style fun → /fun/matchs, etc. */
-export function equivalentFor(pathname: string, style: Style): string | null {
-  const other: Style = style === "simple" ? "fun" : "simple";
-  if (!pathname.startsWith(`/${other}`)) return null;
-  const entry = Object.entries(ROUTES[other]).find(([key, path]) => key !== "home" && path === pathname);
-  return entry ? ROUTES[style][entry[0] as keyof (typeof ROUTES)["simple"]] : pathname === `/${other}/swipe` ? "/fun" : ROUTES[style].home;
+export function resolveAlias(pathname: string): string | null {
+  return ANCIENNES[pathname.replace(/\/$/, "")] ?? null;
 }
