@@ -25,7 +25,7 @@ export function RequestForm({
   return (
     <form action={action} className="flex flex-col gap-6">
       <label className="block">
-        <span className="kd-titre-3 mb-3 block text-aubergine">Dis-lui ce qui te fait envie</span>
+        <span className="kd-titre-3 mb-3 block text-aubergine">Écris ce que tu veux</span>
         <textarea
           name="free_text"
           defaultValue={initialText}

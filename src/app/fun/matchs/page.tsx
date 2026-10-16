@@ -12,7 +12,7 @@ export default async function FunMatches() {
       <BandeauScene
         illustration="table"
         etiquette={`${matches.length} match${matches.length > 1 ? "s" : ""}`}
-        titre="Ce soir, ils veulent"
+        titre="Les matchs de la famille"
       />
       {matches.length === 0 ? (
         <EtatVide phrase="Pas encore de match. Quand la majorité like le même plat, il arrive ici.">

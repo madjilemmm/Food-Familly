@@ -29,12 +29,17 @@ export function StrictToggle({ strict }: { strict: boolean }) {
               await setStrictDislikes(!on);
             })
           }
-          className={`relative h-9 w-16 shrink-0 rounded-full border-[3px] border-aubergine transition-colors duration-240 ${on ? "bg-accent" : "bg-surface"}`}
+          className="flex h-14 w-20 shrink-0 items-center justify-center rounded-full"
         >
+          {/* Le rail fait 36 px de haut, mais toute la zone de 56 px se touche. */}
           <span
             aria-hidden
-            className={`absolute top-1/2 left-1 size-6 -translate-y-1/2 rounded-full bg-aubergine transition-transform duration-240 ease-rebond ${on ? "translate-x-7" : ""}`}
-          />
+            className={`relative h-9 w-16 rounded-full border-[3px] border-aubergine transition-colors duration-240 ${on ? "bg-accent" : "bg-surface"}`}
+          >
+            <span
+              className={`absolute top-1/2 left-1 size-6 -translate-y-1/2 rounded-full bg-aubergine transition-transform duration-240 ease-rebond ${on ? "translate-x-7" : ""}`}
+            />
+          </span>
         </button>
       </div>
       <p className="kd-petit">Les interdits (allergies, régimes) disparaissent toujours pour tout le monde.</p>

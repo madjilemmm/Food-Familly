@@ -19,7 +19,7 @@ export default async function SimpleMatches() {
       <BandeauScene
         illustration="table"
         etiquette={`${matches.length} plat${matches.length > 1 ? "s" : ""} aimé${matches.length > 1 ? "s" : ""}`}
-        titre="Ce soir, ils veulent"
+        titre="Les plats préférés"
       />
 
       {matches.length === 0 ? (

@@ -66,7 +66,7 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
         fond="courses"
         illustration="table"
         etiquette={<Depart overview={overview} />}
-        titre={answered > 0 || candidates.length > 0 ? "Ce soir, ils veulent" : "Les courses"}
+        titre={answered > 0 || candidates.length > 0 ? "Ce soir, la famille veut" : "Les courses"}
       >
         {candidates.length > 0 && (
           <span className="kd-pastille kd-pastille--match mt-3">
@@ -123,7 +123,8 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
 
       <PourCombien people={trip.people ?? Math.max(1, members.length)} />
 
-      <form action={validateTrip} className="sticky bottom-28 z-20">
+      {/* Collé au-dessus des onglets, sur une bande lilas : le contenu passe dessous proprement. */}
+      <form action={validateTrip} className="sticky bottom-[calc(4.25rem+max(env(safe-area-inset-bottom),0.75rem))] z-20 -mx-5 border-t-2 border-trait bg-fond px-5 pt-3 pb-3">
         <SubmitButton pendingLabel="Je prépare la liste…">
           {validated
             ? "Mettre à jour ma liste"

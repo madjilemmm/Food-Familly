@@ -9,7 +9,8 @@ import { InstallHelp } from "@/components/pwa/InstallHelp";
  * mémoire avec Safari : on invite donc à l'installer AVANT de saisir le code.
  */
 export function InstallFirst({ children }: { children: React.ReactNode }) {
-  const [mustInstall, setMustInstall] = useState(false);
+  // null tant qu'on ne sait pas : rien ne s'affiche, puis le bon écran directement (pas de formulaire qui saute).
+  const [mustInstall, setMustInstall] = useState<boolean | null>(null);
   const [skipped, setSkipped] = useState(false);
 
   useEffect(() => {
@@ -17,6 +18,7 @@ export function InstallFirst({ children }: { children: React.ReactNode }) {
     setMustInstall(isIOS() && !isStandalone());
   }, []);
 
+  if (mustInstall === null) return <div aria-busy="true" className="min-h-72" />;
   if (!mustInstall || skipped) return <>{children}</>;
 
   return (

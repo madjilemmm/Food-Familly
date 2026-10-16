@@ -203,3 +203,9 @@ a {
     opacity: 0.8;
   }
 }
+
+/* Recette sans photo, ou photo qui ne charge plus : le motif de fruits et légumes (lilas) plutôt qu'un vide */
+.kd-carte__photo,
+.photo-absente {
+  background: var(--trait) url(/brand/fonds/kaddie-motif-legumes-lilas.webp) center / cover no-repeat;
+}

@@ -137,7 +137,7 @@ function Carte({
         titre={recipe.title}
         photo={recipe.photo_url}
         pastille={recipe.pastille}
-        infos={recipe.source_url ? "Recette Marmiton" : undefined}
+        infos={[recipe.total_minutes && `${recipe.total_minutes} min`, recipe.source_url && "Recette Marmiton"].filter(Boolean).join(" · ") || undefined}
       />
     </CarteGeste>
   );

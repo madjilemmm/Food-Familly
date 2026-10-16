@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- photos Supabase, pas besoin de l'optimiseur */
 
-/** Photo de la recette, ou à défaut un aplat (comme la carte du kit). */
+/** Photo de la recette, ou à défaut le motif de fruits et légumes (comme la carte du kit). */
 export function RecipeVisual({
   recipe,
   className = "",
@@ -9,7 +9,7 @@ export function RecipeVisual({
   className?: string;
 }) {
   if (recipe.photo_url) {
-    return <img src={recipe.photo_url} alt="" loading="lazy" decoding="async" draggable={false} className={`bg-trait object-cover ${className}`} />;
+    return <img src={recipe.photo_url} alt="" loading="lazy" decoding="async" draggable={false} className={`photo-absente object-cover ${className}`} />;
   }
-  return <div aria-hidden className={`bg-trait ${className}`} />;
+  return <div aria-hidden className={`photo-absente ${className}`} />;
 }
