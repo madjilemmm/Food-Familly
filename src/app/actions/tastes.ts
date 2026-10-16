@@ -4,10 +4,11 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
 import { AUTRE, DIETS, INGREDIENTS } from "@/lib/domain/foods";
 import { normalizeName } from "@/lib/domain/shopping-list";
+import { lireEnvies, type Envies } from "@/lib/domain/envies";
 import { changed } from "./_shared";
 
 export type CardAnswer = "pas_fan" | "ok" | "adore";
-export type TastesInput = { diets: string[]; autres: string[]; cards: Record<string, CardAnswer>; done: boolean };
+export type TastesInput = { diets: string[]; autres: string[]; cards: Record<string, CardAnswer>; envies?: Envies; done: boolean };
 
 const DIET_KEYS = new Set(DIETS.map((d) => d.key));
 const CARD_KEYS = new Set(INGREDIENTS.map((f) => f.key));
@@ -41,7 +42,11 @@ export async function saveTastes(input: TastesInput): Promise<{ ok?: boolean; er
   const now = new Date().toISOString();
   await db()
     .from("profiles")
-    .update(input.done ? { tastes_seen_at: now, tastes_done_at: now } : { tastes_seen_at: now })
+    .update({
+      tastes_seen_at: now,
+      ...(input.done ? { tastes_done_at: now } : {}),
+      ...(input.envies ? { envies: lireEnvies(input.envies), envies_done_at: now } : {}),
+    })
     .eq("id", user.profileId)
     .eq("family_id", user.familyId);
   changed();

@@ -13,6 +13,7 @@ import { StartTrip } from "./StartTrip";
 import { RecipeChecklist } from "./RecipeChecklist";
 import { ConfirmButton } from "./ConfirmButton";
 import { RequestForm } from "./RequestForm";
+import { PourCombien } from "./PourCombien";
 
 /**
  * L'écran « Courses », le même pour tout le monde :
@@ -54,7 +55,7 @@ function Depart({ overview, qui }: { overview: TripOverview; qui?: string }) {
 }
 
 function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) {
-  const { trip, responses, candidates, pastDeadline, nobodyAnswered } = overview;
+  const { trip, responses, candidates, pastDeadline, nobodyAnswered, members } = overview;
   const validated = trip.status === "validated";
   const checkedCount = candidates.filter((c) => c.checked).length;
   const answered = responses.filter((r) => r.request).length;
@@ -119,6 +120,8 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
           <p className="text-encre-douce">Pas encore de plat proposé. Tu peux quand même faire ta liste.</p>
         )}
       </section>
+
+      <PourCombien people={trip.people ?? Math.max(1, members.length)} />
 
       <form action={validateTrip} className="sticky bottom-28 z-20">
         <SubmitButton pendingLabel="Je prépare la liste…">

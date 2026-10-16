@@ -19,7 +19,34 @@ export type ImportedRecipe = {
   rating?: number | null;
   ratingCount?: number | null;
   totalMinutes?: number | null;
+  /** Nombre de personnes prévu (« 8 personnes » → 8), pour ajuster les quantités. */
+  servingsCount?: number | null;
+  /** Les étapes, dans l'ordre. */
+  steps?: string[];
 };
+
+/** « 8 personnes », « 4 », « 6 parts » → le nombre ; sinon null. */
+export function servingsCountOf(value: unknown): number | null {
+  const v = Array.isArray(value) ? value[0] : value;
+  const n = Number(String(v ?? "").match(/\d+/)?.[0]);
+  return Number.isFinite(n) && n > 0 && n <= 50 ? n : null;
+}
+
+/** recipeInstructions : texte, liste d'étapes, ou sections d'étapes. */
+export function stepsOf(value: unknown): string[] {
+  const out: string[] = [];
+  const visit = (v: unknown) => {
+    if (typeof v === "string") v.split(/\n+/).forEach((l) => l.trim() && out.push(decodeEntities(l.trim())));
+    else if (Array.isArray(v)) v.forEach(visit);
+    else if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      if (o.itemListElement) visit(o.itemListElement);
+      else if (typeof o.text === "string") out.push(decodeEntities(o.text.replace(/\s+/g, " ").trim()));
+    }
+  };
+  visit(value);
+  return out.filter(Boolean).slice(0, 40).map((s) => s.slice(0, 1500));
+}
 
 /** « PT1H40M » → 100 (minutes). */
 export function parseDuration(value: unknown): number | null {
@@ -159,6 +186,8 @@ export function extractRecipe(html: string): ImportedRecipe | null {
       (recipe.aggregateRating as Json | undefined)?.ratingCount ?? (recipe.aggregateRating as Json | undefined)?.reviewCount,
     ),
     totalMinutes: parseDuration(recipe.totalTime) ?? parseDuration(recipe.cookTime),
+    servingsCount: servingsCountOf(recipe.recipeYield),
+    steps: stepsOf(recipe.recipeInstructions),
   };
 }
 

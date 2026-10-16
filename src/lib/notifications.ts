@@ -51,3 +51,42 @@ export async function notifyMatch(familyId: string, swiperId: string, recipeId: 
     { title: "C'est un match !", body: recipe.data?.title ?? "", url: "/matchs", tag: "match" },
   );
 }
+
+/**
+ * Plus que 10 minutes avant l'heure limite : on relance ceux qui n'ont pas
+ * encore répondu. Une seule fois par course (reminded_at posé avant l'envoi).
+ */
+export async function sendDeadlineReminders(now = new Date()): Promise<number> {
+  const dans10 = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
+  const { data: trips } = await db()
+    .from("shopping_trips")
+    .select("id, family_id, created_by, deadline_at, trip_requests(profile_id)")
+    .eq("status", "open")
+    .is("reminded_at", null)
+    .gt("deadline_at", now.toISOString())
+    .lte("deadline_at", dans10);
+  let envoyees = 0;
+  for (const trip of trips ?? []) {
+    // Réserve la relance : si deux appels arrivent ensemble, un seul l'envoie.
+    const { data: reservee } = await db()
+      .from("shopping_trips")
+      .update({ reminded_at: now.toISOString() })
+      .eq("id", trip.id)
+      .is("reminded_at", null)
+      .select("id");
+    if (!reservee?.length) continue;
+    const all = await members(trip.family_id);
+    const shopper = all.find((m) => m.id === trip.created_by)?.name ?? "Quelqu'un";
+    const ontRepondu = new Set((trip.trip_requests as { profile_id: string }[]).map((r) => r.profile_id));
+    const aRelancer = all.filter((m) => m.id !== trip.created_by && !ontRepondu.has(m.id)).map((m) => m.id);
+    if (aRelancer.length === 0) continue;
+    await sendPush(aRelancer, {
+      title: "Plus que 10 min",
+      body: `Dis à ${shopper} ce que tu veux manger avant ${formatTime(trip.deadline_at)}.`,
+      url: "/courses",
+      tag: "trip",
+    });
+    envoyees += aRelancer.length;
+  }
+  return envoyees;
+}

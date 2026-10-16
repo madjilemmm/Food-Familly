@@ -6,6 +6,7 @@ import { AnimatePresence } from "motion/react";
 import { Bouton, IconeJenVeux, IconePasEnvie, Logo, Scene } from "@/design-system/components/Kaddie";
 import { saveTastes, skipTastes, type CardAnswer } from "@/app/actions/tastes";
 import { CARTES_AJOUTEES, DIETS, cartesPour, compatibility, type TasteLevel } from "@/lib/domain/foods";
+import { STYLES, type Envies, type Piquant, type Temps } from "@/lib/domain/envies";
 import { CarteGeste, PILE, type Direction } from "@/components/CarteGeste";
 import { IconeCoeur, IconeCroix, MessageErreur } from "@/components/ui";
 import { Spinner } from "@/components/Spinner";
@@ -13,13 +14,14 @@ import type { Style } from "@/lib/session";
 
 type Initial = { diets: string[]; autres: string[]; cards: Record<string, "pas_fan" | "adore"> };
 type Other = { name: string; done: boolean; tastes: Record<string, TasteLevel> };
-type Etape = "regime" | "cartes" | "resultat";
+type Etape = "regime" | "envies" | "cartes" | "resultat";
 
 const REPONSE: Record<Direction, CardAnswer> = { gauche: "pas_fan", droite: "ok", haut: "adore" };
 
 /**
  * Le questionnaire de goûts, façon appli de rencontre :
- * 1. régime et allergies, 2. des cartes d'ingrédients, 3. la compatibilité avec la famille.
+ * 1. régime et allergies, 2. tes envies (styles, temps, piquant), 3. des cartes
+ * d'ingrédients (on s'arrête quand on veut), 4. la compatibilité avec la famille.
  */
 export function Questionnaire({
   style,
@@ -27,6 +29,9 @@ export function Questionnaire({
   initial,
   others,
   nouvelles = false,
+  enviesSeules = false,
+  commencerParEnvies = false,
+  initialEnvies,
 }: {
   style: Style;
   suite: string;
@@ -34,9 +39,20 @@ export function Questionnaire({
   others: Other[];
   /** A déjà répondu avant les nouvelles cartes : seulement celles-là. */
   nouvelles?: boolean;
+  /** A déjà répondu avant l'écran « Tes envies » : seulement celui-là. */
+  enviesSeules?: boolean;
+  /** Nouvelles cartes ET écran des envies jamais vu : les envies d'abord. */
+  commencerParEnvies?: boolean;
+  initialEnvies: Envies;
 }) {
   const router = useRouter();
-  const [etape, setEtape] = useState<Etape>(nouvelles ? "cartes" : "regime");
+  const [etape, setEtape] = useState<Etape>(
+    enviesSeules || (nouvelles && commencerParEnvies) ? "envies" : nouvelles ? "cartes" : "regime",
+  );
+  const [envies, setEnvies] = useState<Envies>(initialEnvies);
+  // Les envies ne sont enregistrées que si l'écran a été vu (pas en mode « nouvelles cartes »).
+  const [enviesVues, setEnviesVues] = useState(false);
+  const piquant = (c: Record<string, CardAnswer>, vues = enviesVues) => (vues ? avecPiquant(c, envies.piquant) : c);
   const [diets, setDiets] = useState<string[]>(initial.diets);
   const [autres, setAutres] = useState<string[]>(initial.autres);
   const [cards, setCards] = useState<Record<string, CardAnswer>>(initial.cards);
@@ -45,8 +61,9 @@ export function Questionnaire({
   const [pending, startTransition] = useTransition();
 
   // Une carte déjà couverte par un régime coché (poisson, fruits de mer) n'est pas reposée.
+  // Le piquant est déjà répondu sur l'écran des envies.
   const deck = useMemo(
-    () => cartesPour(diets).filter((f) => !nouvelles || CARTES_AJOUTEES.includes(f.key)),
+    () => cartesPour(diets).filter((f) => (!nouvelles || CARTES_AJOUTEES.includes(f.key)) && f.key !== "piment"),
     [diets, nouvelles],
   );
 
@@ -54,15 +71,15 @@ export function Questionnaire({
     router.push(suite);
     router.refresh();
   };
-  const enregistrer = (done: boolean, ensuite: () => void) =>
+  const enregistrer = (done: boolean, ensuite: () => void, vues = enviesVues) =>
     startTransition(async () => {
       setError(null);
-      const res = await saveTastes({ diets, autres, cards, done });
+      const res = await saveTastes({ diets, autres, cards: piquant(cards, vues), envies: vues ? envies : undefined, done });
       if (res.error) setError(res.error);
       else ensuite();
     });
   const plusTard = () =>
-    nouvelles
+    nouvelles || enviesSeules
       ? enregistrer(true, partir)
       : etape === "regime"
       ? startTransition(async () => {
@@ -81,7 +98,7 @@ export function Questionnaire({
     <Scene
       as="main"
       duo="aubergine"
-      seed={etape === "regime" ? 17 : etape === "cartes" ? 23 : 31}
+      seed={etape === "regime" ? 17 : etape === "envies" ? 11 : etape === "cartes" ? 23 : 31}
       className="pb-safe flex min-h-dvh flex-col gap-5 px-5 pt-[max(env(safe-area-inset-top),1rem)]"
     >
       <header className="flex items-center justify-between pt-3">
@@ -99,7 +116,19 @@ export function Questionnaire({
           setDiets={setDiets}
           autres={autres}
           setAutres={setAutres}
+          onNext={() => setEtape("envies")}
+        />
+      )}
+
+      {etape === "envies" && (
+        <EtapeEnvies
+          envies={envies}
+          setEnvies={setEnvies}
+          pending={pending}
+          seules={enviesSeules}
           onNext={() => {
+            setEnviesVues(true);
+            if (enviesSeules) return enregistrer(true, partir, true);
             setIndex(0);
             setEtape("cartes");
           }}
@@ -114,15 +143,27 @@ export function Questionnaire({
           pending={pending}
           onAnswer={repondre}
           nouvelles={nouvelles}
-          onBack={index > 0 ? () => setIndex(index - 1) : () => setEtape("regime")}
+          onBack={index > 0 ? () => setIndex(index - 1) : () => setEtape(nouvelles ? "regime" : "envies")}
+          onFini={() => enregistrer(true, () => setEtape("resultat"))}
         />
       )}
 
-      {etape === "resultat" && <EtapeResultat others={others} mine={niveaux(diets, autres, cards)} onDone={partir} />}
+      {etape === "resultat" && (
+        <EtapeResultat others={others} mine={niveaux(diets, autres, piquant(cards))} onDone={partir} />
+      )}
 
       {error && <MessageErreur>{error}</MessageErreur>}
     </Scene>
   );
+}
+
+/** « Pas de piquant » = je n'aime pas le piment ; « j'adore » = je l'adore. */
+function avecPiquant(cards: Record<string, CardAnswer>, piquant: Piquant): Record<string, CardAnswer> {
+  const c = { ...cards };
+  if (piquant === "non") c.piment = "pas_fan";
+  else if (piquant === "oui") c.piment = "adore";
+  else delete c.piment;
+  return c;
 }
 
 function niveaux(diets: string[], autres: string[], cards: Record<string, CardAnswer>): Record<string, TasteLevel> {
@@ -162,7 +203,7 @@ function EtapeRegime({
   return (
     <div className="kd-monte flex flex-1 flex-col gap-5">
       <div>
-        <p className="kd-etiquette text-blanc">Étape 1 sur 3</p>
+        <p className="kd-etiquette text-blanc">Étape 1 sur 4</p>
         <h1 className="kd-titre-2 mt-2">Ce que tu ne peux pas manger</h1>
       </div>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Régime et allergies">
@@ -216,7 +257,105 @@ function EtapeRegime({
   );
 }
 
-// ─── 2. Les cartes d'ingrédients ───────────────────────────────────────
+// ─── 2. Tes envies ─────────────────────────────────────────────────────
+
+const TEMPS: { key: Temps; label: string }[] = [
+  { key: "30", label: "Moins de 30 min" },
+  { key: "60", label: "Moins d'1 h" },
+  { key: "any", label: "Peu importe" },
+];
+const PIQUANT: { key: Piquant; label: string }[] = [
+  { key: "non", label: "Pas du tout" },
+  { key: "un_peu", label: "Un peu" },
+  { key: "oui", label: "J'adore" },
+];
+
+function EtapeEnvies({
+  envies,
+  setEnvies,
+  pending,
+  seules,
+  onNext,
+}: {
+  envies: Envies;
+  setEnvies: (fn: (e: Envies) => Envies) => void;
+  pending: boolean;
+  seules: boolean;
+  onNext: () => void;
+}) {
+  const puce = (on: boolean) =>
+    `inline-flex min-h-14 items-center rounded-bouton border-[3px] px-4 font-semibold active:scale-95 ${
+      on ? "border-accent bg-accent text-on-accent" : "border-blanc text-blanc"
+    }`;
+  return (
+    <div className="kd-monte flex flex-1 flex-col gap-5">
+      <div>
+        <p className="kd-etiquette text-blanc">{seules ? "Nouveau" : "Étape 2 sur 4"}</p>
+        <h1 className="kd-titre-2 mt-2">Qu&apos;est-ce qui te fait envie&nbsp;?</h1>
+        <p className="mt-1">Touche tout ce que tu aimes : Kaddie ira chercher ces plats-là.</p>
+      </div>
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Styles de plats">
+        {STYLES.map((st) => {
+          const on = envies.styles.includes(st.key);
+          return (
+            <button
+              key={st.key}
+              type="button"
+              aria-pressed={on}
+              onClick={() =>
+                setEnvies((e) => ({ ...e, styles: on ? e.styles.filter((k) => k !== st.key) : [...e.styles, st.key] }))
+              }
+              className={puce(on)}
+            >
+              {st.label}
+            </button>
+          );
+        })}
+      </div>
+      <div>
+        <p className="kd-etiquette mb-2 text-blanc">En semaine, je cuisine</p>
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Temps de cuisine">
+          {TEMPS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="radio"
+              aria-checked={envies.temps === t.key}
+              onClick={() => setEnvies((e) => ({ ...e, temps: t.key }))}
+              className={puce(envies.temps === t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="kd-etiquette mb-2 text-blanc">Le piquant</p>
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Le piquant">
+          {PIQUANT.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="radio"
+              aria-checked={envies.piquant === t.key}
+              onClick={() => setEnvies((e) => ({ ...e, piquant: t.key }))}
+              className={puce(envies.piquant === t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-auto pb-4">
+        <Bouton variante="secondaire" large disabled={pending} onClick={onNext}>
+          {seules ? "C'est noté" : "Suivant"}
+        </Bouton>
+      </div>
+    </div>
+  );
+}
+
+// ─── 3. Les cartes d'ingrédients ───────────────────────────────────────
 
 function EtapeCartes({
   style,
@@ -225,9 +364,11 @@ function EtapeCartes({
   pending,
   onAnswer,
   onBack,
+  onFini,
   nouvelles,
 }: {
   nouvelles: boolean;
+  onFini: () => void;
   style: Style;
   deck: { key: string; label: string }[];
   index: number;
@@ -244,7 +385,7 @@ function EtapeCartes({
     <div className="flex flex-1 flex-col gap-5">
       <div>
         <p className="kd-etiquette text-blanc">
-          {nouvelles ? "Nouvelles cartes" : "Étape 2 sur 3"} · carte {Math.min(index + 1, deck.length)} sur {deck.length}
+          {nouvelles ? "Nouvelles cartes" : "Étape 3 sur 4"} · carte {Math.min(index + 1, deck.length)} sur {deck.length}
         </p>
         <h1 className="kd-titre-2 mt-2">{nouvelles ? "De nouvelles cartes à swiper" : "Et ça, tu aimes\u00a0?"}</h1>
       </div>
@@ -319,7 +460,16 @@ function EtapeCartes({
         <button onClick={onBack} disabled={pending} className="min-h-14 px-1 text-blanc underline underline-offset-4">
           {index > 0 ? "Carte d'avant" : "Retour"}
         </button>
-        {pending && <Spinner className="w-7 text-blanc" />}
+        {pending ? (
+          <Spinner className="w-7 text-blanc" />
+        ) : (
+          // S'arrêter quand on veut : les cartes restantes comptent comme « ça me va ».
+          index >= 5 && (
+            <button onClick={onFini} className="min-h-14 px-1 font-semibold text-blanc underline underline-offset-4">
+              J&apos;ai fini
+            </button>
+          )
+        )}
       </div>
     </div>
   );
@@ -336,13 +486,13 @@ function NomCarte({ label, className = "h-full" }: { label: string; className?: 
   );
 }
 
-// ─── 3. La compatibilité ───────────────────────────────────────────────
+// ─── 4. La compatibilité ───────────────────────────────────────────────
 
 function EtapeResultat({ others, mine, onDone }: { others: Other[]; mine: Record<string, TasteLevel>; onDone: () => void }) {
   return (
     <div className="kd-monte flex flex-1 flex-col gap-5">
       <div>
-        <p className="kd-etiquette text-blanc">Étape 3 sur 3</p>
+        <p className="kd-etiquette text-blanc">C&apos;est fini</p>
         <h1 className="kd-titre-1 mt-2">C&apos;est noté.</h1>
         <p className="mt-2">Le swipe de toute la famille en tient compte dès maintenant.</p>
       </div>

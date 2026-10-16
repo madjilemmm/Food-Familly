@@ -41,6 +41,8 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
   const [title, setTitle] = useState(recipe?.title ?? "");
   const [remotePhoto, setRemotePhoto] = useState<string | null>(null);
   const [servings, setServings] = useState<string | null>(null);
+  const [personnes, setPersonnes] = useState<string>(recipe?.servings ? String(recipe.servings) : "");
+  const [etapes, setEtapes] = useState<string>(recipe?.steps?.join("\n\n") ?? "");
 
   function applyImport(imported: ImportedRecipe) {
     setTitle(imported.title);
@@ -62,6 +64,8 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
       setRemovePhoto(false);
     }
     setServings(imported.servings);
+    if (imported.servingsCount) setPersonnes(String(imported.servingsCount));
+    if (imported.steps?.length) setEtapes(imported.steps.join("\n\n"));
   }
 
   // Un aliment interdit pour quelqu'un ? On prévient tout de suite (la recette sera cachée du swipe).
@@ -120,6 +124,25 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
           className="kd-champ"
         />
       </label>
+
+      <div>
+        <label htmlFor="servings" className="kd-etiquette mb-2 block">
+          Pour combien de personnes
+        </label>
+        <input
+          id="servings"
+          name="servings"
+          inputMode="numeric"
+          value={personnes}
+          onChange={(e) => setPersonnes(e.target.value.replace(/\D/g, "").slice(0, 2))}
+          placeholder="4"
+          aria-describedby="servings-aide"
+          className="kd-champ w-28"
+        />
+        <p id="servings-aide" className="kd-petit mt-1">
+          Les courses ajustent ensuite les quantités au nombre de personnes.
+        </p>
+      </div>
 
       <div>
         <span className="kd-etiquette mb-2 block">Photo</span>
@@ -231,6 +254,18 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
           <IconePlus className="size-6" /> Ajouter un ingrédient
         </button>
       </fieldset>
+
+      <label className="block">
+        <span className="kd-etiquette mb-2 block">Les étapes</span>
+        <textarea
+          name="steps"
+          value={etapes}
+          onChange={(e) => setEtapes(e.target.value)}
+          rows={6}
+          placeholder={"Une étape par ligne.\nFaire revenir les oignons…"}
+          className="kd-champ py-3"
+        />
+      </label>
 
       {interditPour.length > 0 && (
         <p role="status" className="rounded-pastille bg-aubergine px-4 py-3 text-blanc">

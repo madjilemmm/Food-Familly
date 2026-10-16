@@ -2,6 +2,7 @@ import { requireProfile } from "@/lib/auth";
 import { getFamilyTastes, getProfiles } from "@/lib/data";
 import { ROUTES } from "@/lib/routes";
 import { AUTRE, DIETS, doitVoirNouvellesCartes } from "@/lib/domain/foods";
+import { lireEnvies } from "@/lib/domain/envies";
 import { Questionnaire } from "./Questionnaire";
 
 export const metadata = { title: "Mes goûts — Kaddie" };
@@ -12,7 +13,7 @@ function safeNext(raw: string | undefined, fallback: string) {
   return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : fallback;
 }
 
-export default async function TastesPage({ searchParams }: { searchParams: Promise<{ suite?: string; nouvelles?: string }> }) {
+export default async function TastesPage({ searchParams }: { searchParams: Promise<{ suite?: string; nouvelles?: string; envies?: string }> }) {
   const me = await requireProfile();
   const [{ members }, profiles, params] = await Promise.all([getFamilyTastes(me.family_id), getProfiles(me.family_id), searchParams]);
   const mine = members.find((m) => m.id === me.id)?.tastes ?? {};
@@ -23,6 +24,14 @@ export default async function TastesPage({ searchParams }: { searchParams: Promi
     <Questionnaire
       style={me.style}
       nouvelles={params.nouvelles === "1" && doitVoirNouvellesCartes(me.tastes_done_at)}
+      enviesSeules={params.envies === "1" && Boolean(me.tastes_done_at) && !me.envies_done_at}
+      commencerParEnvies={!me.envies_done_at}
+      initialEnvies={{
+        ...lireEnvies(me.envies),
+        // Avant l'écran des envies, le piquant venait de la carte « Piment ».
+        ...(!me.envies_done_at && mine.piment === "pas_fan" ? { piquant: "non" as const } : {}),
+        ...(!me.envies_done_at && mine.piment === "adore" ? { piquant: "oui" as const } : {}),
+      }}
       suite={safeNext(params.suite, ROUTES[me.style].home)}
       initial={{
         diets: Object.entries(mine).filter(([k, l]) => l === "interdit" && dietKeys.has(k)).map(([k]) => k),

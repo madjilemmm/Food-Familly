@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useTransition } from "react";
+import Link from "next/link";
 import { setTripRecipe } from "@/app/actions/trips";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import type { CandidateRecipe } from "@/lib/views";
@@ -27,9 +28,13 @@ export function RecipeChecklist({ recipes, disabled = false }: { recipes: Candid
           className={`kd-carte outline-4 -outline-offset-4 transition-[outline-color] duration-150 ${r.checked ? "outline-accent" : "outline-transparent"}`}
         >
           <div className="flex gap-4 p-4 pb-0">
-            <RecipeVisual recipe={r} className="size-20 shrink-0 rounded-pastille" />
+            <Link href={`/recettes/${r.id}`} aria-label={`La recette : ${r.title}`} className="shrink-0">
+              <RecipeVisual recipe={r} className="size-20 rounded-pastille" />
+            </Link>
             <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <p className="font-display text-titre-3 text-aubergine">{r.title}</p>
+              <Link href={`/recettes/${r.id}`} className="font-display text-titre-3 text-aubergine">
+                {r.title}
+              </Link>
               <p className="flex flex-wrap gap-1.5">
                 {r.wantedBy.map((name) => (
                   <span key={name} className="kd-pastille">

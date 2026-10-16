@@ -9,5 +9,7 @@ export default async function SimpleLayout({ children }: { children: React.React
   if (!me.tastes_seen_at) redirect("/profil/gouts");
   // Questionnaire rempli avant les nouvelles cartes : seulement celles-là, une fois.
   if (doitVoirNouvellesCartes(me.tastes_done_at)) redirect("/profil/gouts?nouvelles=1");
+  // Questionnaire rempli avant l'écran « Tes envies » : seulement celui-là, une fois.
+  if (me.tastes_done_at && !me.envies_done_at) redirect("/profil/gouts?envies=1");
   return <FamilyLayout me={me}>{children}</FamilyLayout>;
 }

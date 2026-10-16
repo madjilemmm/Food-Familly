@@ -92,3 +92,19 @@ describe("groupByAisle", () => {
     expect(groups.map((g) => g.id)).toEqual(["fruits_legumes", "epicerie", "autre"]);
   });
 });
+
+describe("quantités selon le nombre de personnes", () => {
+  it("ajuste et arrondit comme sur une liste", async () => {
+    const { scaleQuantity, scaleIngredients } = await import("./shopping-list");
+    expect(scaleQuantity(500, "g", 0.5)).toBe(250);
+    expect(scaleQuantity(4, "", 3 / 8)).toBe(2); // 4 œufs pour 8 → 1,5 → 2 œufs pour 3
+    expect(scaleQuantity(1, "", 0.25)).toBe(1); // jamais moins d'un œuf
+    expect(scaleQuantity(1, "pincée", 3)).toBe(1);
+    expect(scaleQuantity(3, "c. à soupe", 0.5)).toBe(1.5);
+    expect(scaleQuantity(20, "cl", 0.5)).toBe(10);
+    expect(scaleQuantity(1.5, "kg", 0.5)).toBe(0.75);
+    expect(scaleQuantity(null, "", 2)).toBeNull();
+    expect(scaleIngredients([{ name: "Pâtes", quantity: 600, unit: "g" }], 6, 3)[0].quantity).toBe(300);
+    expect(scaleIngredients([{ name: "Pâtes", quantity: 600, unit: "g" }], null, 3)[0].quantity).toBe(600);
+  });
+});

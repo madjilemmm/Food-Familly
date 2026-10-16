@@ -142,3 +142,18 @@ describe("extractRecipe : infos pour l'import automatique", () => {
     expect(r.ingredients).toHaveLength(3);
   });
 });
+
+describe("étapes et nombre de personnes", () => {
+  it("lit les étapes et le nombre de personnes", async () => {
+    const { servingsCountOf, stepsOf } = await import("./recipe-import");
+    expect(servingsCountOf("8 personnes")).toBe(8);
+    expect(servingsCountOf(["4"])).toBe(4);
+    expect(servingsCountOf("quelques-uns")).toBeNull();
+    expect(stepsOf([{ "@type": "HowToStep", text: "Faire revenir." }, { "@type": "HowToStep", text: "Ajouter la viande." }])).toEqual([
+      "Faire revenir.",
+      "Ajouter la viande.",
+    ]);
+    expect(stepsOf([{ "@type": "HowToSection", itemListElement: [{ text: "Étape A" }] }])).toEqual(["Étape A"]);
+    expect(stepsOf("Une.\nDeux.")).toEqual(["Une.", "Deux."]);
+  });
+});

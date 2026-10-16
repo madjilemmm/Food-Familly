@@ -3,9 +3,9 @@
 import { redirect } from "next/navigation";
 import { requireUser, type CurrentUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
-import { getCurrentTrip, getRecipesWithIngredients, getProfile } from "@/lib/data";
+import { getCurrentTrip, getRecipesWithIngredients, getProfile, getProfiles } from "@/lib/data";
 import { deadlineFor, type DepartureChoice } from "@/lib/domain/trip";
-import { mergeIngredients, itemKey } from "@/lib/domain/shopping-list";
+import { mergeIngredients, itemKey, scaleIngredients } from "@/lib/domain/shopping-list";
 import { notifyTripStarted, notifyRequestReceived } from "@/lib/notifications";
 import { ROUTES } from "@/lib/routes";
 import { changed, cleanText } from "./_shared";
@@ -90,6 +90,16 @@ export async function setTripRecipe(recipeId: string, selected: boolean) {
   changed();
 }
 
+/** Pour combien de personnes sont ces courses (la liste en tient compte). */
+export async function setTripPeople(people: number) {
+  const user = await requireUser();
+  const trip = await myTripOrThrow(user);
+  const n = Math.round(Number(people));
+  if (!Number.isFinite(n) || n < 1 || n > 30) throw new Error("Nombre invalide");
+  await db().from("shopping_trips").update({ people: n }).eq("id", trip.id);
+  changed();
+}
+
 /**
  * Génère (ou régénère) la liste à partir des plats cochés.
  * Les articles ajoutés à la main sont conservés ; les articles déjà cochés
@@ -101,8 +111,15 @@ export async function validateTrip() {
 
   // Plats cochés et liste actuelle arrivent avec la course : pas de requête en plus.
   const selection = trip.trip_recipes.filter((r) => r.selected);
-  const recipes = await getRecipesWithIngredients(user.familyId, selection.map((s) => s.recipe_id));
-  const merged = mergeIngredients(recipes.map((r) => ({ recipeTitle: r.title, ingredients: r.recipe_ingredients })));
+  const [recipes, members] = await Promise.all([
+    getRecipesWithIngredients(user.familyId, selection.map((s) => s.recipe_id)),
+    getProfiles(user.familyId),
+  ]);
+  // Quantités recalculées pour le nombre de personnes (toute la famille par défaut).
+  const people = trip.people ?? Math.max(1, members.length);
+  const merged = mergeIngredients(
+    recipes.map((r) => ({ recipeTitle: r.title, ingredients: scaleIngredients(r.recipe_ingredients, r.servings, people) })),
+  );
 
   const previous = trip.shopping_list_items;
   const wasChecked = new Set(

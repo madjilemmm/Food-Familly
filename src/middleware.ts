@@ -16,6 +16,8 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   // Numéro de version de l'appli (mise à jour automatique) : rien de privé.
   if (pathname === "/api/version") return NextResponse.next();
+  // Relances « plus que 10 min », appelées par Supabase sans session.
+  if (pathname === "/api/cron/relance") return NextResponse.next();
   const isApi = pathname.startsWith("/api/");
   const session = await decodeAnySession(req.cookies.get(SESSION_COOKIE)?.value);
 

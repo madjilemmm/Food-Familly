@@ -88,6 +88,14 @@ export async function saveRecipe(_prev: { error?: string }, formData: FormData):
   const photo = formData.get("photo");
   const removePhoto = formData.get("remove_photo") === "1";
   const remotePhoto = cleanText(formData.get("photo_remote_url"), 2000);
+  const servingsRaw = Math.round(Number(cleanText(formData.get("servings"), 4)));
+  const servings = Number.isFinite(servingsRaw) && servingsRaw >= 1 && servingsRaw <= 50 ? servingsRaw : null;
+  const steps = cleanText(formData.get("steps"), 20000)
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 40);
+  const details = { servings, steps: steps.length ? steps : null };
 
   if (!title) return { error: "Donnez un nom à la recette." };
 
@@ -104,10 +112,10 @@ export async function saveRecipe(_prev: { error?: string }, formData: FormData):
         .maybeSingle();
       if (!existing) return { error: "Cette recette n'existe plus." };
       oldPhoto = existing.photo_url;
-      const { error } = await db().from("recipes").update({ title, emoji }).eq("id", recipeId).eq("family_id", user.familyId);
+      const { error } = await db().from("recipes").update({ title, emoji, ...details }).eq("id", recipeId).eq("family_id", user.familyId);
       if (error) throw error;
     } else {
-      const { data, error } = await db().from("recipes").insert({ title, emoji, family_id: user.familyId }).select("id").single();
+      const { data, error } = await db().from("recipes").insert({ title, emoji, family_id: user.familyId, ...details }).select("id").single();
       if (error) throw error;
       recipeId = data.id as string;
     }

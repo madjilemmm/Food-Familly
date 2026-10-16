@@ -3,6 +3,8 @@ import { cache } from "react";
 import { db } from "@/lib/supabase/server";
 import { buildDeck } from "@/lib/domain/swipe-deck";
 import { nAimePas, recipeConflicts, type Conflicts, type MemberTastes, type TasteLevel } from "@/lib/domain/foods";
+import { correspondAuxStyles, dureeMax, lireEnvies } from "@/lib/domain/envies";
+import type { DeckRank } from "@/lib/domain/swipe-deck";
 import type { Style } from "@/lib/session";
 
 /*
@@ -22,6 +24,9 @@ export type Profile = {
   /** Questionnaire de goûts vu (même passé avec « Plus tard ») / rempli. */
   tastes_seen_at: string | null;
   tastes_done_at: string | null;
+  /** Écran « Tes envies » : styles, temps, piquant (voir domain/envies.ts). */
+  envies: unknown;
+  envies_done_at: string | null;
 };
 
 export type Family = { id: string; name: string; join_code: string; strict_dislikes: boolean };
@@ -44,10 +49,13 @@ export type Recipe = {
   photo_url: string | null;
   /** Page Marmiton d'origine pour les recettes importées automatiquement. */
   source_url: string | null;
+  /** Nombre de personnes prévu par la recette, et durée totale (minutes). */
+  servings: number | null;
+  total_minutes: number | null;
   created_at: string;
 };
 
-export type RecipeWithIngredients = Recipe & { recipe_ingredients: IngredientRow[] };
+export type RecipeWithIngredients = Recipe & { recipe_ingredients: IngredientRow[]; steps?: string[] | null };
 
 export type Match = Recipe & { matched_at: string; expires_at: string; like_count: number };
 
@@ -55,6 +63,8 @@ export type TripStatus = "open" | "validated" | "done";
 
 export type Trip = {
   id: string;
+  /** Pour combien de personnes (null = toute la famille). */
+  people: number | null;
   created_by: string | null;
   departs_at: string;
   deadline_at: string;
@@ -90,14 +100,14 @@ export type ListItem = {
 /** Une session non terminée plus vieille que ça est considérée comme oubliée. */
 const TRIP_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 
-const RECIPE_FIELDS = "id, title, emoji, photo_url, source_url, created_at";
+const RECIPE_FIELDS = "id, title, emoji, photo_url, source_url, servings, total_minutes, created_at";
 
 function check<T>(result: { data: T | null; error: { message: string } | null }): T {
   if (result.error) throw new Error(result.error.message);
   return result.data as T;
 }
 
-const PROFILE_FIELDS = "id, family_id, name, style, emoji, tastes_seen_at, tastes_done_at";
+const PROFILE_FIELDS = "id, family_id, name, style, emoji, tastes_seen_at, tastes_done_at, envies, envies_done_at";
 
 // ─── Familles et profils ───────────────────────────────────────────────
 
@@ -125,7 +135,7 @@ export async function getRecipe(familyId: string, id: string): Promise<RecipeWit
   return check(
     await db()
       .from("recipes")
-      .select(`${RECIPE_FIELDS}, recipe_ingredients(id, position, name, quantity, unit, aisle)`)
+      .select(`${RECIPE_FIELDS}, steps, recipe_ingredients(id, position, name, quantity, unit, aisle)`)
       .eq("family_id", familyId)
       .eq("id", id)
       .order("position", { referencedTable: "recipe_ingredients" })
@@ -218,20 +228,30 @@ export const getMatches = cache(async function getMatches(familyId: string): Pro
   return forFamily(familyId, all);
 });
 
-/** Mon paquet, trié selon les goûts : interdits et « j'aime pas » retirés, « j'adore » devant. */
+/**
+ * Mon paquet, trié selon les goûts : interdits et « j'aime pas » retirés ;
+ * « j'adore » et mes styles préférés devant ; trop long pour moi, à la fin.
+ */
 export async function getDeck(familyId: string, profileId: string): Promise<Recipe[]> {
-  const [recipes, swipes, ctx] = await Promise.all([
+  const [recipes, swipes, ctx, profiles] = await Promise.all([
     getRecipes(familyId),
     db().from("swipes").select("recipe_id, swiped_at").eq("profile_id", profileId).then(check),
     getTasteContext(familyId),
+    getProfiles(familyId),
   ]);
+  const envies = lireEnvies(profiles.find((p) => p.id === profileId)?.envies);
+  const maxi = dureeMax([envies]);
   const conflicts = new Map(recipes.map((r) => [r.id, conflictsOf(ctx, r, profileId)]));
-  return buildDeck(recipes, swipes as { recipe_id: string; swiped_at: string }[], new Date(), (r) => conflicts.get(r.id)!.verdict).map(
-    (r) => {
-      const c = conflicts.get(r.id)!;
-      return c.verdict === "fin" ? { ...r, pastille: nAimePas(c.pasFanDe) } : r;
-    },
-  );
+  const rank = (r: Recipe): DeckRank => {
+    const v = conflicts.get(r.id)!.verdict;
+    if (v !== "normal") return v;
+    if (r.total_minutes && r.total_minutes > maxi) return "fin";
+    return correspondAuxStyles(ctx.texts.get(r.id) ?? [r.title], envies.styles) ? "tete" : "normal";
+  };
+  return buildDeck(recipes, swipes as { recipe_id: string; swiped_at: string }[], new Date(), rank).map((r) => {
+    const c = conflicts.get(r.id)!;
+    return c.verdict === "fin" && c.pasFanDe.length ? { ...r, pastille: nAimePas(c.pasFanDe) } : r;
+  });
 }
 
 /** Est-ce que la majorité de la famille a liké cette recette récemment ? */
@@ -251,7 +271,7 @@ export const getCurrentTrip = cache(async function getCurrentTrip(familyId: stri
     await db()
       .from("shopping_trips")
       .select(
-        `id, created_by, departs_at, deadline_at, status, validated_at, created_at,
+        `id, created_by, departs_at, deadline_at, status, validated_at, created_at, people,
          trip_requests(id, profile_id, free_text, recipe_ids, updated_at),
          trip_recipes(recipe_id, selected),
          shopping_list_items(id, name, quantity, unit, aisle, source, for_recipes, checked, created_at)`,
