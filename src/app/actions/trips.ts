@@ -34,19 +34,15 @@ async function familyRecipeIds(user: CurrentUser, ids: string[]): Promise<string
 
 // ─── La personne qui part faire les courses ────────────────────────────
 
-/** Depuis le formulaire « Je pars dans… » : chaque durée est un bouton d'envoi (name="choice"). */
-export async function startTripForm(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
-  return startTrip(String(formData.get("choice")) as DepartureChoice);
-}
-
-export async function startTrip(choice: DepartureChoice): Promise<{ error?: string }> {
+export async function startTrip(choice: DepartureChoice) {
   const user = await requireUser();
   if (!CHOICES.includes(choice)) throw new Error("Choix invalide");
 
   const current = await getCurrentTrip(user.familyId);
   if (current && current.created_by !== user.profileId) {
     const shopper = current.created_by ? await getProfile(user.familyId, current.created_by) : null;
-    if (shopper) return { error: `${shopper.name} fait déjà les courses.` };
+    // L'écran des courses montre alors qui les fait déjà.
+    if (shopper) redirect(ROUTES[user.style].courses);
   }
 
   const deadline = deadlineFor(choice);
