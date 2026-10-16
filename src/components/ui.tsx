@@ -132,15 +132,24 @@ export function EnTete({ titre, sousTitre, reglages = true }: { titre: string; s
   );
 }
 
+/** Fond de l'écran Courses (paniers, caddie, provisions) : par-dessus le motif de la scène. */
+export function FondCourses() {
+  // eslint-disable-next-line @next/next/no-img-element -- image de fond statique
+  return <img className="kd-motif" src="/brand/fonds/kaddie-motif-courses-violet.webp" alt="" aria-hidden="true" draggable={false} />;
+}
+
 /** En-tête illustré (bandeau horizontal) : étiquette + grand titre blanc. */
 export function BandeauScene({
   illustration,
   titre,
   etiquette,
   reglages = true,
+  fond,
   children,
 }: {
   illustration: Illustration;
+  /** Remplace l'illustration par le fond de l'écran Courses. */
+  fond?: "courses";
   titre: string;
   etiquette?: React.ReactNode;
   reglages?: boolean;
@@ -150,10 +159,12 @@ export function BandeauScene({
     <Scene
       as="header"
       duo="aubergine"
-      illustration={illustration}
+      // Avec un fond à soi, on ne télécharge pas l'illustration pour rien.
+      illustration={fond ? undefined : illustration}
       format="paysage"
       className="pt-safe -mx-5 mb-5 px-5 pb-7"
     >
+      {fond === "courses" && <FondCourses />}
       <div className="flex items-start justify-between gap-4 pt-2">
         <div className="min-w-0 pt-4">
           {etiquette && <p className="kd-etiquette mb-2 text-blanc">{etiquette}</p>}

@@ -8,7 +8,7 @@ import { cancelTrip, validateTrip } from "@/app/actions/trips";
 import { Logo, Scene } from "@/design-system/components/Kaddie";
 import { Countdown } from "@/components/Countdown";
 import { SubmitButton } from "@/components/SubmitButton";
-import { BandeauScene, LienReglages } from "@/components/ui";
+import { BandeauScene, FondCourses, LienReglages } from "@/components/ui";
 import { StartTrip } from "./StartTrip";
 import { RecipeChecklist } from "./RecipeChecklist";
 import { ConfirmButton } from "./ConfirmButton";
@@ -27,6 +27,7 @@ export async function CoursesScreen({ me, notifications }: { me: Profile; notifi
     const others = (await getProfiles(me.family_id)).filter((p) => p.id !== me.id).map((p) => p.name);
     return (
       <Scene duo="aubergine" seed={4} className="ecran-scene justify-between gap-6">
+        <FondCourses />
         <div className="flex flex-col gap-4 pt-6">
           <div className="flex items-start justify-between">
             <Logo width={120} />
@@ -61,6 +62,7 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
   return (
     <>
       <BandeauScene
+        fond="courses"
         illustration="table"
         etiquette={<Depart overview={overview} />}
         titre={answered > 0 || candidates.length > 0 ? "Ce soir, ils veulent" : "Les courses"}
@@ -155,6 +157,7 @@ async function ResponderView({ me, overview }: { me: Profile; overview: TripOver
   return (
     <>
       <BandeauScene
+        fond="courses"
         illustration="marche"
         etiquette={validated ? `La liste de ${who} est faite` : <Depart overview={overview} qui={who} />}
         titre={validated ? "Encore une envie ?" : "Tu veux quoi ?"}
