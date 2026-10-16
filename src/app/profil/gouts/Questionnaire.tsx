@@ -506,16 +506,14 @@ function EtapeResultat({ others, mine, onDone }: { others: Other[]; mine: Record
         <p className="mt-2">Le swipe de toute la famille en tient compte dès maintenant.</p>
       </div>
       {others.length > 0 && (
-        <ul className="flex flex-col gap-3">
+        <ul className="border-t-2 border-blanc/30">
           {others.map((o) => (
-            <li key={o.name} className="kd-carte gap-1 p-5">
+            <li key={o.name} className="flex min-h-16 items-center gap-3 border-b-2 border-blanc/30 py-2">
+              <span className="min-w-0 flex-1 font-semibold">Toi et {o.name}</span>
               {o.done ? (
-                <>
-                  <p className="kd-etiquette">Toi et {o.name}</p>
-                  <p className="kd-titre-2 text-aubergine">{compatibility(mine, o.tastes)}&nbsp;% compatibles</p>
-                </>
+                <span className="font-display text-titre-3">{compatibility(mine, o.tastes)}&nbsp;% compatibles</span>
               ) : (
-                <p className="font-display text-titre-3 text-aubergine">{o.name} n&apos;a pas encore répondu</p>
+                <span className="kd-petit text-blanc">pas encore répondu</span>
               )}
             </li>
           ))}

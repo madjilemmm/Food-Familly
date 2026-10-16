@@ -49,23 +49,21 @@ export function ImportFromUrl({ onImport, compact }: { onImport: (r: ImportedRec
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="kd-btn kd-btn--secondaire kd-btn--large">
+      <button type="button" onClick={() => setOpen(true)} className="min-h-12 self-start text-violet underline underline-offset-4">
         Remplir depuis un site de recettes
       </button>
     );
   }
 
+  // Une ligne : le champ et son bouton. Le collage direct reste à portée, en lien.
   return (
-    <section className="kd-carte gap-3 p-4">
-      <h2 className="kd-titre-3 text-aubergine">Importer depuis un site</h2>
-      <p className="kd-petit">Marmiton, 750g, Cuisine AZ, Ptitchef… Copie le lien de la recette, puis touche le bouton.</p>
-      <button type="button" onClick={pasteAndImport} disabled={pending} className="kd-btn kd-btn--secondaire kd-btn--large">
-        {pending ? "Import en cours…" : "Coller le lien et importer"}
-      </button>
+    <section className="flex flex-col gap-2">
+      <p className="kd-etiquette">Remplir depuis un site (Marmiton, 750g…)</p>
       <div className="flex gap-2">
         <input
           type="url"
           inputMode="url"
+          aria-label="Lien de la recette"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => {
@@ -74,13 +72,16 @@ export function ImportFromUrl({ onImport, compact }: { onImport: (r: ImportedRec
               run(url);
             }
           }}
-          placeholder="ou colle le lien ici"
+          placeholder="Lien de la recette"
           className="kd-champ min-w-0 flex-1"
         />
         <button type="button" onClick={() => run(url)} disabled={pending || !url.trim()} className="kd-btn kd-btn--secondaire shrink-0 px-4">
-          OK
+          {pending ? "…" : "Importer"}
         </button>
       </div>
+      <button type="button" onClick={pasteAndImport} disabled={pending} className="min-h-12 self-start text-violet underline underline-offset-4">
+        {pending ? "Import en cours…" : "Coller le lien et importer"}
+      </button>
       {message &&
         (message.ok ? (
           <p role="status" className="rounded-pastille bg-accent px-4 py-3 text-on-accent">

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useActionState, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { motion } from "motion/react";
-import { startTrip } from "@/app/actions/trips";
+import { startTripForm } from "@/app/actions/trips";
 import { Spinner } from "@/components/Spinner";
 import { MessageErreur } from "@/components/ui";
 import { Bouton } from "@/design-system/components/Kaddie";
@@ -17,9 +18,9 @@ export function StartTrip({
   others: string[];
 }) {
   const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const [chosen, setChosen] = useState<DepartureChoice | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Un vrai formulaire (comme « Faire ma liste ») : envoi et redirection gérés par Next,
+  // l'écran suit même si les onglets sont encore en train de se précharger.
+  const [state, action] = useActionState(startTripForm, {});
   const names = others.length > 1 ? `${others.slice(0, -1).join(", ")} et ${others[others.length - 1]}` : others[0];
   const who =
     others.length === 0
@@ -47,32 +48,35 @@ export function StartTrip({
       className="kd-carte gap-4 p-5"
     >
       <p className="kd-titre-2 text-center text-aubergine">Je pars dans…</p>
-      <div className="grid grid-cols-2 gap-3">
+      <form action={action} className="grid grid-cols-2 gap-3">
         {choices.map((c) => (
-          <button
-            key={c.id}
-            disabled={pending}
-            onClick={() => {
-              setChosen(c.id);
-              setError(null);
-              startTransition(async () => {
-                const res = await startTrip(c.id);
-                if (res?.error) setError(res.error);
-              });
-            }}
-            className={`kd-btn min-h-20 px-3 whitespace-nowrap ${chosen === c.id ? "" : "kd-btn--secondaire"} ${
-              pending && chosen !== c.id ? "opacity-40" : ""
-            } ${choices.length % 2 === 1 && c === choices[choices.length - 1] ? "col-span-2" : ""}`}
-          >
-            {pending && chosen === c.id ? <Spinner className="w-8" /> : c.label}
-          </button>
+          <ChoixDepart key={c.id} id={c.id} label={c.label} large={choices.length % 2 === 1 && c === choices[choices.length - 1]} />
         ))}
-      </div>
-      {error && <MessageErreur>{error}</MessageErreur>}
+      </form>
+      {state.error && <MessageErreur>{state.error}</MessageErreur>}
       <p className="kd-petit text-center">{who}</p>
-      <button onClick={() => setOpen(false)} disabled={pending} className="min-h-14 w-full text-encre-douce underline underline-offset-4">
+      <button onClick={() => setOpen(false)} className="min-h-14 w-full text-encre-douce underline underline-offset-4">
         Annuler
       </button>
     </motion.div>
+  );
+}
+
+/** Une durée : bouton d'envoi du formulaire ; celle choisie attend la réponse, les autres s'effacent. */
+function ChoixDepart({ id, label, large }: { id: DepartureChoice; label: string; large: boolean }) {
+  const { pending, data } = useFormStatus();
+  const choisi = data?.get("choice") === id;
+  return (
+    <button
+      type="submit"
+      name="choice"
+      value={id}
+      disabled={pending}
+      className={`kd-btn min-h-20 px-3 whitespace-nowrap ${choisi ? "" : "kd-btn--secondaire"} ${pending && !choisi ? "opacity-40" : ""} ${
+        large ? "col-span-2" : ""
+      }`}
+    >
+      {pending && choisi ? <Spinner className="w-8" /> : label}
+    </button>
   );
 }

@@ -193,9 +193,9 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
             <option key={u} value={u} />
           ))}
         </datalist>
-        <ul className="flex flex-col gap-3">
+        <ul className="kd-liste border-t-2 border-trait">
           {rows.map((row) => (
-            <li key={row.key} className="flex flex-col gap-2 rounded-carte bg-surface p-3">
+            <li key={row.key} className="flex flex-col gap-2 border-b-2 border-trait py-3">
               <div className="flex gap-2">
                 <input
                   aria-label="Ingrédient"

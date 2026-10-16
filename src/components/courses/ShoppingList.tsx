@@ -87,15 +87,15 @@ export function ShoppingList({
       )}
 
       {pendingRequests.length > 0 && (
-        <section className="kd-carte mb-6 gap-3 p-4">
-          <h2 className="kd-titre-3 text-aubergine">Ce que la famille a demandé</h2>
-          <ul className="flex flex-col gap-3">
+        <section className="mb-6">
+          <h2 className="kd-etiquette">Demandé par la famille</h2>
+          <ul className="kd-liste">
             {pendingRequests.map((r) => (
-              <li key={r.id} className="flex items-center gap-3">
+              <li key={r.id} className="kd-liste__article gap-3 py-2">
                 <span className="flex-1">
                   <strong>{r.from}</strong>&nbsp;: « {r.text} »
                 </span>
-                <button onClick={() => add(r.text, "request")} className="kd-btn kd-btn--like shrink-0 px-4">
+                <button onClick={() => add(r.text, "request")} className="kd-btn kd-btn--like min-h-12 shrink-0 px-4">
                   Ajouter
                 </button>
               </li>

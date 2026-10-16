@@ -37,12 +37,10 @@ export function CreateFamilyForm() {
 
       <fieldset className="min-w-0">
         <legend className="kd-etiquette mb-2">Les membres</legend>
-        <ul className="flex flex-col gap-4">
+        {/* Une ligne par membre : prénom, style, et qui je suis. */}
+        <ul className="kd-liste border-t-2 border-trait">
           {members.map((m, i) => (
-            <li
-              key={m.key}
-              className={`flex flex-col gap-3 rounded-carte bg-surface p-4 outline-4 ${me === i ? "outline-accent" : "outline-transparent"}`}
-            >
+            <li key={m.key} className="flex flex-col gap-2 border-b-2 border-trait py-3">
               <div className="flex gap-2">
                 <input
                   aria-label="Prénom"
@@ -66,15 +64,21 @@ export function CreateFamilyForm() {
                   </button>
                 )}
               </div>
-              <StylePicker value={m.style} onChange={(style) => update(m.key, { style })} />
-              <button
-                type="button"
-                aria-pressed={me === i}
-                onClick={() => setMe(i)}
-                className={`kd-btn kd-btn--large ${me === i ? "kd-btn--like" : "kd-btn--secondaire"}`}
-              >
-                C&apos;est moi
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <StylePicker compact value={m.style} onChange={(style) => update(m.key, { style })} />
+                </div>
+                <button
+                  type="button"
+                  aria-pressed={me === i}
+                  onClick={() => setMe(i)}
+                  className={`min-h-12 shrink-0 rounded-bouton border-[3px] px-3 font-semibold ${
+                    me === i ? "border-aubergine bg-accent text-on-accent" : "border-trait text-encre-douce"
+                  }`}
+                >
+                  C&apos;est moi
+                </button>
+              </div>
             </li>
           ))}
         </ul>

@@ -34,6 +34,11 @@ async function familyRecipeIds(user: CurrentUser, ids: string[]): Promise<string
 
 // ─── La personne qui part faire les courses ────────────────────────────
 
+/** Depuis le formulaire « Je pars dans… » : chaque durée est un bouton d'envoi (name="choice"). */
+export async function startTripForm(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
+  return startTrip(String(formData.get("choice")) as DepartureChoice);
+}
+
 export async function startTrip(choice: DepartureChoice): Promise<{ error?: string }> {
   const user = await requireUser();
   if (!CHOICES.includes(choice)) throw new Error("Choix invalide");
@@ -60,7 +65,9 @@ export async function startTrip(choice: DepartureChoice): Promise<{ error?: stri
   if (error) throw new Error(error.message);
 
   changed(() => notifyTripStarted(user.familyId, user.profileId, trip.deadline_at));
-  return {};
+  // Une redirection plutôt qu'un rafraîchissement sur place : l'écran suit même si
+  // les onglets sont encore en train de se précharger.
+  redirect(ROUTES[user.style].courses);
 }
 
 export async function cancelTrip() {

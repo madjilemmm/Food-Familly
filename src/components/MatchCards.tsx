@@ -6,7 +6,7 @@ import type { Match } from "@/lib/data";
 /** Les plats matchés, en cartes blanches sur fond lilas ; on touche pour voir la recette. */
 export function MatchCards({ matches }: { matches: Match[] }) {
   return (
-    <ul className="grid grid-cols-1 gap-4 min-[400px]:grid-cols-2">
+    <ul className="grid grid-cols-2 gap-3">
       {matches.map((m) => (
         <li key={m.id}>
           <Link
@@ -15,7 +15,7 @@ export function MatchCards({ matches }: { matches: Match[] }) {
             className="block h-full rounded-carte active:scale-[0.98]"
           >
             <CarteRecette
-              className="h-full [&_.kd-carte__corps]:p-4 [&_.kd-carte__titre]:text-titre-3"
+              className="h-full [&_.kd-carte__corps]:gap-1 [&_.kd-carte__corps]:p-3 [&_.kd-carte__titre]:text-bouton"
               titre={m.title}
               photo={m.photo_url}
               infos={[

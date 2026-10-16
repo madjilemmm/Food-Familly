@@ -30,12 +30,15 @@ export async function CoursesScreen({ me, notifications }: { me: Profile; notifi
       <Scene duo="aubergine" seed={4} className="ecran-scene justify-between gap-6">
         <FondCourses />
         <div className="flex flex-col gap-4 pt-6">
+          {/* La cloche des notifs rejoint les réglages : rien entre le titre et le grand bouton. */}
           <div className="flex items-start justify-between">
             <Logo width={120} />
-            <LienReglages surScene />
+            <span className="flex gap-2">
+              {notifications}
+              <LienReglages surScene />
+            </span>
           </div>
           <h1 className="kd-titre-1">Salut {me.name}&nbsp;!</h1>
-          {notifications}
         </div>
         <StartTrip choices={departureChoices()} others={others} />
       </Scene>
