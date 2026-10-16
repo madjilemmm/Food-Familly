@@ -8,6 +8,7 @@ import { swipe, undoSwipe } from "@/app/actions/swipes";
 import { useAnnuler } from "@/components/Annuler";
 import { Bouton, CarteRecette, IconeJenVeux, IconePasEnvie, Logo, Scene } from "@/design-system/components/Kaddie";
 import type { Recipe } from "@/lib/data";
+import { listeDeNoms } from "@/lib/domain/convives";
 import { CarteGeste, PILE } from "./CarteGeste";
 
 /*
@@ -27,7 +28,7 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
     nouvelles.forEach((r) => vues.current.add(r.id));
     setDeck((d) => [...d, ...nouvelles]);
   }, [initialDeck]);
-  const [match, setMatch] = useState<Recipe | null>(null);
+  const [match, setMatch] = useState<{ recipe: Recipe; avec: string[] } | null>(null);
   const [error, setError] = useState(false);
   const pileRef = useRef<HTMLDivElement>(null);
   const [monte, setMonte] = useState(false);
@@ -40,13 +41,19 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
     const carte = top;
     setDeck((d) => d.slice(1));
     const envoi = swipe(carte.id, liked)
-      .then((res) => res.match && setMatch(carte))
-      .catch(() => setError(true));
-    // Un doigt qui glisse trop vite : la carte peut revenir.
+      .then((res) => {
+        if (res.match) setMatch({ recipe: carte, avec: res.avec });
+        return res.avant;
+      })
+      .catch(() => {
+        setError(true);
+        return null;
+      });
+    // Un doigt qui glisse trop vite : la carte revient, et le swipe redevient ce qu'il était.
     proposer(`${liked ? "Miam" : "Bof"} : ${carte.title}`, () => {
-      setMatch((m) => (m?.id === carte.id ? null : m));
+      setMatch((m) => (m?.recipe.id === carte.id ? null : m));
       setDeck((d) => [carte, ...d.filter((r) => r.id !== carte.id)]);
-      envoi.then(() => undoSwipe(carte.id));
+      envoi.then((avant) => undoSwipe(carte.id, avant));
     });
   }
 
@@ -110,7 +117,7 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
       {/* Au-dessus de tout (la scène isole ses calques) : rendu directement dans <body>. */}
       {monte &&
         createPortal(
-          <AnimatePresence>{match && <EcranMatch recipe={match} onClose={() => setMatch(null)} />}</AnimatePresence>,
+          <AnimatePresence>{match && <EcranMatch recipe={match.recipe} avec={match.avec} onClose={() => setMatch(null)} />}</AnimatePresence>,
           document.body,
         )}
     </div>
@@ -165,7 +172,7 @@ function PileVide() {
 }
 
 /** « C'est un match » : monogramme qui éclot, puis la carte qui monte (120 ms après). */
-function EcranMatch({ recipe, onClose }: { recipe: Recipe; onClose: () => void }) {
+function EcranMatch({ recipe, avec, onClose }: { recipe: Recipe; avec: string[]; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -192,7 +199,7 @@ function EcranMatch({ recipe, onClose }: { recipe: Recipe; onClose: () => void }
             <Logo variante="monogramme" width={96} title="" />
           </div>
           <h2 className="kd-display text-[56px]!">C&apos;est un match&nbsp;!</h2>
-          <p className="kd-titre-3">La majorité de la famille en veut.</p>
+          <p className="kd-titre-3">{avec.length ? `${listeDeNoms(avec)} et toi en avez envie.` : "Vous êtes plusieurs à en avoir envie."}</p>
         </div>
         <CarteRecette
           className="kd-monte min-h-0 text-left [animation-delay:120ms] [&_.kd-carte__photo]:max-h-[30dvh]"

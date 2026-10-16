@@ -36,8 +36,8 @@ export async function addItem(name: string, source: "manual" | "request" = "manu
 }
 
 /**
- * Un article ajouté à la main disparaît ; un ingrédient de recette est mis de côté
- * (« j'en ai déjà ») pour ne pas revenir à la prochaine mise à jour de la liste.
+ * Un article ajouté à la main disparaît ; un ingrédient de recette ou un article demandé
+ * est mis de côté (« j'en ai déjà ») pour ne pas revenir à la prochaine mise à jour de la liste.
  */
 export async function deleteItem(itemId: string, recette = false) {
   const trip = await tripId();
@@ -49,8 +49,8 @@ export async function deleteItem(itemId: string, recette = false) {
   changed();
 }
 
-/** « Annuler » après avoir retiré un ingrédient de recette. */
-export async function restoreItem(itemId: string) {
-  await db().from("shopping_list_items").update({ source: "recipe" }).eq("id", itemId).eq("trip_id", await tripId());
+/** « Annuler » après avoir retiré un ingrédient de recette ou un article demandé. */
+export async function restoreItem(itemId: string, source: "recipe" | "request" = "recipe") {
+  await db().from("shopping_list_items").update({ source }).eq("id", itemId).eq("trip_id", await tripId());
   changed();
 }

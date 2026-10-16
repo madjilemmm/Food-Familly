@@ -190,13 +190,14 @@ export function ShoppingList({
                     aria-label={`Retirer ${item.name}`}
                     onClick={() =>
                       startTransition(async () => {
-                        const recette = item.source === "recipe";
+                        // Un ingrédient de recette ou un article demandé est gardé de côté : il ne revient pas.
+                        const deCote = item.source === "recipe" || item.source === "request";
                         apply({ type: "delete", id: item.id });
-                        if (!item.id.startsWith("tmp-")) await deleteItem(item.id, recette);
+                        if (!item.id.startsWith("tmp-")) await deleteItem(item.id, deCote);
                         // Retiré par erreur ? Il revient d'un geste.
-                        proposer(recette ? `${item.name} : déjà à la maison` : `${item.name} retiré`, () =>
-                          recette
-                            ? startTransition(() => restoreItem(item.id))
+                        proposer(item.source === "recipe" ? `${item.name} : déjà à la maison` : `${item.name} retiré`, () =>
+                          deCote
+                            ? startTransition(() => restoreItem(item.id, item.source as "recipe" | "request"))
                             : add([{ name: item.name, quantity: item.quantity, unit: item.unit, aisle: item.aisle }], item.source as "manual" | "request"),
                         );
                       })
@@ -223,6 +224,7 @@ export function ShoppingList({
                 : "La liste sera effacée pour toute la famille."
             }
             confirmLabel="Oui, c'est fini"
+            apres="/courses"
             className="kd-btn kd-btn--large"
           >
             J&apos;ai fini les courses

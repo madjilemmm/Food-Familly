@@ -1,16 +1,15 @@
 import "server-only";
 import { cache } from "react";
 import { db } from "@/lib/supabase/server";
-import { buildDeck } from "@/lib/domain/swipe-deck";
 import { nAimePas, recipeConflicts, type Conflicts, type MemberTastes, type TasteLevel } from "@/lib/domain/foods";
-import { correspondAuxStyles, dureeMax, lireEnvies } from "@/lib/domain/envies";
-import type { DeckRank } from "@/lib/domain/swipe-deck";
+import { correspondAuxStyles, dureeMax, lireEnvies, styleDe, type Envies } from "@/lib/domain/envies";
+import { calculerMatchs, estEnvie, ordonnerPaquet, type Avis, type Signaux } from "@/lib/domain/reco";
 import type { Style } from "@/lib/session";
 
 /*
  * Les lectures appelées par plusieurs composants d'une même page (mise en page,
  * page, en-tête…) passent par cache() : une seule requête par affichage.
- * isMatch n'en profite pas : il est relu juste après une écriture.
+ * enviesPour n'en profite pas : il est relu juste après un swipe.
  */
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -57,7 +56,8 @@ export type Recipe = {
 
 export type RecipeWithIngredients = Recipe & { recipe_ingredients: IngredientRow[]; steps?: string[] | null };
 
-export type Match = Recipe & { matched_at: string; expires_at: string; like_count: number };
+/** Un match : au moins 2 personnes ont envie de ce plat (likers : leurs profils, avec : leurs prénoms). */
+export type Match = Recipe & { matched_at: string; expires_at: string; like_count: number; likers: string[]; avec: string[] };
 
 export type TripStatus = "open" | "validated" | "done";
 
@@ -73,8 +73,11 @@ export type Trip = {
   created_at: string;
   /** Chargés avec la course, en une seule requête. */
   trip_requests: TripRequest[];
-  /** people : nombre de personnes corrigé à la main pour ce plat (null = déduit). */
-  trip_recipes: { recipe_id: string; selected: boolean; people?: number | null }[];
+  /**
+   * people : nombre de personnes (invités compris) ; eaters : qui le mange.
+   * null = déduit (demandes, envies). Enregistrés quand la liste est faite ou corrigés à la main.
+   */
+  trip_recipes: { recipe_id: string; selected: boolean; people?: number | null; eaters?: string[] | null }[];
   shopping_list_items: ListItem[];
 };
 
@@ -208,72 +211,219 @@ export async function forFamily<R extends { id: string; title: string }>(familyI
   return recipes.filter((r) => !conflictsOf(ctx, r).familleCache);
 }
 
-// ─── Swipes & matchs ───────────────────────────────────────────────────
+// ─── Swipes, goûts, envies, matchs (règles : lib/domain/reco.ts) ───────
 
-export const getMatches = cache(async function getMatches(familyId: string): Promise<Match[]> {
-  // Les recettes viennent de getRecipes (en parallèle, et partagé avec le reste de la page).
-  const [rows, recipes] = await Promise.all([
-    db()
-      .from("active_matches")
-      .select("recipe_id, matched_at, expires_at, like_count")
-      .eq("family_id", familyId)
-      .order("matched_at", { ascending: false })
-      .then((r) => check(r) as { recipe_id: string; matched_at: string; expires_at: string; like_count: number }[]),
-    getRecipes(familyId),
-  ]);
-  if (rows.length === 0) return [];
-  const byId = new Map(recipes.map((r) => [r.id, r]));
-  const all = rows.flatMap((m) => {
-    const recipe = byId.get(m.recipe_id);
-    return recipe ? [{ ...recipe, matched_at: m.matched_at, expires_at: m.expires_at, like_count: m.like_count }] : [];
-  });
-  return forFamily(familyId, all);
+const JOUR = 86_400_000;
+
+/** Le dernier swipe de chaque membre sur chaque recette : la base des goûts et des envies. */
+export const getFamilySwipes = cache(async function getFamilySwipes(familyId: string): Promise<Map<string, Map<string, Avis>>> {
+  const ids = (await getProfiles(familyId)).map((p) => p.id);
+  if (ids.length === 0) return new Map();
+  // « * » : liked_at peut manquer tant que la migration des envies n'est pas passée.
+  const rows = check(await db().from("swipes").select("*").in("profile_id", ids)) as {
+    profile_id: string;
+    recipe_id: string;
+    liked: boolean;
+    swiped_at: string;
+    liked_at?: string | null;
+  }[];
+  const parRecette = new Map<string, Map<string, Avis>>();
+  for (const r of rows) {
+    const avis: Avis = {
+      liked: r.liked,
+      swipedAt: Date.parse(r.swiped_at),
+      likedAt: r.liked_at ? Date.parse(r.liked_at) : r.liked ? Date.parse(r.swiped_at) : null,
+    };
+    if (!parRecette.has(r.recipe_id)) parRecette.set(r.recipe_id, new Map());
+    parRecette.get(r.recipe_id)!.set(r.profile_id, avis);
+  }
+  return parRecette;
 });
 
 /**
- * Mon paquet, trié selon les goûts : interdits et « j'aime pas » retirés ;
- * « j'adore » et mes styles préférés devant ; trop long pour moi, à la fin.
+ * Ce que la famille a retenu aux dernières courses (90 jours, course en cours exclue) :
+ * - achats : dernier achat de chaque plat (course terminée) — éteint les envies ;
+ * - retenus : dernière fois que chaque plat a été retenu — évite la répétition ;
+ * - ecartes : plats retirés à la dernière course ;
+ * - courses : qui a mangé quoi, des plus récentes aux plus anciennes — pour l'équité.
+ */
+export type Historique = {
+  achats: Map<string, number>;
+  retenus: Map<string, number>;
+  ecartes: Set<string>;
+  courses: { eaters: Set<string> | null }[];
+};
+
+export const getHistorique = cache(async function getHistorique(familyId: string): Promise<Historique> {
+  const since = new Date(Date.now() - 90 * JOUR).toISOString();
+  const [rows, enCours] = await Promise.all([
+    db()
+      .from("shopping_trips")
+      .select("id, status, validated_at, trip_recipes(*)")
+      .eq("family_id", familyId)
+      .not("validated_at", "is", null)
+      .gte("validated_at", since)
+      .order("validated_at", { ascending: false })
+      .limit(30)
+      .then(
+        (r) =>
+          check(r) as {
+            id: string;
+            status: TripStatus;
+            validated_at: string;
+            trip_recipes: { recipe_id: string; selected: boolean; eaters?: string[] | null }[];
+          }[],
+      ),
+    getCurrentTrip(familyId),
+  ]);
+  const h: Historique = { achats: new Map(), retenus: new Map(), ecartes: new Set(), courses: [] };
+  for (const t of rows) {
+    if (t.id === enCours?.id) continue;
+    const at = Date.parse(t.validated_at);
+    const gardes = t.trip_recipes.filter((r) => r.selected);
+    for (const r of gardes) {
+      h.retenus.set(r.recipe_id, Math.max(at, h.retenus.get(r.recipe_id) ?? 0));
+      if (t.status === "done") h.achats.set(r.recipe_id, Math.max(at, h.achats.get(r.recipe_id) ?? 0));
+    }
+    if (h.courses.length === 0) for (const r of t.trip_recipes) if (!r.selected) h.ecartes.add(r.recipe_id);
+    // Qui a mangé : inconnu si un plat n'a pas l'information (courses d'avant le suivi).
+    h.courses.push({ eaters: gardes.every((r) => r.eaters) ? new Set(gardes.flatMap((r) => r.eaters!)) : null });
+  }
+  return h;
+});
+
+/** Ce qu'on sait d'un membre face à une recette : son swipe, son questionnaire, ses envies. */
+export function signauxDe(
+  memberId: string,
+  recipe: Recipe,
+  conflits: Conflicts,
+  envies: Envies,
+  texts: string[],
+  avis: Avis | undefined,
+): Signaux {
+  return {
+    avis,
+    adore: conflits.adoreIds.includes(memberId),
+    pasFan: conflits.pasFanIds.includes(memberId),
+    style: envies.styles.length > 0 && correspondAuxStyles(texts, envies.styles),
+    tropLong: Boolean(recipe.total_minutes && recipe.total_minutes > dureeMax([envies])),
+  };
+}
+
+/** Les matchs : au moins 2 personnes ont envie du même plat (voir calculerMatchs). */
+export const getMatches = cache(async function getMatches(familyId: string): Promise<Match[]> {
+  const [avis, hist, recipes, profiles, ctx] = await Promise.all([
+    getFamilySwipes(familyId),
+    getHistorique(familyId),
+    getRecipes(familyId),
+    getProfiles(familyId),
+    getTasteContext(familyId),
+  ]);
+  const byId = new Map(recipes.map((r) => [r.id, r]));
+  const noms = new Map(profiles.map((p) => [p.id, p.name]));
+  const matchs = calculerMatchs(
+    avis,
+    (id) => hist.achats.get(id) ?? null,
+    Date.now(),
+    (id) => {
+      const r = byId.get(id);
+      return !r || conflictsOf(ctx, r).familleCache;
+    },
+  );
+  return matchs.map((m) => ({
+    ...byId.get(m.recipeId)!,
+    matched_at: new Date(m.matchedAt).toISOString(),
+    expires_at: new Date(m.expiresAt).toISOString(),
+    like_count: m.likers.length,
+    likers: m.likers,
+    avec: m.likers.flatMap((id) => noms.get(id) ?? []),
+  }));
+});
+
+/** Qui a envie de chaque plat en ce moment (les premiers à l'avoir dit d'abord). */
+export const getFamilyEnvies = cache(async function getFamilyEnvies(familyId: string): Promise<Map<string, string[]>> {
+  const [avis, hist] = await Promise.all([getFamilySwipes(familyId), getHistorique(familyId)]);
+  const now = Date.now();
+  const envies = new Map<string, string[]>();
+  for (const [recipeId, parMembre] of avis) {
+    const achat = hist.achats.get(recipeId) ?? null;
+    const qui = [...parMembre]
+      .filter(([, a]) => estEnvie(a, achat, now))
+      .sort(([, a], [, b]) => a.swipedAt - b.swipedAt)
+      .map(([id]) => id);
+    if (qui.length) envies.set(recipeId, qui);
+  }
+  return envies;
+});
+
+/** Mes envies du moment, les plus récentes d'abord. */
+export const getMyLikes = cache(async function getMyLikes(familyId: string, profileId: string): Promise<Recipe[]> {
+  const [avis, envies, recipes] = await Promise.all([getFamilySwipes(familyId), getFamilyEnvies(familyId), getRecipes(familyId)]);
+  const date = (id: string) => avis.get(id)?.get(profileId)?.swipedAt ?? 0;
+  return recipes.filter((r) => envies.get(r.id)?.includes(profileId)).sort((a, b) => date(b.id) - date(a.id));
+});
+
+/** Mes plats aimés (goût durable) qui ne sont pas une envie en ce moment, les plus récents d'abord. */
+export const getPlatsAimes = cache(async function getPlatsAimes(familyId: string, profileId: string): Promise<Recipe[]> {
+  const [avis, envies, recipes] = await Promise.all([getFamilySwipes(familyId), getFamilyEnvies(familyId), getRecipes(familyId)]);
+  const aime = (id: string) => avis.get(id)?.get(profileId)?.likedAt ?? null;
+  return recipes
+    .filter((r) => aime(r.id) != null && !envies.get(r.id)?.includes(profileId))
+    .sort((a, b) => aime(b.id)! - aime(a.id)!);
+});
+
+/** Juste après un swipe (sans cache) : qui a envie de ce plat, s'il y a match ; null sinon. */
+export async function enviesPour(familyId: string, recipeId: string): Promise<string[] | null> {
+  const ids = (await getProfiles(familyId)).map((p) => p.id);
+  const [rows, hist] = await Promise.all([
+    db().from("swipes").select("*").eq("recipe_id", recipeId).in("profile_id", ids).then(check),
+    getHistorique(familyId),
+  ]);
+  const avis = new Map(
+    (rows as { profile_id: string; liked: boolean; swiped_at: string; liked_at?: string | null }[]).map((r) => [
+      r.profile_id,
+      { liked: r.liked, swipedAt: Date.parse(r.swiped_at), likedAt: r.liked_at ? Date.parse(r.liked_at) : null },
+    ]),
+  );
+  const [m] = calculerMatchs(new Map([[recipeId, avis]]), () => hist.achats.get(recipeId) ?? null, Date.now());
+  return m?.likers ?? null;
+}
+
+/**
+ * Mon paquet (règles : ordonnerPaquet) : interdits et « j'aime pas » retirés ;
+ * mes goûts, ce dont les autres ont envie et la découverte devant ; mes favoris
+ * qui reviennent de temps en temps ; ce qu'un autre n'aime pas, à la fin.
  */
 export async function getDeck(familyId: string, profileId: string): Promise<Recipe[]> {
-  const [recipes, swipes, ctx, profiles] = await Promise.all([
+  const [recipes, avis, envies, ctx, profiles] = await Promise.all([
     getRecipes(familyId),
-    db().from("swipes").select("recipe_id, swiped_at").eq("profile_id", profileId).then(check),
+    getFamilySwipes(familyId),
+    getFamilyEnvies(familyId),
     getTasteContext(familyId),
     getProfiles(familyId),
   ]);
-  const envies = lireEnvies(profiles.find((p) => p.id === profileId)?.envies);
-  const maxi = dureeMax([envies]);
+  const mesEnvies = lireEnvies(profiles.find((p) => p.id === profileId)?.envies);
   const conflicts = new Map(recipes.map((r) => [r.id, conflictsOf(ctx, r, profileId)]));
-  const rank = (r: Recipe): DeckRank => {
-    const v = conflicts.get(r.id)!.verdict;
-    if (v !== "normal") return v;
-    if (r.total_minutes && r.total_minutes > maxi) return "fin";
-    return correspondAuxStyles(ctx.texts.get(r.id) ?? [r.title], envies.styles) ? "tete" : "normal";
-  };
-  return buildDeck(recipes, swipes as { recipe_id: string; swiped_at: string }[], new Date(), rank).map((r) => {
+  const cartes = recipes.map((r) => {
     const c = conflicts.get(r.id)!;
-    return c.verdict === "fin" && c.pasFanDe.length ? { ...r, pastille: nAimePas(c.pasFanDe) } : r;
+    const texts = ctx.texts.get(r.id) ?? [r.title];
+    const monAvis = avis.get(r.id)?.get(profileId);
+    return {
+      ...r,
+      cache: c.verdict === "cache",
+      fin: c.verdict === "fin",
+      avis: monAvis,
+      signaux: signauxDe(profileId, r, c, mesEnvies, texts, monAvis),
+      enviesDesAutres: (envies.get(r.id) ?? []).filter((id) => id !== profileId).length,
+      vuParLaFamille: (avis.get(r.id)?.size ?? 0) > 0,
+      style: styleDe(texts),
+    };
+  });
+  return ordonnerPaquet(cartes, Date.now()).map(({ cache: _c, fin, avis: _a, signaux: _s, enviesDesAutres: _e, vuParLaFamille: _v, style: _st, ...r }) => {
+    const c = conflicts.get(r.id)!;
+    return fin && c.pasFanDe.length ? { ...r, pastille: nAimePas(c.pasFanDe) } : r;
   });
 }
-
-/** Est-ce que la majorité de la famille a liké cette recette récemment ? */
-export async function isMatch(familyId: string, recipeId: string): Promise<boolean> {
-  const row = check(
-    await db().from("active_matches").select("recipe_id").eq("family_id", familyId).eq("recipe_id", recipeId).maybeSingle(),
-  );
-  return row != null;
-}
-
-/** Les plats que j'ai likés ces 14 derniers jours : mes envies à moi, matchées ou non. */
-export const getMyLikes = cache(async function getMyLikes(familyId: string, profileId: string): Promise<Recipe[]> {
-  const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
-  const [rows, recipes] = await Promise.all([
-    db().from("swipes").select("recipe_id").eq("profile_id", profileId).eq("liked", true).gte("swiped_at", since).order("swiped_at", { ascending: false }),
-    getRecipes(familyId),
-  ]);
-  const byId = new Map(recipes.map((r) => [r.id, r]));
-  return (check(rows) as { recipe_id: string }[]).flatMap((r) => byId.get(r.recipe_id) ?? []);
-});
 
 // ─── Courses ───────────────────────────────────────────────────────────
 

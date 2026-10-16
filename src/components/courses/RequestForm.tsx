@@ -44,8 +44,8 @@ export function RequestForm({
         <p className="text-encre-douce">Pas encore d&apos;envie ni de match. Swipe pour en trouver.</p>
       ) : (
         <>
-          <Plats legende="Tes envies" detail="Pour toi" recettes={envies} initialRecipeIds={initialRecipeIds} />
-          <Plats legende="Les matchs" detail="Pour toute la famille" recettes={matchs} initialRecipeIds={initialRecipeIds} />
+          <Plats legende="Tes envies et tes plats aimés" detail="Pour toi" recettes={envies} initialRecipeIds={initialRecipeIds} />
+          <Plats legende="Les matchs" detail="Envies en commun" recettes={matchs} initialRecipeIds={initialRecipeIds} />
         </>
       )}
 

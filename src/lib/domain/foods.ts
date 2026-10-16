@@ -194,6 +194,10 @@ export type Conflicts = {
   interditPar: string[];
   pasFanDe: string[];
   adorePar: string[];
+  /** Les mêmes, par profil (pour le moteur de recommandation). */
+  interditIds: string[];
+  pasFanIds: string[];
+  adoreIds: string[];
   /** Pour le paquet de `meId`. */
   verdict: Verdict;
   /** Pour ce que toute la famille voit (matchs, plats des courses, import). */
@@ -227,6 +231,9 @@ export function recipeConflicts(text: RecipeText, members: MemberTastes[], stric
     interditPar: interdit.map((m) => m.name),
     pasFanDe: pasFan.map((m) => m.name),
     adorePar: adore.map((m) => m.name),
+    interditIds: interdit.map((m) => m.id),
+    pasFanIds: pasFan.map((m) => m.id),
+    adoreIds: adore.map((m) => m.id),
     verdict,
     familleCache,
   };

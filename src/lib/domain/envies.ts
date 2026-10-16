@@ -112,6 +112,11 @@ export function correspondAuxStyles(texte: string[], styles: string[]): boolean 
   return choisis.some((s) => texte.some((ligne) => contient(ligne, s.words)));
 }
 
+/** Le style d'un plat (le premier reconnu), pour varier le paquet ; null si aucun. */
+export function styleDe(texte: string[]): string | null {
+  return STYLES.find((s) => texte.some((ligne) => contient(ligne, s.words)))?.key ?? null;
+}
+
 /** Durée maximale acceptable pour la famille : la plus pressée l'emporte, avec un peu de marge. */
 export function dureeMax(envies: Envies[]): number {
   if (envies.some((e) => e.temps === "30")) return 45;

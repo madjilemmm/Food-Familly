@@ -3,54 +3,134 @@ import { cache } from "react";
 import {
   conflictsOf,
   getCurrentTrip,
-  getMatches,
-  getMyLikes,
+  getFamilyEnvies,
+  getFamilySwipes,
+  getHistorique,
   getTasteContext,
   getProfiles,
   getRecipes,
+  signauxDe,
   type Profile,
   type Recipe,
   type Trip,
   type TripRequest,
 } from "@/lib/data";
 import { isPastDeadline } from "@/lib/domain/trip";
-import { convivesDe, type Convives } from "@/lib/domain/convives";
+import type { Convives } from "@/lib/domain/convives";
+import { lireEnvies } from "@/lib/domain/envies";
+import { classerPlats, compatibilite, oubliParMembre, scoreIndividuel, type CandidatCourse, type PlatClasse } from "@/lib/domain/reco";
 
-export type CandidateRecipe = Recipe & {
+/** Au plus, Kaddie retient d'elle-même ce nombre de plats. */
+export const MAX_PROPOSES = 5;
+/** Idées tirées des goûts durables (plats aimés), en plus des demandes et des envies. */
+export const IDEES_MAX = 6;
+/** Un plat retenu il y a moins de 2 semaines n'est pas reproposé comme idée. */
+const IDEE_PAS_AVANT_JOURS = 14;
+const JOUR = 86_400_000;
+
+export type PlatDeLaCourse = {
+  id: string;
+  /** Gardé pour cette course (choix enregistré, sinon la proposition de Kaddie). */
   checked: boolean;
-  isMatch: boolean;
-  wantedBy: string[];
-  /** Une envie (un like) de la personne qui fait les courses. */
-  envieDuShopper: boolean;
-  /** Pour qui est ce plat, et pour combien. */
+  /** Proposé d'office par Kaddie : demandé, ou envie de plusieurs personnes. */
+  propose: boolean;
+  /** Qui le mange (profils), et le libellé « pour qui ». */
+  eaters: string[];
   convives: Convives;
+  /** Pourquoi il est là : demandé par…, envie de…, aimé par…, pour toute la famille. */
+  raison: PlatClasse["raison"];
 };
 
 /**
- * Pour qui est chaque plat de la course (voir convivesDe) : sert à l'affichage
- * et au calcul des quantités de la liste.
+ * Les plats d'une course, classés par le moteur (classerPlats, lib/domain/reco.ts) :
+ * demandes, envies du moment (de tout le monde, y compris la personne qui fait les
+ * courses), choix déjà faits, et quelques idées tirées des plats aimés.
+ * Sert à l'écran de préparation ET au calcul de la liste : les deux voient la même chose.
  */
-export function convivesDesPlats(
-  trip: Trip,
-  members: Profile[],
-  matchIds: Set<string>,
-  likesDuShopper: Set<string>,
-): (recipeId: string) => Convives {
+export async function platsDeLaCourse(familyId: string, trip: Trip): Promise<PlatDeLaCourse[]> {
+  const [members, envies, avis, hist, recipes, tastes] = await Promise.all([
+    getProfiles(familyId),
+    getFamilyEnvies(familyId),
+    getFamilySwipes(familyId),
+    getHistorique(familyId),
+    getRecipes(familyId),
+    getTasteContext(familyId),
+  ]);
+  const now = Date.now();
+  const ids = members.map((m) => m.id);
   const noms = new Map(members.map((m) => [m.id, m.name]));
-  const shopper = (trip.created_by && noms.get(trip.created_by)) || "";
-  const corrections = new Map(trip.trip_recipes.map((r) => [r.recipe_id, r.people ?? null]));
-  return (recipeId) =>
-    convivesDe({
-      isMatch: matchIds.has(recipeId),
-      demandePar: trip.trip_requests
-        .filter((r) => r.profile_id !== trip.created_by && r.recipe_ids.includes(recipeId))
-        .flatMap((r) => noms.get(r.profile_id) ?? []),
-      envieDuShopper: likesDuShopper.has(recipeId),
-      shopper,
-      famille: trip.people ?? Math.max(1, members.length),
-      corrige: corrections.get(recipeId),
-    });
+  const enviesDe = new Map(members.map((m) => [m.id, lireEnvies(m.envies)]));
+  const recettes = new Map(recipes.map((r) => [r.id, r]));
+  const explicites = new Map(trip.trip_recipes.map((r) => [r.recipe_id, r]));
+  const demandes = new Map<string, string[]>();
+  for (const r of trip.trip_requests) {
+    if (r.profile_id === trip.created_by) continue;
+    for (const id of r.recipe_ids) demandes.set(id, [...(demandes.get(id) ?? []), r.profile_id]);
+  }
+  const conflits = new Map<string, ReturnType<typeof conflictsOf>>();
+  const conflitsDe = (r: Recipe) => conflits.get(r.id) ?? conflits.set(r.id, conflictsOf(tastes, r)).get(r.id)!;
+  const goutsDe = (r: Recipe) =>
+    new Map(
+      ids.map((id) => [
+        id,
+        scoreIndividuel(signauxDe(id, r, conflitsDe(r), enviesDe.get(id)!, tastes.texts.get(r.id) ?? [r.title], avis.get(r.id)?.get(id)), now),
+      ]),
+    );
+  const aimePar = (id: string) => [...(avis.get(id) ?? [])].filter(([, a]) => a.likedAt != null).map(([m]) => m);
+  const joursDepuisRetenu = (id: string) => (hist.retenus.has(id) ? (now - hist.retenus.get(id)!) / JOUR : null);
+
+  // Idées : des plats aimés par quelqu'un, pas retenus récemment, les plus compatibles d'abord.
+  const base = new Set([...demandes.keys(), ...envies.keys(), ...explicites.keys()]);
+  const idees = recipes
+    .filter((r) => !base.has(r.id) && aimePar(r.id).length > 0 && !conflitsDe(r).familleCache)
+    .filter((r) => (joursDepuisRetenu(r.id) ?? Infinity) >= IDEE_PAS_AVANT_JOURS)
+    .map((r) => {
+      const gouts = goutsDe(r);
+      return { id: r.id, note: compatibilite(aimePar(r.id).map((m) => gouts.get(m) ?? null)) };
+    })
+    .sort((a, b) => b.note - a.note)
+    .slice(0, IDEES_MAX)
+    .map((x) => x.id);
+
+  const candidats: CandidatCourse[] = [...base, ...idees].flatMap((id) => {
+    const r = recettes.get(id);
+    if (!r) return [];
+    const choix = explicites.get(id);
+    return [
+      {
+        id,
+        demandePar: demandes.get(id) ?? [],
+        enviePar: envies.get(id) ?? [],
+        aimePar: aimePar(id),
+        choix: choix && { selected: choix.selected, people: choix.people ?? null, eaters: choix.eaters ?? null },
+        exclu: conflitsDe(r).familleCache,
+        gouts: goutsDe(r),
+        joursDepuisRetenu: joursDepuisRetenu(id),
+        ecarte: hist.ecartes.has(id),
+      },
+    ];
+  });
+
+  return classerPlats(candidats, {
+    membres: ids,
+    oubli: oubliParMembre(hist.courses, ids),
+    ouverte: trip.status !== "validated",
+    max: MAX_PROPOSES,
+  }).map((p) => ({
+    id: p.id,
+    checked: p.checked,
+    propose: p.propose,
+    eaters: p.eaters,
+    raison: p.raison,
+    convives: {
+      noms: p.eaters.length >= ids.length ? "famille" : p.eaters.flatMap((id) => noms.get(id) ?? []),
+      n: p.people,
+      corrige: explicites.get(p.id)?.people != null,
+    },
+  }));
 }
+
+export type CandidateRecipe = Recipe & PlatDeLaCourse;
 
 export type TripOverview = {
   trip: Trip;
@@ -68,7 +148,7 @@ export type TripOverview = {
 
 /**
  * Tout ce qu'il faut pour une session de courses : qui la fait, les réponses
- * des autres et les plats proposés (demandés, matchés ou déjà cochés).
+ * des autres et les plats (voir platsDeLaCourse).
  * Le dépassement de l'heure limite est calculé ici, à l'affichage.
  */
 export const getTripOverview = cache(async function getTripOverview(
@@ -76,17 +156,9 @@ export const getTripOverview = cache(async function getTripOverview(
   myProfileId: string,
 ): Promise<TripOverview | null> {
   // Tout part en même temps : un seul aller-retour vers la base.
-  const [trip, members, matches, recipes, tastes] = await Promise.all([
-    getCurrentTrip(familyId),
-    getProfiles(familyId),
-    getMatches(familyId),
-    getRecipes(familyId),
-    getTasteContext(familyId),
-  ]);
+  const [trip, members, recipes] = await Promise.all([getCurrentTrip(familyId), getProfiles(familyId), getRecipes(familyId)]);
   if (!trip) return null;
-  const likes = trip.created_by ? await getMyLikes(familyId, trip.created_by) : [];
   const requests = trip.trip_requests;
-  const selection = new Map(trip.trip_recipes.map((r) => [r.recipe_id, r.selected]));
   const recipeById = new Map(recipes.map((r) => [r.id, r]));
   const shopper = members.find((m) => m.id === trip.created_by) ?? null;
 
@@ -101,37 +173,10 @@ export const getTripOverview = cache(async function getTripOverview(
       };
     });
 
-  const matchIds = new Set(matches.map((m) => m.id));
-  const likeIds = new Set(likes.map((r) => r.id));
-  const pourQui = convivesDesPlats(trip, members, matchIds, likeIds);
-  // Demandes, matchs, déjà cochés, et les envies à elle de la personne qui fait les courses.
-  const ids = new Set<string>([
-    ...responses.flatMap((r) => r.recipes.map((x) => x.id)),
-    ...matches.map((m) => m.id),
-    ...selection.keys(),
-    ...likeIds,
-  ]);
-
-  const candidates: CandidateRecipe[] = [...ids]
-    .flatMap((id) => recipeById.get(id) ?? [])
-    // Ce qu'un membre ne peut pas manger n'est jamais proposé (ni ce qu'il n'aime pas, en mode strict).
-    .filter((recipe) => !conflictsOf(tastes, recipe).familleCache)
-    .map((recipe) => ({
-      ...recipe,
-      checked: selection.get(recipe.id) === true,
-      isMatch: matchIds.has(recipe.id),
-      wantedBy: responses.filter((r) => r.request?.recipe_ids.includes(recipe.id)).map((r) => r.member.name),
-      envieDuShopper: likeIds.has(recipe.id),
-      convives: pourQui(recipe.id),
-    }))
-    // Les plats demandés d'abord, puis les matchs, puis ses envies à soi, puis le reste
-    .sort(
-      (a, b) =>
-        b.wantedBy.length - a.wantedBy.length ||
-        Number(b.isMatch) - Number(a.isMatch) ||
-        Number(b.envieDuShopper) - Number(a.envieDuShopper) ||
-        a.title.localeCompare(b.title, "fr"),
-    );
+  const candidates = (await platsDeLaCourse(familyId, trip)).flatMap((p) => {
+    const recipe = recipeById.get(p.id);
+    return recipe ? [{ ...recipe, ...p }] : [];
+  });
 
   return {
     trip,

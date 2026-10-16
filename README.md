@@ -4,8 +4,8 @@ La petite appli familiale pour choisir les repas et faire les courses sans prise
 Chaque famille crée son espace, ajoute ses membres et partage un code. Ensuite, **n'importe qui** peut faire les courses :
 
 - **Celui ou celle qui part** l'annonce en 2 taps. Les autres sont prévenus, il voit leurs réponses en direct, coche les plats, et la liste de courses se fait toute seule, triée par rayon.
-- **Tout le monde** swipe des recettes comme sur une appli de rencontre. Quand la **majorité de la famille** like le même plat, c'est un **match**. Quand quelqu'un part, les autres répondent avec du texte libre et/ou des matchs.
-- Une seule appli pour tout le monde, trois onglets : **Envies** (swipe, matchs), **Courses**, **Recettes**. Ce n'est pas le profil qui décide de l'écran, c'est le moment : celle ou celui qui touche « Je pars » fait les courses (préparation « Qui mange quoi ? », puis le magasin avec rien que la liste) ; les autres disent ce qu'ils veulent, ou **prennent le relais**. Chaque plat sait pour qui il est (un match → toute la famille, une demande → qui l'a demandé, son envie → soi), et les quantités suivent.
+- **Tout le monde** swipe des recettes comme sur une appli de rencontre : à droite « j'en ai envie », à gauche « pas envie là ». Quand **au moins deux personnes** ont envie du même plat, c'est un **match**, pour ces personnes-là. Quand quelqu'un part, les autres répondent avec du texte libre et/ou des plats, et leurs envies arrivent de toute façon à la personne qui fait les courses.
+- Une seule appli pour tout le monde, trois onglets : **Envies** (swipe, matchs), **Courses**, **Recettes**. Ce n'est pas le profil qui décide de l'écran, c'est le moment : celle ou celui qui touche « Je pars » fait les courses (préparation « Qui mange quoi ? », puis le magasin avec rien que la liste) ; les autres disent ce qu'ils veulent, ou **prennent le relais**. Kaddie propose d'office les plats demandés et les envies partagées ; chaque plat dit pourquoi (« Demandé par Madji », « Envie de Madji et Yoalem ») et pour qui, corrigeable (« Qui en mange ? », invités), et les quantités suivent.
 
 Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres, Realtime, Storage), Web Push (VAPID), hébergement sur Vercel (gratuit).
 
@@ -34,8 +34,10 @@ Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres,
 | Qui fait les courses | N'importe quel membre. Une seule course à la fois par famille : les autres voient « X part dans… » et lui envoient leurs demandes. Tout le monde peut consulter et compléter la liste. |
 | Départ en courses | Choix : 30 min, 1 h, 2 h ou « ce soir, 18 h ». Ce dernier choix disparaît après 17 h. |
 | Heure limite dépassée | Si personne n'a répondu, la personne qui fait les courses voit automatiquement les plats matchés. C'est calculé à l'affichage, sans tâche planifiée. Elle n'attend jamais personne : elle peut faire sa liste à tout moment. |
-| Match | Une recette likée par **plus de la moitié** de la famille dans les 14 derniers jours (2 sur 3, 3 sur 4, 3 sur 5…). |
-| Paquet de swipe | Une recette swipée revient dans le paquet 14 jours plus tard, donc il ne s'épuise jamais. Quand il reste moins de 8 plats à découvrir, une dizaine de plats principaux bien notés arrivent tout seuls de Marmiton ; ceux que personne n'a aimés en 4 semaines laissent la place. |
+| Goût, envie, repas | Trois choses distinctes (règles : `src/lib/domain/reco.ts`). **Goût** : « j'aime ce plat » (dernier like, gardé même après un « Bof ») ou « pas pour moi », plus le questionnaire ; il s'estompe doucement (demi-vie 90 jours). **Envie** : un like de moins de 14 jours, éteint dès que le plat a été acheté. **Repas retenu** : un plat gardé pour une course, avec qui le mange vraiment. On corrige son avis depuis la fiche recette. |
+| Match | **Au moins deux personnes** ont envie du même plat : une compatibilité entre elles, pas un repas décidé. Ceux qui n'ont rien dit, ou qui ne swipent plus, n'entrent pas dans le calcul (ne pas avoir voté n'est jamais un refus). Les interdits excluent toujours le plat. |
+| Propositions des courses | Un score explicable : compatibilité des personnes concernées (moyenne des goûts, l'inconnu est neutre, un désaccord pèse) + contexte (demandé, envies, retenu récemment, retiré la dernière fois). Les « autres idées » passent à tour de rôle par personne, et quelqu'un qui n'a eu aucun plat aux dernières courses remonte : personne n'est oublié parce que ses goûts sont minoritaires. Tous les poids sont dans `REGLAGES`. |
+| Paquet de swipe | D'abord des plats jamais vus, classés pour moi (mes goûts, ce dont les autres ont envie, la découverte), sans trois plats du même style d'affilée ; un favori revient une carte sur 5 (aimé : après 3 semaines, refusé : après 6), donc le paquet ne s'épuise jamais. Quand il reste moins de 8 plats à découvrir, une dizaine de plats principaux bien notés arrivent tout seuls de Marmiton ; ceux que personne n'a aimés en 4 semaines laissent la place. |
 | Goûts | À sa première connexion, chacun remplit un petit questionnaire (régime et allergies, **tes envies** : styles de plats, temps de cuisine, piquant, puis des cartes d'ingrédients qu'on peut arrêter quand on veut) (modifiable dans Réglages → **Mes goûts**, ou « Plus tard »). Trois niveaux : **interdit** (régime, allergie : la recette disparaît pour **toute la famille**, du swipe, des matchs, des plats des courses et de l'import Marmiton), **j'aime pas** (disparaît de **mon** paquet ; pour les autres, en **mode strict** — par défaut, réglable dans Ma famille — elle disparaît aussi, sinon elle passe en fin de paquet avec « Madji n'aime pas »), **j'adore** (en tête de mon paquet). Les régimes sont des groupes d'aliments : « sans porc » attrape lardons, jambon, chorizo… Tout reste visible dans **Recettes**, avec une étiquette. Pour une allergie, vérifiez toujours les étiquettes : le tri se fait sur les noms des ingrédients. |
 | Relance | 10 minutes avant l'heure limite, ceux qui n'ont pas encore répondu reçoivent « Plus que 10 min », une seule fois. Supabase (pg_cron) appelle `/api/cron/relance` chaque minute. |
 | Recettes importées | Uniquement des plats principaux populaires que des jeunes mangent volontiers (burgers, pâtes, tacos, curry coco, gratins…), cherchés selon les **envies** de la famille ; rien de « léger », d'abats ni de trop long pour la personne la plus pressée. Chaque recette garde ses étapes, sa durée et son nombre de personnes : on la consulte en touchant un match ou un plat. |
@@ -66,7 +68,9 @@ Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres,
    [`supabase/migrations/20261017000001_deja_a_la_maison.sql`](supabase/migrations/20261017000001_deja_a_la_maison.sql)
    (« j'en ai déjà » : un ingrédient de recette retiré de la liste ne revient pas), puis
    [`supabase/migrations/20261017000002_qui_mange_quoi.sql`](supabase/migrations/20261017000002_qui_mange_quoi.sql)
-   (nombre de personnes par plat, et majorité comptée parmi celles et ceux qui swipent).
+   (nombre de personnes par plat), puis
+   [`supabase/migrations/20261017000003_envies.sql`](supabase/migrations/20261017000003_envies.sql)
+   (goût gardé après un « Bof », et qui mange chaque plat retenu ; ajouts seulement).
    Chaque fichier se lance dans cet ordre ; on peut les relancer sans risque.
 
    Pas besoin de données de départ : on crée sa famille directement dans l'appli. (Le fichier facultatif
@@ -231,7 +235,7 @@ Tout se fait dans l'appli, ⚙️ → **Ma famille** :
 ```bash
 npm run dev        # serveur de développement
 npm run build      # build de production
-npm test           # tests unitaires (Vitest) : fusion de liste, paquet de swipe, heures de Paris, session
+npm test           # tests unitaires (Vitest) : moteur de recommandation (12 scénarios familiaux), liste, heures, session
 npm run lint       # ESLint
 npm run typecheck  # TypeScript
 npm run vapid      # nouvelle paire de clés VAPID
@@ -274,8 +278,8 @@ supabase/
 - `profiles` : les membres d'une famille, avec les dates du questionnaire de goûts (`tastes_seen_at`, `tastes_done_at`)
 - `profile_tastes` : les goûts de chacun (`food` = clé de `src/lib/domain/foods.ts` ou `autre:…`, `level` = `interdit` / `pas_fan` / `adore`)
 - `recipes`, `recipe_ingredients` : nom, quantité, unité, rayon ; `recipes.source_url` pour les recettes importées de Marmiton
-- `swipes` : un swipe par profil et par recette, daté (expiration après 14 jours)
-- vue `active_matches` : recettes likées par la majorité de la famille il y a moins de 14 jours
+- `swipes` : le dernier swipe par profil et par recette (`swiped_at`, et `liked_at` : la dernière fois qu'on l'a aimé)
+- `trip_recipes` : les plats d'une course (gardé ou non, `eaters` : qui le mange, `people` : invités compris) ; envies et matchs sont calculés dans `reco.ts` (la vue `active_matches` n'est plus utilisée)
 - `shopping_trips` : une session de courses d'une famille, avec la personne qui la fait (heure limite, statut `open` → `validated` → `done`)
 - `trip_requests` : la réponse de chaque fils (texte libre + recettes choisies)
 - `trip_recipes` : les plats cochés par la personne qui fait les courses

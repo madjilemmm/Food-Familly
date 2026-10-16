@@ -3,17 +3,9 @@
 import { redirect } from "next/navigation";
 import { requireUser, type CurrentUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
-import {
-  getCurrentTrip,
-  getMatches,
-  getMyLikes,
-  getRecipesWithIngredients,
-  getProfile,
-  getProfiles,
-  loadCurrentTrip,
-  type Trip,
-} from "@/lib/data";
-import { convivesDesPlats } from "@/lib/views";
+import { getCurrentTrip, getRecipesWithIngredients, getProfile, getProfiles, loadCurrentTrip, type Trip } from "@/lib/data";
+import { platsDeLaCourse } from "@/lib/views";
+import { articlesDe } from "@/lib/domain/articles";
 import { deadlineFor, type DepartureChoice } from "@/lib/domain/trip";
 import { mergeIngredients, itemKey, scaleIngredients } from "@/lib/domain/shopping-list";
 import { notifyTripStarted, notifyRequestReceived, notifyTakeOver } from "@/lib/notifications";
@@ -117,8 +109,8 @@ export async function finishTrip() {
   const user = await requireUser();
   const trip = await currentTripOrThrow(user);
   await db().from("shopping_trips").update({ status: "done" }).eq("id", trip.id);
+  // Pas de redirection ici : le bouton recharge l'écran des courses (voir ConfirmButton « apres »).
   changed();
-  redirect(ROUTES.courses);
 }
 
 export async function setTripRecipe(recipeId: string, selected: boolean) {
@@ -133,15 +125,25 @@ export async function setTripRecipe(recipeId: string, selected: boolean) {
   changed();
 }
 
-/** Corrige pour combien de personnes est un plat (la liste en tient compte). */
-export async function setTripRecipePeople(recipeId: string, people: number) {
+/**
+ * Qui mange ce plat, et combien d'invités en plus : la liste suit.
+ * Indépendant de qui l'aime d'habitude : c'est le repas réel.
+ */
+export async function setTripRecipeEaters(recipeId: string, eaters: string[], invites = 0) {
   const user = await requireUser();
-  const trip = await myTripOrThrow(user);
-  const n = Math.round(Number(people));
-  if (!Number.isFinite(n) || n < 1 || n > 30) throw new Error("Nombre invalide");
-  const { error } = await db().from("trip_recipes").update({ people: n }).eq("trip_id", trip.id).eq("recipe_id", recipeId);
-  // Base pas encore migrée (colonne absente) : le nombre reste celui déduit, sans casser l'écran.
-  if (error) return;
+  const [trip, members] = await Promise.all([myTripOrThrow(user), getProfiles(user.familyId)]);
+  const membres = new Set(members.map((m) => m.id));
+  const qui = [...new Set(eaters)].filter((id) => membres.has(id));
+  const extra = Math.max(0, Math.min(20, Math.round(Number(invites) || 0)));
+  if (qui.length + extra < 1) throw new Error("Il faut au moins une personne");
+  // Le plat a pu être proposé d'office par Kaddie (pas encore enregistré) : on l'enregistre gardé.
+  const { error } = await db()
+    .from("trip_recipes")
+    .upsert(
+      { trip_id: trip.id, recipe_id: recipeId, selected: true, eaters: qui, people: qui.length + extra },
+      { onConflict: "trip_id,recipe_id" },
+    );
+  if (error) throw new Error(error.message);
   if (trip.status === "validated") await rebuildList(user.familyId);
   changed();
 }
@@ -154,6 +156,18 @@ export async function setTripRecipePeople(recipeId: string, people: number) {
 export async function validateTrip() {
   const user = await requireUser();
   const trip = await myTripOrThrow(user);
+  // Les plats gardés deviennent des repas retenus, avec qui les mange : la liste faite
+  // n'en ajoute plus d'elle-même, et on saura plus tard qui a mangé quoi (équité, répétition).
+  const plats = await platsDeLaCourse(user.familyId, trip);
+  const retenus = plats.filter((p) => p.checked);
+  if (retenus.length > 0) {
+    await db()
+      .from("trip_recipes")
+      .upsert(
+        retenus.map((p) => ({ trip_id: trip.id, recipe_id: p.id, selected: true, eaters: p.eaters, people: p.convives.n })),
+        { onConflict: "trip_id,recipe_id" },
+      );
+  }
   await Promise.all([
     rebuildList(user.familyId, trip),
     db().from("shopping_trips").update({ status: "validated", validated_at: new Date().toISOString() }).eq("id", trip.id),
@@ -162,43 +176,49 @@ export async function validateTrip() {
   redirect(ROUTES.liste);
 }
 
-/** Recalcule les ingrédients des recettes de la liste (relue sans cache si besoin). */
+/**
+ * Recalcule la liste : les ingrédients des plats gardés, pour celles et ceux qui les
+ * mangent, et les demandes écrites, découpées en articles (« des céréales, du Nutella »).
+ */
 async function rebuildList(familyId: string, known?: Trip) {
   const trip = known ?? (await loadCurrentTrip(familyId));
   if (!trip) return;
-  // Plats cochés et liste actuelle arrivent avec la course : pas de requête en plus.
-  const selection = trip.trip_recipes.filter((r) => r.selected);
-  const [recipes, members, matches, likes] = await Promise.all([
-    getRecipesWithIngredients(familyId, selection.map((s) => s.recipe_id)),
-    getProfiles(familyId),
-    getMatches(familyId),
-    trip.created_by ? getMyLikes(familyId, trip.created_by) : Promise.resolve([]),
-  ]);
+  const plats = (await platsDeLaCourse(familyId, trip)).filter((p) => p.checked);
+  const recipes = await getRecipesWithIngredients(familyId, plats.map((p) => p.id));
   // Quantités recalculées plat par plat : pour celles et ceux qui le mangent.
-  const pourQui = convivesDesPlats(trip, members, new Set(matches.map((m) => m.id)), new Set(likes.map((r) => r.id)));
+  const pourCombien = new Map(plats.map((p) => [p.id, p.convives.n]));
   const previous = trip.shopping_list_items;
   const aLaMaison = new Set(previous.filter((i) => i.source === "maison").map((i) => itemKey(i.name, i.unit)));
   const merged = mergeIngredients(
-    recipes.map((r) => ({ recipeTitle: r.title, ingredients: scaleIngredients(r.recipe_ingredients, r.servings, pourQui(r.id).n) })),
+    recipes.map((r) => ({ recipeTitle: r.title, ingredients: scaleIngredients(r.recipe_ingredients, r.servings, pourCombien.get(r.id) ?? 1) })),
   ).filter((m) => !aLaMaison.has(m.key));
   const wasChecked = new Set(
     previous.filter((i) => i.source === "recipe" && i.checked).map((i) => itemKey(i.name, i.unit)),
   );
+  // Les demandes écrites vont sur la liste toutes seules (sauf ce qui y est déjà, ou a été retiré).
+  const dejaLa = new Set(previous.map((i) => i.name.trim().toLowerCase()));
+  const ecrites = trip.trip_requests
+    .filter((r) => r.free_text && r.profile_id !== trip.created_by)
+    .flatMap((r) => articlesDe(r.free_text!))
+    .filter((a) => !dejaLa.has(a.name.toLowerCase()) && Boolean(dejaLa.add(a.name.toLowerCase())));
 
   await db().from("shopping_list_items").delete().eq("trip_id", trip.id).eq("source", "recipe");
-  if (merged.length === 0) return;
-  const { error: insertError } = await db().from("shopping_list_items").insert(
-    merged.map((m) => ({
-      trip_id: trip.id,
-      name: m.name,
-      quantity: m.quantity,
-      unit: m.unit,
-      aisle: m.aisle,
-      source: "recipe",
-      for_recipes: m.forRecipes.join(", "),
-      checked: wasChecked.has(m.key),
-    })),
-  );
+  const { error: insertError } = await db()
+    .from("shopping_list_items")
+    .insert([
+      ...merged.map((m) => ({
+        trip_id: trip.id,
+        name: m.name,
+        quantity: m.quantity,
+        unit: m.unit,
+        aisle: m.aisle,
+        source: "recipe",
+        for_recipes: m.forRecipes.join(", "),
+        checked: wasChecked.has(m.key),
+      })),
+      // Mêmes colonnes que les ingrédients (envoi groupé) : sinon la base reçoit des vides.
+      ...ecrites.map((a) => ({ trip_id: trip.id, ...a, source: "request", for_recipes: null, checked: false })),
+    ]);
   if (insertError) throw new Error(insertError.message);
 }
 
@@ -238,8 +258,8 @@ export async function submitRequest(
       : Promise.resolve(),
   ]);
   if (error) return { error: "Oups, l'envoi a échoué. Réessaie." };
-  // La liste est déjà faite : les plats demandés y arrivent tout seuls.
-  if (trip.status === "validated" && recipeIds.length > 0) await rebuildList(user.familyId).catch(() => {});
+  // La liste est déjà faite : les plats et les articles demandés y arrivent tout seuls.
+  if (trip.status === "validated") await rebuildList(user.familyId).catch(() => {});
 
   changed(() => notifyRequestReceived(user.familyId, trip.created_by, user.profileId, freeText, recipeIds.length));
   return { ok: true };

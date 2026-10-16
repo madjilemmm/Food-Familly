@@ -18,6 +18,7 @@ export function ConfirmButton({
   children,
   className = "",
   disabled,
+  apres,
   "aria-label": ariaLabel,
 }: {
   action: () => Promise<unknown> | unknown;
@@ -27,6 +28,8 @@ export function ConfirmButton({
   children: React.ReactNode;
   className?: string;
   disabled?: boolean;
+  /** Une fois l'action faite, ouvre cette adresse (rechargement franc : l'écran suit à coup sûr). */
+  apres?: string;
   "aria-label"?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -53,7 +56,8 @@ export function ConfirmButton({
         onConfirm={() =>
           startTransition(async () => {
             await action();
-            setOpen(false);
+            if (apres) window.location.assign(apres);
+            else setOpen(false);
           })
         }
       />

@@ -53,16 +53,14 @@ export async function notifyRequestReceived(
   await sendPush([shopperId], { title: `${name} a répondu`, body: parts.join(" et "), url: "/courses", tag: `request-${memberId}` });
 }
 
-/** Nouveau match : on prévient le reste de la famille (celui qui vient de swiper le voit déjà). */
-export async function notifyMatch(familyId: string, swiperId: string, recipeId: string) {
-  const [all, recipe] = await Promise.all([
-    members(familyId),
-    db().from("recipes").select("title").eq("id", recipeId).maybeSingle(),
-  ]);
-  await sendPush(
-    all.filter((m) => m.id !== swiperId).map((m) => m.id),
-    { title: "C'est un match !", body: recipe.data?.title ?? "", url: "/matchs", tag: "match" },
-  );
+/**
+ * Nouveau match : seules les autres personnes qui ont envie du plat sont prévenues
+ * (celle qui vient de swiper le voit déjà ; les autres ne sont pas concernées).
+ */
+export async function notifyMatch(familyId: string, recipeId: string, autres: string[]) {
+  if (autres.length === 0) return;
+  const recipe = await db().from("recipes").select("title").eq("id", recipeId).eq("family_id", familyId).maybeSingle();
+  await sendPush(autres, { title: "C'est un match !", body: recipe.data?.title ?? "", url: "/matchs", tag: "match" });
 }
 
 /**

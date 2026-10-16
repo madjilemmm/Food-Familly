@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfile, requireUser } from "@/lib/auth";
-import { getCurrentTrip, getProfiles, getRecipe, type RecipeWithIngredients } from "@/lib/data";
+import { getCurrentTrip, getFamilyEnvies, getFamilySwipes, getProfiles, getRecipe, type RecipeWithIngredients } from "@/lib/data";
 import { db } from "@/lib/supabase/server";
 import { extractRecipe } from "@/lib/domain/recipe-import";
 import { safeFetch } from "@/lib/safe-fetch";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import { IconeRetour } from "@/components/ui";
 import { Ingredients } from "./Ingredients";
+import { AvisRecette, type EtatAvis } from "./AvisRecette";
 
 export const metadata = { title: "La recette — Kaddie" };
 
@@ -32,15 +33,19 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const user = await requireUser();
-  const [, found, members, trip] = await Promise.all([
+  const [, found, members, trip, swipes, envies] = await Promise.all([
     requireProfile(),
     getRecipe(user.familyId, id),
     getProfiles(user.familyId),
     getCurrentTrip(user.familyId),
+    getFamilySwipes(user.familyId),
+    getFamilyEnvies(user.familyId),
   ]);
   if (!found) notFound();
   const recipe = await completer(found);
   const people = trip?.people ?? Math.max(1, members.length);
+  const monAvis = swipes.get(id)?.get(user.profileId);
+  const etat: EtatAvis = envies.get(id)?.includes(user.profileId) ? "envie" : monAvis?.likedAt != null ? "aime" : monAvis ? "refuse" : null;
   const infos = [recipe.total_minutes && duree(recipe.total_minutes), recipe.servings && `prévue pour ${recipe.servings}`].filter(Boolean);
 
   return (
@@ -57,6 +62,8 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
       <RecipeVisual recipe={recipe} className="mt-2 aspect-[4/3] w-full rounded-carte" />
       <h1 className="kd-titre-1 mt-5 text-aubergine">{recipe.title}</h1>
       {infos.length > 0 && <p className="kd-etiquette mt-2">{infos.join(" · ")}</p>}
+
+      <AvisRecette key={etat ?? "aucun"} recipeId={recipe.id} etat={etat} />
 
       <Ingredients ingredients={recipe.recipe_ingredients} servings={recipe.servings} people={people} />
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/data";
-import { forFamily, getMatches, getMyLikes, getProfiles, getRecipes } from "@/lib/data";
+import { forFamily, getMatches, getMyLikes, getPlatsAimes, getProfiles, getRecipes } from "@/lib/data";
 import { getTripOverview, type TripOverview } from "@/lib/views";
 import { departureChoices, formatTime } from "@/lib/domain/trip";
 import { ROUTES } from "@/lib/routes";
@@ -11,6 +11,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { BandeauScene, FondCourses, LienReglages } from "@/components/ui";
 import { StartTrip } from "./StartTrip";
 import { RecipeChecklist } from "./RecipeChecklist";
+import { listeDeNoms } from "@/lib/domain/convives";
 import { ConfirmButton } from "./ConfirmButton";
 import { RequestForm } from "./RequestForm";
 import { ListScreen } from "./ListScreen";
@@ -67,63 +68,54 @@ function Depart({ overview, qui }: { overview: TripOverview; qui?: string }) {
   );
 }
 
-/** J'y vais, je prépare : pour qui est chaque plat, ce qu'on m'a demandé en plus. */
+/**
+ * J'y vais, je prépare : Kaddie a déjà retenu les plats (demandés, ou envie de plusieurs),
+ * avec les prénoms de qui les mange. Dans le cas courant, il n'y a qu'à faire la liste.
+ */
 function PreparerView({ me, overview }: { me: Profile; overview: TripOverview }) {
-  const { trip, responses, candidates, pastDeadline, nobodyAnswered } = overview;
+  const { trip, responses, candidates } = overview;
   const validated = trip.status === "validated";
   const checkedCount = candidates.filter((c) => c.checked).length;
-  const answered = responses.filter((r) => r.request).length;
+  const ontRepondu = responses.filter((r) => r.request).map((r) => r.member.name);
   const enAttente = responses.filter((r) => !r.request).map((r) => r.member.name);
-  const enPlus = responses.filter((r) => r.request?.free_text);
+  // Les demandes écrites vont sur la liste toutes seules (découpées en articles).
+  const ecrites = responses.filter((r) => r.request?.free_text);
   // Déjà sur la liste avant de la faire : les articles pas pris la dernière fois, ou ajoutés à la main.
   const dejaSurLaListe = trip.shopping_list_items.filter((i) => i.source === "manual" || i.source === "request").map((i) => i.name);
-  const noms = (l: string[]) => (l.length > 1 ? `${l.slice(0, -1).join(", ")} et ${l[l.length - 1]}` : l[0]);
+  const reponses =
+    responses.length === 0
+      ? null
+      : enAttente.length === 0
+        ? `${listeDeNoms(ontRepondu)} ${ontRepondu.length > 1 ? "ont" : "a"} répondu`
+        : ontRepondu.length === 0
+          ? `Pas encore de réponse de ${listeDeNoms(enAttente)}`
+          : `${listeDeNoms(ontRepondu)} ${ontRepondu.length > 1 ? "ont" : "a"} répondu · pas encore ${listeDeNoms(enAttente)}`;
 
   return (
     <>
-      <BandeauScene
-        fond="courses"
-        illustration="table"
-        etiquette={
-          <>
-            <Depart overview={overview} />
-            {responses.length > 0 && ` · ${answered} sur ${responses.length} ont répondu`}
-          </>
-        }
-        titre="Qui mange quoi ?"
-      />
+      <BandeauScene fond="courses" illustration="table" etiquette={<Depart overview={overview} />} titre="Kaddie te propose" />
 
-      <section className="mb-8">
-        {pastDeadline && nobodyAnswered && (
-          <p className="kd-petit mb-2">Personne n&apos;a répondu : voici les plats que la famille aime, et tes envies.</p>
-        )}
-        {candidates.length > 0 ? (
-          <RecipeChecklist recipes={candidates} moi={me.name} />
-        ) : (
-          <p className="text-encre-douce">Pas encore de plat proposé. Swipe tes envies, ou fais ta liste quand même.</p>
-        )}
+      {reponses && <p className="mb-4 font-semibold">{reponses}</p>}
+
+      <section className="mb-6">
+        <RecipeChecklist recipes={candidates} moi={{ id: me.id, name: me.name }} membres={overview.members.map((m) => ({ id: m.id, name: m.name }))} />
       </section>
 
-      {enPlus.length > 0 && (
-        <section className="mb-8">
-          <h2 className="kd-etiquette">Demandé en plus</h2>
-          <ul className="kd-liste">
-            {enPlus.map(({ member, request }) => (
-              <li key={member.id} className="kd-liste__article">
-                <span>
-                  <strong>{member.name}</strong>&nbsp;: « {request!.free_text} »
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
+      {(ecrites.length > 0 || (!validated && dejaSurLaListe.length > 0)) && (
+        <ul className="kd-petit mb-8 flex flex-col gap-1">
+          {ecrites.map(({ member, request }) => (
+            <li key={member.id}>
+              + {request!.free_text} ({member.name}) : va sur la liste
+            </li>
+          ))}
+          {!validated && dejaSurLaListe.length > 0 && (
+            <li>
+              Déjà sur ta liste&nbsp;: {listeDeNoms(dejaSurLaListe.slice(0, 6))}
+              {dejaSurLaListe.length > 6 ? "…" : ""}
+            </li>
+          )}
+        </ul>
       )}
-
-      {!validated && dejaSurLaListe.length > 0 && (
-        <p className="kd-petit mb-4">Déjà sur ta liste&nbsp;: {noms(dejaSurLaListe.slice(0, 6))}{dejaSurLaListe.length > 6 ? "…" : ""}</p>
-      )}
-
-      {enAttente.length > 0 && <p className="kd-petit mb-8">Pas encore répondu : {noms(enAttente)}</p>}
 
       {/* Collé au-dessus des onglets, sur une bande lilas : le contenu passe dessous proprement. */}
       <form action={validateTrip} className="sticky bottom-[calc(4.25rem+max(env(safe-area-inset-bottom),0.75rem))] z-20 -mx-5 border-t-2 border-trait bg-fond px-5 pt-3 pb-3">
@@ -153,19 +145,22 @@ function PreparerView({ me, overview }: { me: Profile; overview: TripOverview })
 /** Quelqu'un d'autre y va : mes envies (pour moi), les matchs (pour tous), ou je prends le relais. */
 async function ResponderView({ me, overview }: { me: Profile; overview: TripOverview }) {
   const { trip, shopper, responses } = overview;
-  const [matches, recipes, likes] = await Promise.all([
+  const [matches, recipes, likes, aimes] = await Promise.all([
     getMatches(me.family_id),
     getRecipes(me.family_id),
     getMyLikes(me.family_id, me.id),
+    getPlatsAimes(me.family_id, me.id),
   ]);
   const mine = responses.find((r) => r.member.id === me.id)?.request ?? null;
   const others = responses.filter((r) => r.member.id !== me.id && r.request);
   const matchIds = new Set(matches.map((m) => m.id));
   const likeIds = new Set(likes.map((r) => r.id));
   const [envies, partages] = await Promise.all([
+    // Mes envies du moment, puis mes plats aimés (pour en redemander un sans le reswiper).
     forFamily(me.family_id, [
       ...likes.filter((r) => !matchIds.has(r.id)),
-      ...recipes.filter((r) => mine?.recipe_ids.includes(r.id) && !matchIds.has(r.id) && !likeIds.has(r.id)),
+      ...aimes.filter((r) => !matchIds.has(r.id)).slice(0, 6),
+      ...recipes.filter((r) => mine?.recipe_ids.includes(r.id) && !matchIds.has(r.id) && !likeIds.has(r.id) && !aimes.some((a) => a.id === r.id)),
     ]),
     forFamily(me.family_id, matches),
   ]);
