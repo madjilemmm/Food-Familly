@@ -4,6 +4,7 @@ import { db } from "@/lib/supabase/server";
 import { nAimePas, recipeConflicts, type Conflicts, type MemberTastes, type TasteLevel } from "@/lib/domain/foods";
 import { correspondAuxStyles, dureeMax, lireEnvies, styleDe, type Envies } from "@/lib/domain/envies";
 import { calculerMatchs, estEnvie, ordonnerPaquet, type Avis, type Signaux } from "@/lib/domain/reco";
+import { passagesDesIngredients, sansDouteALaMaison } from "@/lib/domain/maison";
 import type { Style } from "@/lib/session";
 
 /*
@@ -245,13 +246,15 @@ export const getFamilySwipes = cache(async function getFamilySwipes(familyId: st
  * - achats : dernier achat de chaque plat (course terminée) — éteint les envies ;
  * - retenus : dernière fois que chaque plat a été retenu — évite la répétition ;
  * - ecartes : plats retirés à la dernière course ;
- * - courses : qui a mangé quoi, des plus récentes aux plus anciennes — pour l'équité.
+ * - courses : qui a mangé quoi, des plus récentes aux plus anciennes — pour l'équité ;
+ * - aLaMaison : ingrédients sans doute toujours à la maison (voir domain/maison.ts).
  */
 export type Historique = {
   achats: Map<string, number>;
   retenus: Map<string, number>;
   ecartes: Set<string>;
   courses: { eaters: Set<string> | null }[];
+  aLaMaison: Set<string>;
 };
 
 export const getHistorique = cache(async function getHistorique(familyId: string): Promise<Historique> {
@@ -259,7 +262,7 @@ export const getHistorique = cache(async function getHistorique(familyId: string
   const [rows, enCours] = await Promise.all([
     db()
       .from("shopping_trips")
-      .select("id, status, validated_at, trip_recipes(*)")
+      .select("id, status, validated_at, trip_recipes(*), shopping_list_items(name, source, checked)")
       .eq("family_id", familyId)
       .not("validated_at", "is", null)
       .gte("validated_at", since)
@@ -272,11 +275,12 @@ export const getHistorique = cache(async function getHistorique(familyId: string
             status: TripStatus;
             validated_at: string;
             trip_recipes: { recipe_id: string; selected: boolean; eaters?: string[] | null }[];
+            shopping_list_items: { name: string; source: string; checked: boolean }[];
           }[],
       ),
     getCurrentTrip(familyId),
   ]);
-  const h: Historique = { achats: new Map(), retenus: new Map(), ecartes: new Set(), courses: [] };
+  const h: Historique = { achats: new Map(), retenus: new Map(), ecartes: new Set(), courses: [], aLaMaison: new Set() };
   for (const t of rows) {
     if (t.id === enCours?.id) continue;
     const at = Date.parse(t.validated_at);
@@ -289,6 +293,10 @@ export const getHistorique = cache(async function getHistorique(familyId: string
     // Qui a mangé : inconnu si un plat n'a pas l'information (courses d'avant le suivi).
     h.courses.push({ eaters: gardes.every((r) => r.eaters) ? new Set(gardes.flatMap((r) => r.eaters!)) : null });
   }
+  // Ce qui a été retiré ou acheté aux courses terminées (les plus récentes d'abord).
+  h.aLaMaison = sansDouteALaMaison(
+    passagesDesIngredients(rows.filter((t) => t.id !== enCours?.id && t.status === "done").map((t) => ({ items: t.shopping_list_items }))),
+  );
   return h;
 });
 

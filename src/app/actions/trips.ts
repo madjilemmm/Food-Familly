@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { requireUser, type CurrentUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
-import { getCurrentTrip, getRecipesWithIngredients, getProfile, getProfiles, loadCurrentTrip, type Trip } from "@/lib/data";
+import { getCurrentTrip, getHistorique, getRecipesWithIngredients, getProfile, getProfiles, loadCurrentTrip, type Trip } from "@/lib/data";
+import { cleMaison } from "@/lib/domain/maison";
 import { platsDeLaCourse } from "@/lib/views";
 import { articlesDe } from "@/lib/domain/articles";
 import { deadlineFor, type DepartureChoice } from "@/lib/domain/trip";
@@ -183,7 +184,8 @@ export async function validateTrip() {
 async function rebuildList(familyId: string, known?: Trip) {
   const trip = known ?? (await loadCurrentTrip(familyId));
   if (!trip) return;
-  const plats = (await platsDeLaCourse(familyId, trip)).filter((p) => p.checked);
+  const [tousLesPlats, hist] = await Promise.all([platsDeLaCourse(familyId, trip), getHistorique(familyId)]);
+  const plats = tousLesPlats.filter((p) => p.checked);
   const recipes = await getRecipesWithIngredients(familyId, plats.map((p) => p.id));
   // Quantités recalculées plat par plat : pour celles et ceux qui le mangent.
   const pourCombien = new Map(plats.map((p) => [p.id, p.convives.n]));
@@ -191,7 +193,10 @@ async function rebuildList(familyId: string, known?: Trip) {
   const aLaMaison = new Set(previous.filter((i) => i.source === "maison").map((i) => itemKey(i.name, i.unit)));
   const merged = mergeIngredients(
     recipes.map((r) => ({ recipeTitle: r.title, ingredients: scaleIngredients(r.recipe_ingredients, r.servings, pourCombien.get(r.id) ?? 1) })),
-  ).filter((m) => !aLaMaison.has(m.key));
+  )
+    .filter((m) => !aLaMaison.has(m.key))
+    // Sans doute toujours à la maison (sel, huile…) : à vérifier avant de partir, pas d'office sur la liste.
+    .filter((m) => !hist.aLaMaison.has(cleMaison(m.name)));
   const wasChecked = new Set(
     previous.filter((i) => i.source === "recipe" && i.checked).map((i) => itemKey(i.name, i.unit)),
   );

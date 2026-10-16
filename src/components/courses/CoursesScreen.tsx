@@ -15,6 +15,7 @@ import { listeDeNoms } from "@/lib/domain/convives";
 import { ConfirmButton } from "./ConfirmButton";
 import { RequestForm } from "./RequestForm";
 import { ListScreen } from "./ListScreen";
+import { AVerifier } from "./AVerifier";
 
 /**
  * L'écran « Courses » change avec le moment, pas avec la personne :
@@ -144,6 +145,8 @@ function PreparerView({ me, overview }: { me: Profile; overview: TripOverview })
           )}
         </ul>
       )}
+
+      <AVerifier key={overview.aVerifier.join("|")} noms={overview.aVerifier} />
 
       {/* Collé au-dessus des onglets, sur une bande lilas : le contenu passe dessous proprement. */}
       <form action={validateTrip} className="sticky bottom-[calc(4.25rem+max(env(safe-area-inset-bottom),0.75rem))] z-20 -mx-5 border-t-2 border-trait bg-fond px-5 pt-3 pb-3">

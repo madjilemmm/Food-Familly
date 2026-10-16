@@ -6,6 +6,7 @@ import {
   getFamilyEnvies,
   getFamilySwipes,
   getHistorique,
+  getRecipesWithIngredients,
   getTasteContext,
   getProfiles,
   getRecipes,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/data";
 import { isPastDeadline } from "@/lib/domain/trip";
 import type { Convives } from "@/lib/domain/convives";
+import { cleMaison } from "@/lib/domain/maison";
 import { lireEnvies } from "@/lib/domain/envies";
 import { classerPlats, compatibilite, oubliParMembre, scoreIndividuel, type CandidatCourse, type PlatClasse } from "@/lib/domain/reco";
 
@@ -144,6 +146,8 @@ export type TripOverview = {
   candidates: CandidateRecipe[];
   pastDeadline: boolean;
   nobodyAnswered: boolean;
+  /** Ingrédients des plats gardés, sans doute déjà à la maison : à vérifier avant de partir. */
+  aVerifier: string[];
 };
 
 /**
@@ -173,10 +177,25 @@ export const getTripOverview = cache(async function getTripOverview(
       };
     });
 
-  const candidates = (await platsDeLaCourse(familyId, trip)).flatMap((p) => {
+  const [plats, hist] = await Promise.all([platsDeLaCourse(familyId, trip), getHistorique(familyId)]);
+  const candidates = plats.flatMap((p) => {
     const recipe = recipeById.get(p.id);
     return recipe ? [{ ...recipe, ...p }] : [];
   });
+
+  // Les ingrédients des plats gardés que la famille a sans doute déjà (et pas encore remis sur la liste).
+  const gardes = candidates.filter((c) => c.checked).map((c) => c.id);
+  const ingredients = hist.aLaMaison.size && gardes.length ? (await getRecipesWithIngredients(familyId, gardes)).flatMap((r) => r.recipe_ingredients) : [];
+  const surLaListe = new Set(trip.shopping_list_items.filter((i) => i.source !== "maison").map((i) => cleMaison(i.name)));
+  const vus = new Set<string>();
+  const aVerifier = ingredients
+    .filter((i) => {
+      const cle = cleMaison(i.name);
+      if (!hist.aLaMaison.has(cle) || surLaListe.has(cle) || vus.has(cle)) return false;
+      vus.add(cle);
+      return true;
+    })
+    .map((i) => i.name);
 
   return {
     trip,
@@ -187,5 +206,6 @@ export const getTripOverview = cache(async function getTripOverview(
     candidates,
     pastDeadline: isPastDeadline(trip.deadline_at),
     nobodyAnswered: requests.length === 0,
+    aVerifier,
   };
 });
