@@ -4,6 +4,7 @@ import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { AutoUpdate } from "@/components/pwa/AutoUpdate";
 import { Mouvement } from "@/components/Mouvement";
+import { BarreEtat } from "@/components/pwa/BarreEtat";
 
 const rubik = Rubik({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-rubik", display: "swap" });
 
@@ -40,8 +41,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="fr">
       <body className={`${rubik.variable} kd-app font-sans`}>
-        {/* Barre d'état iPhone (texte blanc) : toujours sur du violet, même au-dessus des écrans lilas */}
-        <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)] bg-violet" />
+        {/* Barre d'état iPhone : le bandeau illustré monte jusqu'en haut ; violet seulement au-dessus du lilas. */}
+        <BarreEtat />
         <ServiceWorkerRegister />
         <AutoUpdate />
         <Mouvement>{children}</Mouvement>
