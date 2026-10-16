@@ -6,6 +6,7 @@ import { forgetProfile, leaveFamily } from "@/app/actions/auth";
 import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 import { MyStyle } from "@/components/family/MyStyle";
 import { IconeRetour } from "@/components/ui";
+import { ConfirmButton } from "@/components/courses/ConfirmButton";
 
 export const metadata = { title: "Réglages — Kaddie" };
 
@@ -53,9 +54,17 @@ export default async function SettingsPage() {
         ))}
       </ul>
 
-      <form action={leaveFamily} className="text-center">
-        <button className="min-h-14 px-2 text-encre-douce underline underline-offset-4">Quitter cette famille sur ce téléphone</button>
-      </form>
+      <div className="text-center">
+        <ConfirmButton
+          action={leaveFamily}
+          question={`Quitter ${family?.name ?? "cette famille"} ?`}
+          detail={family ? `Pour revenir sur ce téléphone, il faudra le code : ${family.join_code}` : undefined}
+          confirmLabel="Oui, quitter"
+          className="min-h-14 px-2 text-encre-douce underline underline-offset-4"
+        >
+          Quitter cette famille sur ce téléphone
+        </ConfirmButton>
+      </div>
     </main>
   );
 }

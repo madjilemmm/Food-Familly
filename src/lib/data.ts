@@ -91,7 +91,8 @@ export type ListItem = {
   quantity: number | null;
   unit: string;
   aisle: string;
-  source: "recipe" | "manual" | "request";
+  /** « maison » : ingrédient de recette qu'on a déjà (retiré de la liste, pas remis à la mise à jour). */
+  source: "recipe" | "manual" | "request" | "maison";
   for_recipes: string | null;
   checked: boolean;
   created_at: string;
@@ -265,7 +266,10 @@ export async function isMatch(familyId: string, recipeId: string): Promise<boole
 // ─── Courses ───────────────────────────────────────────────────────────
 
 /** La session de courses en cours de la famille (ouverte ou validée, pas trop ancienne). */
-export const getCurrentTrip = cache(async function getCurrentTrip(familyId: string): Promise<Trip | null> {
+export const getCurrentTrip = cache(loadCurrentTrip);
+
+/** Sans cache : relu juste après une écriture. */
+export async function loadCurrentTrip(familyId: string): Promise<Trip | null> {
   const since = new Date(Date.now() - TRIP_MAX_AGE_MS).toISOString();
   return check(
     await db()
@@ -286,4 +290,4 @@ export const getCurrentTrip = cache(async function getCurrentTrip(familyId: stri
       .limit(1)
       .maybeSingle(),
   );
-});
+}

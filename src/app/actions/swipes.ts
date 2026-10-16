@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
 import { isMatch } from "@/lib/data";
 import { notifyMatch } from "@/lib/notifications";
+import { revalidatePath } from "next/cache";
 import { changed } from "./_shared";
 
 export async function swipe(recipeId: string, liked: boolean): Promise<{ match: boolean }> {
@@ -24,7 +25,9 @@ export async function swipe(recipeId: string, liked: boolean): Promise<{ match: 
   if (error) throw new Error(error.message);
 
   const match = liked && (await isMatch(user.familyId, recipeId));
-  changed(match && !wasMatch ? () => notifyMatch(user.familyId, user.profileId, recipeId) : undefined);
+  // Les autres téléphones ne sont prévenus (et rafraîchis) que pour un nouveau match.
+  if (match && !wasMatch) changed(() => notifyMatch(user.familyId, user.profileId, recipeId));
+  else revalidatePath("/", "layout");
   return { match };
 }
 

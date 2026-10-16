@@ -72,12 +72,6 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
         titre={answered > 0 || candidates.length > 0 ? "Ce soir, la famille veut" : "Les courses"}
       />
 
-      {validated && (
-        <Link href={ROUTES[me.style].liste} className="kd-btn kd-btn--like kd-btn--large mb-6">
-          Ma liste est prête, je l&apos;ouvre
-        </Link>
-      )}
-
       <section className="mb-8">
         <h2 className="kd-etiquette mb-2">La famille</h2>
         {responses.length === 0 ? (
@@ -119,8 +113,9 @@ function ShopperView({ me, overview }: { me: Profile; overview: TripOverview }) 
       {/* Collé au-dessus des onglets, sur une bande lilas : le contenu passe dessous proprement. */}
       <form action={validateTrip} className="sticky bottom-[calc(4.25rem+max(env(safe-area-inset-bottom),0.75rem))] z-20 -mx-5 border-t-2 border-trait bg-fond px-5 pt-3 pb-3">
         <SubmitButton pendingLabel="Je prépare la liste…">
+          {/* La liste faite suit déjà les demandes et les plats cochés : on l'ouvre, simplement. */}
           {validated
-            ? "Mettre à jour ma liste"
+            ? "Ouvrir ma liste"
             : `Faire ma liste${checkedCount ? ` (${checkedCount} plat${checkedCount > 1 ? "s" : ""})` : ""}`}
         </SubmitButton>
       </form>

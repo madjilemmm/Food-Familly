@@ -2,10 +2,10 @@
 
 import { useOptimistic, useRef, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { addItem, deleteItem, setItemChecked } from "@/app/actions/list";
+import { addItems, deleteItem, restoreItem, setItemChecked } from "@/app/actions/list";
 import { finishTrip } from "@/app/actions/trips";
 import { groupByAisle } from "@/lib/domain/aisles";
-import { guessAisle } from "@/lib/domain/recipe-import";
+import { articlesDe, lireArticle, type Article } from "@/lib/domain/articles";
 import { formatQuantity } from "@/lib/domain/shopping-list";
 import type { ListItem } from "@/lib/data";
 import { IconeCroix, IconePlus } from "@/components/ui";
@@ -14,7 +14,7 @@ import { useAnnuler } from "@/components/Annuler";
 
 type Action =
   | { type: "check"; id: string; checked: boolean }
-  | { type: "add"; item: ListItem }
+  | { type: "add"; items: ListItem[] }
   | { type: "delete"; id: string };
 
 export function ShoppingList({
@@ -27,41 +27,46 @@ export function ShoppingList({
   const [, startTransition] = useTransition();
   const proposer = useAnnuler();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [list, apply] = useOptimistic(items, (state, action: Action) => {
+  // Les ingrédients qu'on a déjà à la maison ne s'affichent plus.
+  const visibles = items.filter((i) => i.source !== "maison");
+  const [list, apply] = useOptimistic(visibles, (state, action: Action) => {
     switch (action.type) {
       case "check":
         return state.map((i) => (i.id === action.id ? { ...i, checked: action.checked } : i));
       case "add":
-        return [...state, action.item];
+        return [...state, ...action.items];
       case "delete":
         return state.filter((i) => i.id !== action.id);
     }
   });
 
-  const add = (name: string, source: "manual" | "request") => {
-    const clean = name.trim();
-    if (!clean) return;
+  const add = (articles: Article[], source: "manual" | "request") => {
+    if (articles.length === 0) return;
     startTransition(async () => {
       apply({
         type: "add",
-        item: {
-          id: `tmp-${Date.now()}`,
-          name: clean,
-          quantity: null,
-          unit: "",
-          aisle: guessAisle(clean),
+        items: articles.map((a, n) => ({
+          ...a,
+          id: `tmp-${Date.now()}-${n}`,
           source,
           for_recipes: null,
           checked: false,
           created_at: new Date().toISOString(),
-        },
+        })),
       });
-      await addItem(clean, source);
+      await addItems(
+        articles.map((a) => [a.quantity ?? "", a.unit, a.name].filter(Boolean).join(" ")),
+        source,
+      );
     });
   };
 
+  // Une demande écrite (« des pâtes, du Nutella ») devient un article par chose demandée.
   const alreadyAdded = new Set(list.filter((i) => i.source === "request").map((i) => i.name.trim().toLowerCase()));
-  const pendingRequests = requests.filter((r) => !alreadyAdded.has(r.text.trim().toLowerCase()));
+  const pendingRequests = requests
+    .map((r) => ({ ...r, articles: articlesDe(r.text) }))
+    .filter((r) => r.articles.some((a) => !alreadyAdded.has(a.name.toLowerCase())));
+  const restants = list.length - list.filter((i) => i.checked).length;
   const done = list.filter((i) => i.checked).length;
   // Les rayons dans l'ordre du parcours en magasin ; un rayon terminé passe en bas.
   // Dans chaque rayon, ce qui reste à prendre en haut, ce qui est pris en bas.
@@ -95,8 +100,11 @@ export function ShoppingList({
                 <span className="flex-1">
                   <strong>{r.from}</strong>&nbsp;: « {r.text} »
                 </span>
-                <button onClick={() => add(r.text, "request")} className="kd-btn kd-btn--like min-h-12 shrink-0 px-4">
-                  Ajouter
+                <button
+                  onClick={() => add(r.articles.filter((a) => !alreadyAdded.has(a.name.toLowerCase())), "request")}
+                  className="kd-btn kd-btn--like min-h-12 shrink-0 px-4"
+                >
+                  {r.articles.length > 1 ? `Ajouter (${r.articles.length})` : "Ajouter"}
                 </button>
               </li>
             ))}
@@ -108,7 +116,8 @@ export function ShoppingList({
         className="mb-6 flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          add(inputRef.current?.value ?? "", "manual");
+          const article = lireArticle(inputRef.current?.value ?? "");
+          if (article) add([article], "manual");
           // Le clavier reste ouvert pour enchaîner les articles.
           if (inputRef.current) {
             inputRef.current.value = "";
@@ -174,23 +183,27 @@ export function ShoppingList({
                       {item.for_recipes && <span className="kd-petit block no-underline">pour {item.for_recipes}</span>}
                     </span>
                   </button>
-                  {item.source !== "recipe" && (
-                    <button
-                      type="button"
-                      aria-label={`Retirer ${item.name}`}
-                      onClick={() =>
-                        startTransition(async () => {
-                          apply({ type: "delete", id: item.id });
-                          if (!item.id.startsWith("tmp-")) await deleteItem(item.id);
-                          // Retiré par erreur ? Il revient d'un geste.
-                          if (item.source !== "recipe") proposer(`${item.name} retiré`, () => add(item.name, item.source as "manual" | "request"));
-                        })
-                      }
-                      className="flex size-14 shrink-0 items-center justify-center text-encre-douce"
-                    >
-                      <IconeCroix className="size-6" />
-                    </button>
-                  )}
+                  {/* Tout se retire : un ingrédient de recette qu'on a déjà ne revient pas à la mise à jour. */}
+                  <button
+                    type="button"
+                    aria-label={`Retirer ${item.name}`}
+                    onClick={() =>
+                      startTransition(async () => {
+                        const recette = item.source === "recipe";
+                        apply({ type: "delete", id: item.id });
+                        if (!item.id.startsWith("tmp-")) await deleteItem(item.id, recette);
+                        // Retiré par erreur ? Il revient d'un geste.
+                        proposer(recette ? `${item.name} : déjà à la maison` : `${item.name} retiré`, () =>
+                          recette
+                            ? startTransition(() => restoreItem(item.id))
+                            : add([{ name: item.name, quantity: item.quantity, unit: item.unit, aisle: item.aisle }], item.source as "manual" | "request"),
+                        );
+                      })
+                    }
+                    className="flex size-14 shrink-0 items-center justify-center text-encre-douce"
+                  >
+                    <IconeCroix className="size-6" />
+                  </button>
                 </motion.li>
               ))}
             </AnimatePresence>
@@ -203,7 +216,11 @@ export function ShoppingList({
           <ConfirmButton
             action={finishTrip}
             question="Les courses sont finies ?"
-            detail="La liste sera effacée pour toute la famille."
+            detail={
+              restants > 0
+                ? `${restants} article${restants > 1 ? "s" : ""} pas pris : ${restants > 1 ? "ils passeront" : "il passera"} dans la prochaine liste.`
+                : "La liste sera effacée pour toute la famille."
+            }
             confirmLabel="Oui, c'est fini"
             className="kd-btn kd-btn--large"
           >

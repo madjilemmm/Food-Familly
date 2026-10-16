@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Spinner } from "@/components/Spinner";
-import { Bouton } from "@/design-system/components/Kaddie";
 import type { DepartureChoice } from "@/lib/domain/trip";
 
 export function StartTrip({
@@ -14,7 +13,6 @@ export function StartTrip({
   /** Les autres membres, prévenus par notification. */
   others: string[];
 }) {
-  const [open, setOpen] = useState(false);
   // Un formulaire HTML classique (POST puis redirection) : l'écran suit à coup sûr,
   // même si les onglets sont encore en train de se précharger.
   const [choisi, setChoisi] = useState<DepartureChoice | null>(null);
@@ -26,17 +24,7 @@ export function StartTrip({
         ? "Toute la famille reçoit une notif et choisit ses plats."
         : `${names} ${others.length > 1 ? "reçoivent" : "reçoit"} une notif et ${others.length > 1 ? "choisissent leurs" : "choisit ses"} plats.`;
 
-  if (!open) {
-    return (
-      <div className="flex flex-col gap-3">
-        <Bouton variante="geant" className="kd-pop" onClick={() => setOpen(true)}>
-          Je pars faire les courses
-        </Bouton>
-        <p className="text-center font-medium">{who}</p>
-      </div>
-    );
-  }
-
+  // Les durées tout de suite : un seul appui pour lancer les courses.
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -44,7 +32,7 @@ export function StartTrip({
       transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       className="kd-carte gap-4 p-5"
     >
-      <p className="kd-titre-2 text-center text-aubergine">Je pars dans…</p>
+      <p className="kd-titre-2 text-center text-aubergine">Je pars faire les courses dans…</p>
       <form method="post" action="/api/courses/depart" className="grid grid-cols-2 gap-3">
         {choices.map((c) => (
           <ChoixDepart
@@ -58,9 +46,6 @@ export function StartTrip({
         ))}
       </form>
       <p className="kd-petit text-center">{who}</p>
-      <button onClick={() => setOpen(false)} className="min-h-14 w-full text-encre-douce underline underline-offset-4">
-        Annuler
-      </button>
     </motion.div>
   );
 }

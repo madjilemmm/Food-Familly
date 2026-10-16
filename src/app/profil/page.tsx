@@ -4,6 +4,7 @@ import { requireFamily } from "@/lib/auth";
 import { getFamily, getProfiles } from "@/lib/data";
 import { chooseProfile, leaveFamily } from "@/app/actions/auth";
 import { illustrationDe } from "@/components/ui";
+import { ConfirmButton } from "@/components/courses/ConfirmButton";
 
 export const metadata = { title: "C'est qui ? — Kaddie" };
 export const dynamic = "force-dynamic";
@@ -42,9 +43,17 @@ export default async function ProfilePage() {
         Je ne suis pas dans la liste
       </Link>
       <p className="kd-petit mt-auto text-center">Ton choix reste sur ce téléphone.</p>
-      <form action={leaveFamily} className="text-center">
-        <button className="min-h-14 px-2 text-encre-douce underline underline-offset-4">Ce n&apos;est pas ma famille</button>
-      </form>
+      <div className="text-center">
+        <ConfirmButton
+          action={leaveFamily}
+          question="Ce n'est pas ta famille ?"
+          detail="Tu reviens à l'écran du code famille."
+          confirmLabel="Oui, changer de famille"
+          className="min-h-14 px-2 text-encre-douce underline underline-offset-4"
+        >
+          Ce n&apos;est pas ma famille
+        </ConfirmButton>
+      </div>
     </main>
   );
 }

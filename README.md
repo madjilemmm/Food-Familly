@@ -62,7 +62,9 @@ Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres,
    [`supabase/migrations/20261015000001_recettes_web.sql`](supabase/migrations/20261015000001_recettes_web.sql) puis
    [`supabase/migrations/20261016000001_gouts.sql`](supabase/migrations/20261016000001_gouts.sql), puis
    [`supabase/migrations/20261016000002_envies_recettes_relance.sql`](supabase/migrations/20261016000002_envies_recettes_relance.sql)
-   (envies, recette complète, nombre de personnes, et la relance « plus que 10 minutes » appelée chaque minute par Supabase).
+   (envies, recette complète, nombre de personnes, et la relance « plus que 10 minutes » appelée chaque minute par Supabase), puis
+   [`supabase/migrations/20261017000001_deja_a_la_maison.sql`](supabase/migrations/20261017000001_deja_a_la_maison.sql)
+   (« j'en ai déjà » : un ingrédient de recette retiré de la liste ne revient pas).
    Chaque fichier se lance dans cet ordre ; on peut les relancer sans risque.
 
    Pas besoin de données de départ : on crée sa famille directement dans l'appli. (Le fichier facultatif

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireUser, type CurrentUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
-import { getCurrentTrip, getRecipesWithIngredients, getProfile, getProfiles } from "@/lib/data";
+import { getCurrentTrip, getRecipesWithIngredients, getProfile, getProfiles, loadCurrentTrip, type Trip } from "@/lib/data";
 import { deadlineFor, type DepartureChoice } from "@/lib/domain/trip";
 import { mergeIngredients, itemKey, scaleIngredients } from "@/lib/domain/shopping-list";
 import { notifyTripStarted, notifyRequestReceived } from "@/lib/notifications";
@@ -46,6 +46,18 @@ export async function startTrip(choice: DepartureChoice) {
   }
 
   const deadline = deadlineFor(choice);
+  // Ce qui n'a pas été pris la dernière fois (moins de 2 semaines) passe dans la nouvelle liste.
+  const { data: dernier } = await db()
+    .from("shopping_trips")
+    .select("id, shopping_list_items(name, quantity, unit, aisle, source, for_recipes, checked)")
+    .eq("family_id", user.familyId)
+    .gte("created_at", new Date(Date.now() - 14 * 86_400_000).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const restes = ((dernier?.shopping_list_items ?? []) as Omit<Trip["shopping_list_items"][number], "id" | "created_at">[]).filter(
+    (i) => !i.checked && i.source !== "maison",
+  );
   // Une seule session à la fois par famille : les anciennes sont closes.
   await db().from("shopping_trips").update({ status: "done" }).eq("family_id", user.familyId).neq("status", "done");
   const { data: trip, error } = await db()
@@ -59,6 +71,11 @@ export async function startTrip(choice: DepartureChoice) {
     .select("id, deadline_at")
     .single();
   if (error) throw new Error(error.message);
+  if (restes.length > 0) {
+    await db()
+      .from("shopping_list_items")
+      .insert(restes.map((i) => ({ trip_id: trip.id, name: i.name, quantity: i.quantity, unit: i.unit, aisle: i.aisle, for_recipes: i.for_recipes, source: "manual" })));
+  }
 
   changed(() => notifyTripStarted(user.familyId, user.profileId, trip.deadline_at));
   // Une redirection plutôt qu'un rafraîchissement sur place : l'écran suit même si
@@ -90,6 +107,7 @@ export async function setTripRecipe(recipeId: string, selected: boolean) {
     .from("trip_recipes")
     .upsert({ trip_id: trip.id, recipe_id: recipeId, selected }, { onConflict: "trip_id,recipe_id" });
   if (error) throw new Error(error.message);
+  if (trip.status === "validated") await rebuildList(user.familyId);
   changed();
 }
 
@@ -100,59 +118,62 @@ export async function setTripPeople(people: number) {
   const n = Math.round(Number(people));
   if (!Number.isFinite(n) || n < 1 || n > 30) throw new Error("Nombre invalide");
   await db().from("shopping_trips").update({ people: n }).eq("id", trip.id);
+  if (trip.status === "validated") await rebuildList(user.familyId);
   changed();
 }
 
 /**
  * Génère (ou régénère) la liste à partir des plats cochés.
  * Les articles ajoutés à la main sont conservés ; les articles déjà cochés
- * le restent.
+ * le restent ; ceux qu'on a déjà à la maison ne reviennent pas.
  */
 export async function validateTrip() {
   const user = await requireUser();
   const trip = await myTripOrThrow(user);
+  await Promise.all([
+    rebuildList(user.familyId, trip),
+    db().from("shopping_trips").update({ status: "validated", validated_at: new Date().toISOString() }).eq("id", trip.id),
+  ]);
+  changed();
+  redirect(ROUTES[user.style].liste);
+}
 
+/** Recalcule les ingrédients des recettes de la liste (relue sans cache si besoin). */
+async function rebuildList(familyId: string, known?: Trip) {
+  const trip = known ?? (await loadCurrentTrip(familyId));
+  if (!trip) return;
   // Plats cochés et liste actuelle arrivent avec la course : pas de requête en plus.
   const selection = trip.trip_recipes.filter((r) => r.selected);
   const [recipes, members] = await Promise.all([
-    getRecipesWithIngredients(user.familyId, selection.map((s) => s.recipe_id)),
-    getProfiles(user.familyId),
+    getRecipesWithIngredients(familyId, selection.map((s) => s.recipe_id)),
+    getProfiles(familyId),
   ]);
   // Quantités recalculées pour le nombre de personnes (toute la famille par défaut).
   const people = trip.people ?? Math.max(1, members.length);
+  const previous = trip.shopping_list_items;
+  const aLaMaison = new Set(previous.filter((i) => i.source === "maison").map((i) => itemKey(i.name, i.unit)));
   const merged = mergeIngredients(
     recipes.map((r) => ({ recipeTitle: r.title, ingredients: scaleIngredients(r.recipe_ingredients, r.servings, people) })),
-  );
-
-  const previous = trip.shopping_list_items;
+  ).filter((m) => !aLaMaison.has(m.key));
   const wasChecked = new Set(
     previous.filter((i) => i.source === "recipe" && i.checked).map((i) => itemKey(i.name, i.unit)),
   );
 
-  const replaceItems = async () => {
-    await db().from("shopping_list_items").delete().eq("trip_id", trip.id).eq("source", "recipe");
-    if (merged.length === 0) return;
-    const { error: insertError } = await db().from("shopping_list_items").insert(
-      merged.map((m) => ({
-        trip_id: trip.id,
-        name: m.name,
-        quantity: m.quantity,
-        unit: m.unit,
-        aisle: m.aisle,
-        source: "recipe",
-        for_recipes: m.forRecipes.join(", "),
-        checked: wasChecked.has(m.key),
-      })),
-    );
-    if (insertError) throw new Error(insertError.message);
-  };
-  await Promise.all([
-    replaceItems(),
-    db().from("shopping_trips").update({ status: "validated", validated_at: new Date().toISOString() }).eq("id", trip.id),
-  ]);
-
-  changed();
-  redirect(ROUTES[user.style].liste);
+  await db().from("shopping_list_items").delete().eq("trip_id", trip.id).eq("source", "recipe");
+  if (merged.length === 0) return;
+  const { error: insertError } = await db().from("shopping_list_items").insert(
+    merged.map((m) => ({
+      trip_id: trip.id,
+      name: m.name,
+      quantity: m.quantity,
+      unit: m.unit,
+      aisle: m.aisle,
+      source: "recipe",
+      for_recipes: m.forRecipes.join(", "),
+      checked: wasChecked.has(m.key),
+    })),
+  );
+  if (insertError) throw new Error(insertError.message);
 }
 
 // ─── Les autres membres ────────────────────────────────────────────────
@@ -191,6 +212,8 @@ export async function submitRequest(
       : Promise.resolve(),
   ]);
   if (error) return { error: "Oups, l'envoi a échoué. Réessaie." };
+  // La liste est déjà faite : les plats demandés y arrivent tout seuls.
+  if (trip.status === "validated" && recipeIds.length > 0) await rebuildList(user.familyId).catch(() => {});
 
   changed(() => notifyRequestReceived(user.familyId, trip.created_by, user.profileId, freeText, recipeIds.length));
   return { ok: true };
