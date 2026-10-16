@@ -209,3 +209,24 @@ a {
 .photo-absente {
   background: var(--trait) url(/brand/fonds/kaddie-motif-legumes-lilas.webp) center / cover no-repeat;
 }
+
+/* Feuille de confirmation : monte du bas, redescend à la fermeture (courbes du kit). */
+.feuille-fond { animation: feuille-fond-in 200ms ease-out both; }
+.feuille-fond[data-ferme] { animation: feuille-fond-out 180ms ease-in both; }
+.feuille { animation: feuille-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.feuille-fond[data-ferme] .feuille { animation: feuille-out 180ms ease-in both; }
+@keyframes feuille-fond-in { from { opacity: 0; } }
+@keyframes feuille-fond-out { to { opacity: 0; } }
+@keyframes feuille-in { from { transform: translateY(100%); } }
+@keyframes feuille-out { to { transform: translateY(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .feuille-fond,
+  .feuille,
+  .feuille-fond[data-ferme],
+  .feuille-fond[data-ferme] .feuille { animation: none; }
+}
+
+/* Bandeau avec deux boutons ronds : sur les petits écrans, le titre reste sur une ligne. */
+@media (max-width: 389px) {
+  .bandeau-titre-serre { font-size: calc(var(--taille-titre-1) * 0.86); }
+}

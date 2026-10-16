@@ -29,8 +29,18 @@ async function completer(recipe: RecipeWithIngredients): Promise<RecipeWithIngre
 
 const duree = (min: number) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${String(min % 60).padStart(2, "0")}` : ""}`);
 
-export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+/** Le retour ramène à l'écran d'où l'on vient (Matchs, Courses…), sinon aux recettes. */
+const RETOURS: Record<string, string> = { "/matchs": "Les matchs", "/courses": "Les courses", "/envies": "Les envies" };
+
+export default async function RecipePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ depuis?: string }>;
+}) {
+  const [{ id }, { depuis }] = await Promise.all([params, searchParams]);
+  const retour = depuis && RETOURS[depuis] ? { href: depuis, label: RETOURS[depuis] } : { href: "/recettes", label: "Les recettes" };
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const user = await requireUser();
   const [, found, members, trip, swipes, envies] = await Promise.all([
@@ -51,8 +61,8 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   return (
     <article className="pt-safe pb-6">
       <div className="flex items-center justify-between">
-        <Link href="/recettes" className="-ml-2 inline-flex min-h-14 items-center gap-1 font-semibold text-violet">
-          <IconeRetour className="size-6" /> Les recettes
+        <Link href={retour.href} className="-ml-2 inline-flex min-h-14 items-center gap-1 font-semibold text-violet">
+          <IconeRetour className="size-6" /> {retour.label}
         </Link>
         <Link href={`/recettes/${recipe.id}/modifier`} className="kd-btn kd-btn--secondaire min-h-12 px-4 text-bouton">
           Modifier

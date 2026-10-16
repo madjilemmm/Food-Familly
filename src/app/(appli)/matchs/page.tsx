@@ -18,13 +18,13 @@ export default async function Matchs() {
     <>
       <BandeauScene
         illustration="table"
-        etiquette={`${matches.length} match${matches.length > 1 ? "s" : ""}`}
+        etiquette={matches.length ? `${matches.length} match${matches.length > 1 ? "s" : ""}` : undefined}
         titre="Vos envies en commun"
       />
       {matches.length === 0 ? (
         <EtatVide phrase="Pas encore de match. Quand vous êtes au moins deux à avoir envie du même plat, il arrive ici.">
-          <Link href="/envies" className="kd-btn kd-btn--secondaire kd-btn--large">
-            Aller swiper
+          <Link href="/envies" className="kd-btn kd-btn--secondaire min-h-12 px-5">
+            Swiper des plats
           </Link>
         </EtatVide>
       ) : (
@@ -37,7 +37,7 @@ export default async function Matchs() {
           <p className="kd-petit mb-2">Elles arrivent toutes seules à la personne qui fait les courses. Touche un plat pour changer d&apos;avis.</p>
           <ul className="kd-liste border-t-2 border-trait">
             {seules.map((r) => (
-              <LigneRecette key={r.id} recipe={r} infos={r.total_minutes ? `${r.total_minutes} min` : undefined} />
+              <LigneRecette key={r.id} recipe={r} depuis="/matchs" infos={r.total_minutes ? `${r.total_minutes} min` : undefined} />
             ))}
           </ul>
         </section>

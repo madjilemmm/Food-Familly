@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { submitRequest } from "@/app/actions/trips";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -41,7 +42,13 @@ export function RequestForm({
       </label>
 
       {envies.length === 0 && matchs.length === 0 ? (
-        <p className="text-encre-douce">Pas encore d&apos;envie ni de match. Swipe pour en trouver.</p>
+        <p className="text-encre-douce">
+          Pas encore d&apos;envie. Écris ce que tu veux, ou{" "}
+          <Link href="/envies" className="font-semibold text-violet underline underline-offset-4">
+            swipe des plats
+          </Link>{" "}
+          : ils arriveront ici.
+        </p>
       ) : (
         <>
           <Plats legende="Tes envies et tes plats aimés" detail="Pour toi" recettes={envies} initialRecipeIds={initialRecipeIds} />

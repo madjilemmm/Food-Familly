@@ -10,6 +10,7 @@ export function MatchCards({ matches, moi }: { matches: Match[]; moi: string }) 
         <LigneRecette
           key={m.id}
           recipe={m}
+          depuis="/matchs"
           infos={[`Envie de ${listeDeNoms(m.avec, moi).replace(/^Toi\b/, "toi")}`, m.total_minutes && `${m.total_minutes} min`].filter(Boolean).join(" · ")}
         />
       ))}

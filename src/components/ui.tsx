@@ -177,7 +177,7 @@ export function BandeauScene({
       <div className="flex items-start justify-between gap-4 pt-2">
         <div className="min-w-0 pt-4">
           {etiquette && <p className="kd-etiquette mb-2 text-blanc">{etiquette}</p>}
-          <h1 className="kd-titre-1">{titre}</h1>
+          <h1 className={`kd-titre-1 ${actions ? "bandeau-titre-serre" : ""}`}>{titre}</h1>
         </div>
         {(actions || reglages) && (
           <span className="flex shrink-0 gap-2">
@@ -203,12 +203,13 @@ export function MessageErreur({ children }: { children: React.ReactNode }) {
 }
 
 /** État vide : petite scène, phrase courte en BoldenVan blanc, et une action. */
-export function EtatVide({ seed = 5, phrase, children }: { seed?: number; phrase: string; children?: React.ReactNode }) {
+/** État vide : ce qui se passe, en une phrase, et l'action utile. Sobre, comme une liste vide de Recettes. */
+export function EtatVide({ phrase, children }: { phrase: string; children?: React.ReactNode }) {
   return (
-    <Scene duo="aubergine" seed={seed} format="carre" className="flex flex-col gap-5 rounded-carte p-6">
-      <p className="kd-titre-2">{phrase}</p>
+    <div className="flex flex-col items-start gap-4 border-t-2 border-trait pt-5">
+      <p className="text-encre-douce">{phrase}</p>
       {children}
-    </Scene>
+    </div>
   );
 }
 

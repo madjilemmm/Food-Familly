@@ -11,6 +11,7 @@ import type { ListItem } from "@/lib/data";
 import { IconeCroix, IconePlus } from "@/components/ui";
 import { ConfirmButton } from "./ConfirmButton";
 import { useAnnuler } from "@/components/Annuler";
+import { useErreurReseau } from "@/components/ErreurReseau";
 
 type Action =
   | { type: "check"; id: string; checked: boolean }
@@ -26,6 +27,7 @@ export function ShoppingList({
 }) {
   const [, startTransition] = useTransition();
   const proposer = useAnnuler();
+  const { essayer, alerte } = useErreurReseau();
   const inputRef = useRef<HTMLInputElement>(null);
   // Les ingrédients qu'on a déjà à la maison ne s'affichent plus.
   const visibles = items.filter((i) => i.source !== "maison");
@@ -54,9 +56,11 @@ export function ShoppingList({
           created_at: new Date().toISOString(),
         })),
       });
-      await addItems(
-        articles.map((a) => [a.quantity ?? "", a.unit, a.name].filter(Boolean).join(" ")),
-        source,
+      await essayer(() =>
+        addItems(
+          articles.map((a) => [a.quantity ?? "", a.unit, a.name].filter(Boolean).join(" ")),
+          source,
+        ),
       );
     });
   };
@@ -159,7 +163,7 @@ export function ShoppingList({
                     onClick={() =>
                       startTransition(async () => {
                         apply({ type: "check", id: item.id, checked: !item.checked });
-                        if (!item.id.startsWith("tmp-")) await setItemChecked(item.id, !item.checked);
+                        if (!item.id.startsWith("tmp-")) await essayer(() => setItemChecked(item.id, !item.checked));
                       })
                     }
                     className="flex min-h-14 flex-1 items-center gap-3 py-2 text-left"
@@ -193,7 +197,7 @@ export function ShoppingList({
                         // Un ingrédient de recette ou un article demandé est gardé de côté : il ne revient pas.
                         const deCote = item.source === "recipe" || item.source === "request";
                         apply({ type: "delete", id: item.id });
-                        if (!item.id.startsWith("tmp-")) await deleteItem(item.id, deCote);
+                        if (!item.id.startsWith("tmp-") && !(await essayer(() => deleteItem(item.id, deCote)))) return;
                         // Retiré par erreur ? Il revient d'un geste.
                         proposer(item.source === "recipe" ? `${item.name} : déjà à la maison` : `${item.name} retiré`, () =>
                           deCote
@@ -231,6 +235,7 @@ export function ShoppingList({
           </ConfirmButton>
         </div>
       )}
+      {alerte}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { setTripRecipe, setTripRecipeEaters } from "@/app/actions/trips";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import { IconePlus } from "@/components/ui";
 import { listeDeNoms } from "@/lib/domain/convives";
+import { useErreurReseau } from "@/components/ErreurReseau";
 import type { CandidateRecipe } from "@/lib/views";
 
 type Membre = { id: string; name: string };
@@ -49,15 +50,16 @@ export function RecipeChecklist({ recipes, moi, membres }: { recipes: CandidateR
     ),
   );
   const noms = new Map(membres.map((m) => [m.id, m.name]));
+  const { essayer, alerte } = useErreurReseau();
   const garder = (id: string, checked: boolean) =>
     startTransition(async () => {
       apply({ id, checked });
-      await setTripRecipe(id, checked);
+      await essayer(() => setTripRecipe(id, checked));
     });
   const manger = (id: string, eaters: string[], invites: number) =>
     startTransition(async () => {
       apply({ id, eaters, n: eaters.length + invites });
-      await setTripRecipeEaters(id, eaters, invites);
+      await essayer(() => setTripRecipeEaters(id, eaters, invites));
     });
 
   const retenus = optimistic.filter((r) => r.checked);
@@ -70,7 +72,11 @@ export function RecipeChecklist({ recipes, moi, membres }: { recipes: CandidateR
       {retenus.length > 0 ? (
         <ul className="kd-liste">{retenus.map(ligne)}</ul>
       ) : (
-        <p className="text-encre-douce">Rien de demandé pour l&apos;instant. Pioche dans les idées, ou fais ta liste quand même.</p>
+        <p className="text-encre-douce">
+          {autres.length > 0
+            ? "Rien de retenu pour l'instant : pioche dans les idées ci-dessous, ou fais ta liste quand même."
+            : "Personne n'a encore rien demandé. Tu peux faire ta liste quand même et y ajouter des articles."}
+        </p>
       )}
       {autres.length > 0 && (
         <details className="group mt-4">
@@ -81,6 +87,7 @@ export function RecipeChecklist({ recipes, moi, membres }: { recipes: CandidateR
           <ul className="kd-liste">{autres.map(ligne)}</ul>
         </details>
       )}
+      {alerte}
     </>
   );
 }
@@ -106,7 +113,7 @@ function Plat({
   return (
     <li className="border-b-2 border-trait py-2">
       <div className="flex items-center gap-3">
-        <Link href={`/recettes/${r.id}`} aria-label={`La recette : ${r.title}`} className="shrink-0 active:scale-95">
+        <Link href={`/recettes/${r.id}?depuis=/courses`} aria-label={`La recette : ${r.title}`} className="shrink-0 active:scale-95">
           <RecipeVisual recipe={r} className="size-14 rounded-pastille" />
         </Link>
         <button

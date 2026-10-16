@@ -22,7 +22,7 @@ export function FamilyCodeForm() {
         autoCapitalize="none"
         autoCorrect="off"
         spellCheck={false}
-        className="kd-champ kd-champ--code text-titre-3! tracking-[0.04em]!"
+        className="kd-champ kd-champ--code text-bouton! tracking-[0.02em]!"
       />
       {state.error && <MessageErreur>{state.error}</MessageErreur>}
       <SubmitButton>C&apos;est parti</SubmitButton>

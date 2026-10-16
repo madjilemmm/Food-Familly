@@ -55,12 +55,19 @@ export async function CoursesScreen({ me, vue, notifications }: { me: Profile; v
                 <LigneRecette
                   key={m.id}
                   recipe={m}
+                  depuis="/courses"
                   infos={`Envie de ${listeDeNoms(m.avec, me.name).replace(/^Toi\b/, "toi")}`}
                 />
               ))}
             </ul>
           ) : (
-            <p className="text-encre-douce">Rien en commun pour l&apos;instant. Swipe dans Envies : Kaddie préparera les plats d&apos;elle-même.</p>
+            <p className="text-encre-douce">
+              Rien en commun pour l&apos;instant.{" "}
+              <Link href={ROUTES.envies} className="font-semibold text-violet underline underline-offset-4">
+                Swipe des plats
+              </Link>{" "}
+              : Kaddie préparera les courses d&apos;elle-même.
+            </p>
           )}
         </section>
       </>
