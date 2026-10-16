@@ -132,10 +132,16 @@ export function EnTete({ titre, sousTitre, reglages = true }: { titre: string; s
   );
 }
 
-/** Fond de l'écran Courses (paniers, caddie, provisions) : par-dessus le motif de la scène. */
-export function FondCourses() {
+/**
+ * Fond de l'écran Courses (paniers, caddie, provisions) : par-dessus le motif de la scène.
+ * En plein écran, une version en hauteur (l'image, son reflet, l'image) pour ne pas
+ * agrandir les dessins ; en bandeau, l'image d'origine en paysage.
+ */
+export function FondCourses({ format = "portrait" }: { format?: "portrait" | "paysage" }) {
+  const src =
+    format === "portrait" ? "/brand/fonds/kaddie-motif-courses-violet-portrait.webp" : "/brand/fonds/kaddie-motif-courses-violet.webp";
   // eslint-disable-next-line @next/next/no-img-element -- image de fond statique
-  return <img className="kd-motif" src="/brand/fonds/kaddie-motif-courses-violet.webp" alt="" aria-hidden="true" draggable={false} />;
+  return <img className="kd-motif object-top" src={src} alt="" aria-hidden="true" draggable={false} />;
 }
 
 /** En-tête illustré (bandeau horizontal) : étiquette + grand titre blanc. */
@@ -164,7 +170,7 @@ export function BandeauScene({
       format="paysage"
       className="pt-safe -mx-5 mb-5 px-5 pb-7"
     >
-      {fond === "courses" && <FondCourses />}
+      {fond === "courses" && <FondCourses format="paysage" />}
       <div className="flex items-start justify-between gap-4 pt-2">
         <div className="min-w-0 pt-4">
           {etiquette && <p className="kd-etiquette mb-2 text-blanc">{etiquette}</p>}
