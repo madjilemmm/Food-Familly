@@ -70,10 +70,11 @@ export const IconeSwipe = (p: IconeProps) => (
   </Trait>
 );
 
+// Une roue dentée : l'ancien rond à rayons se lisait comme un soleil (« changer de thème »).
 export const IconeReglages = (p: IconeProps) => (
   <Trait {...p}>
-    <circle cx="12" cy="12" r="3" />
-    <path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" />
+    <path d="M9.95 5.31L10.17 2.58A9.6 9.6 0 0 1 13.83 2.58L14.05 5.31A7 7 0 0 1 16.77 6.88L19.25 5.7A9.6 9.6 0 0 1 21.08 8.87L18.82 10.43A7 7 0 0 1 18.82 13.57L21.08 15.13A9.6 9.6 0 0 1 19.25 18.3L16.77 17.12A7 7 0 0 1 14.05 18.69L13.83 21.42A9.6 9.6 0 0 1 10.17 21.42L9.95 18.69A7 7 0 0 1 7.23 17.12L4.75 18.3A9.6 9.6 0 0 1 2.92 15.13L5.18 13.57A7 7 0 0 1 5.18 10.43L2.92 8.87A9.6 9.6 0 0 1 4.75 5.7L7.23 6.88A7 7 0 0 1 9.95 5.31Z" />
+    <circle cx="12" cy="12" r="2.8" />
   </Trait>
 );
 
@@ -152,6 +153,7 @@ export function BandeauScene({
   reglages = true,
   fond,
   actions,
+  titreSous = false,
   children,
 }: {
   illustration: Illustration;
@@ -162,8 +164,16 @@ export function BandeauScene({
   reglages?: boolean;
   /** Boutons ronds à côté des réglages (la cloche des notifs, par exemple). */
   actions?: React.ReactNode;
+  /** Étiquette et boutons sur une ligne, le titre dessous sur toute la largeur (plusieurs boutons). */
+  titreSous?: boolean;
   children?: React.ReactNode;
 }) {
+  const boutons = (actions || reglages) && (
+    <span className="ml-auto flex shrink-0 gap-2">
+      {actions}
+      {reglages && <LienReglages surScene />}
+    </span>
+  );
   return (
     <Scene
       as="header"
@@ -174,18 +184,23 @@ export function BandeauScene({
       className="pt-safe -mx-5 mb-5 px-5 pb-7"
     >
       {fond === "courses" && <FondCourses format="paysage" />}
-      <div className="flex items-start justify-between gap-4 pt-2">
-        <div className="min-w-0 pt-4">
-          {etiquette && <p className="kd-etiquette mb-2 text-blanc">{etiquette}</p>}
-          <h1 className={`kd-titre-1 ${actions ? "bandeau-titre-serre" : ""}`}>{titre}</h1>
+      {titreSous ? (
+        <>
+          <div className="flex items-center gap-4 pt-2">
+            {etiquette && <p className="kd-etiquette text-blanc">{etiquette}</p>}
+            {boutons}
+          </div>
+          <h1 className="kd-titre-1 mt-2">{titre}</h1>
+        </>
+      ) : (
+        <div className="flex items-start justify-between gap-4 pt-2">
+          <div className="min-w-0 pt-4">
+            {etiquette && <p className="kd-etiquette mb-2 text-blanc">{etiquette}</p>}
+            <h1 className={`kd-titre-1 ${actions ? "bandeau-titre-serre" : ""}`}>{titre}</h1>
+          </div>
+          {boutons}
         </div>
-        {(actions || reglages) && (
-          <span className="flex shrink-0 gap-2">
-            {actions}
-            {reglages && <LienReglages surScene />}
-          </span>
-        )}
-      </div>
+      )}
       {children}
     </Scene>
   );

@@ -4,11 +4,11 @@ import { requireProfile, requireUser } from "@/lib/auth";
 import { remplirSiBesoin } from "@/lib/marmiton";
 import { getCurrentTrip, getDeck, getMatches, getProfiles } from "@/lib/data";
 import { isPastDeadline } from "@/lib/domain/trip";
-import { Scene } from "@/design-system/components/Kaddie";
 import { Countdown } from "@/components/Countdown";
 import { SwipeDeck } from "@/components/SwipeDeck";
-import { IconePanier } from "@/components/ui";
-import { CarteGouts, SwipeHeader } from "@/components/SwipeHeader";
+import { BandeauScene, IconePanier } from "@/components/ui";
+import { BoutonMatchs, CarteGouts } from "@/components/Envies";
+import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 
 // Laisse le temps à l'import Marmiton (lancé après l'affichage) de finir.
 export const maxDuration = 60;
@@ -33,13 +33,25 @@ export default async function Envies() {
   after(() => remplirSiBesoin(user.familyId, deck.length));
 
   return (
-    <Scene duo="aubergine" seed={21} className="ecran-scene gap-4">
-      <SwipeHeader matchs={matches.length} />
+    // Comme Recettes : le bandeau illustré, puis la pile de cartes sur le lilas, jusqu'aux onglets.
+    <div className="ecran-envies">
+      <BandeauScene
+        illustration="table"
+        etiquette="Ce soir"
+        titre="Ça te dit ?"
+        titreSous
+        actions={
+          <>
+            <NotificationsCard variant="icone" />
+            <BoutonMatchs matchs={matches.length} />
+          </>
+        }
+      />
       {/* Un seul bandeau à la fois : la course en cours d'abord, sinon le questionnaire. */}
       {bandeauCourse && trip && (
         <Link
           href="/courses"
-          className="flex min-h-14 items-center gap-3 rounded-bouton bg-blanc px-4 py-2 text-petit leading-snug font-semibold text-aubergine active:scale-[0.98]"
+          className="mb-4 flex min-h-14 items-center gap-3 rounded-bouton bg-blanc px-4 py-2 text-petit leading-snug font-semibold text-aubergine active:scale-[0.98]"
         >
           <IconePanier className="size-6 shrink-0 text-violet" />
           <span className="flex-1">
@@ -56,8 +68,7 @@ export default async function Envies() {
         </Link>
       )}
       {!bandeauCourse && !me.tastes_done_at && <CarteGouts retour="/envies" />}
-      <h1 className="kd-titre-2">Qu&apos;est-ce qui te fait envie ce soir&nbsp;?</h1>
       <SwipeDeck initialDeck={deck} />
-    </Scene>
+    </div>
   );
 }
