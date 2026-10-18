@@ -63,6 +63,18 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/*
+ * Appli installée sur iOS 26 : tant que la page est plus courte que l'écran (Envies), iOS la
+ * raccourcit de la hauteur de la barre d'état et la barre d'onglets flotte au-dessus d'une bande
+ * lilas (WebKit 301108). Une page au moins aussi haute que l'écran récupère tout l'écran.
+ * min() : sans barre translucide, l'encart du haut vaut 0 et la page ne défile pas pour rien.
+ */
+@media (display-mode: standalone) {
+  html {
+    min-height: min(100lvh, calc(100% + env(safe-area-inset-top)));
+  }
+}
+
 html,
 body {
   background: var(--fond);
