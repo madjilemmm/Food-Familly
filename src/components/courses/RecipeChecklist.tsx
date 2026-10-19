@@ -114,7 +114,7 @@ function Plat({
     <li className="border-b-2 border-trait py-2">
       <div className="flex items-center gap-3">
         <Link href={`/recettes/${r.id}?depuis=/courses`} aria-label={`La recette : ${r.title}`} className="shrink-0 active:scale-95">
-          <RecipeVisual recipe={r} className="size-14 rounded-pastille" />
+          <RecipeVisual recipe={r} taille="vignette" className="size-14 rounded-pastille" />
         </Link>
         <button
           type="button"

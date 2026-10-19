@@ -33,7 +33,7 @@ export default async function RecipesPage() {
         {recipes.map((r) => (
           <li key={r.id}>
             <Link href={`/recettes/${r.id}`} className="flex items-center gap-4 border-b-2 border-trait py-2 active:bg-trait/40">
-              <RecipeVisual recipe={r} className="size-14 shrink-0 rounded-pastille" />
+              <RecipeVisual recipe={r} taille="vignette" className="size-14 shrink-0 rounded-pastille" />
               <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
                 <span className="font-semibold">{r.title}</span>
                 <Etiquettes conflits={conflictsOf(tastes, r)} />

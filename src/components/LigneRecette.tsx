@@ -18,7 +18,7 @@ export function LigneRecette({
   return (
     <li>
       <Link href={`/recettes/${recipe.id}${depuis ? `?depuis=${encodeURIComponent(depuis)}` : ""}`} className="flex items-center gap-4 border-b-2 border-trait py-2 active:bg-trait/40">
-        <RecipeVisual recipe={recipe} className="size-14 shrink-0 rounded-pastille" />
+        <RecipeVisual recipe={recipe} taille="vignette" className="size-14 shrink-0 rounded-pastille" />
         <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
           <span className="font-semibold">{recipe.title}</span>
           {infos && <span className="kd-petit">{infos}</span>}

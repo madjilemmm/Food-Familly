@@ -181,7 +181,7 @@ export function BandeauScene({
       // Avec un fond à soi, on ne télécharge pas l'illustration pour rien.
       illustration={fond ? undefined : illustration}
       format="paysage"
-      className="pt-safe -mx-5 mb-5 px-5 pb-7"
+      className="bandeau pt-safe -mx-5 mb-5 px-5 pb-7"
     >
       {fond === "courses" && <FondCourses format="paysage" />}
       {titreSous ? (

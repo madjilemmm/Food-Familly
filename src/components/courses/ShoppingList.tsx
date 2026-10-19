@@ -130,7 +130,17 @@ export function ShoppingList({
           }
         }}
       >
-        <input ref={inputRef} name="name" placeholder="Ajouter un article…" enterKeyHint="done" className="kd-champ min-w-0 flex-1" />
+        <input
+          ref={inputRef}
+          name="article"
+          aria-label="Ajouter un article"
+          placeholder="Ajouter un article…"
+          // Pas de nom ni de contact proposé au-dessus du clavier : c'est un article.
+          autoComplete="off"
+          autoCapitalize="sentences"
+          enterKeyHint="done"
+          className="kd-champ min-w-0 flex-1"
+        />
         <button type="submit" aria-label="Ajouter l'article" className="kd-btn kd-btn--secondaire w-14 shrink-0 px-0">
           <IconePlus />
         </button>

@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- aperçu local de la photo */
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { deleteRecipe, saveRecipe } from "@/app/actions/recipes";
 import type { ImportedRecipe } from "@/lib/domain/recipe-import";
 import { ImportFromUrl } from "./ImportFromUrl";
@@ -71,6 +71,26 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
   // Un aliment interdit pour quelqu'un ? On prévient tout de suite (la recette sera cachée du swipe).
   const interditPour = recipeConflicts([title, ...rows.map((r) => r.name)], gouts, false).interditPar;
 
+  // Clavier : « Suivant » passe au champ d'après, et une nouvelle ligne d'ingrédient reçoit le curseur
+  // (« Entrée » n'enregistre plus la recette à moitié remplie).
+  const aFocaliser = useRef<string | null>(null);
+  useEffect(() => {
+    if (!aFocaliser.current) return;
+    document.querySelector<HTMLElement>(`[data-champ="${aFocaliser.current}"]`)?.focus();
+    aFocaliser.current = null;
+  }, [rows]);
+  const focaliser = (champ: string) => document.querySelector<HTMLElement>(`[data-champ="${champ}"]`)?.focus();
+  const ajouterLigne = () => {
+    const nouvelle = emptyRow(rows[rows.length - 1]?.aisle);
+    aFocaliser.current = `${nouvelle.key}-nom`;
+    setRows((rs) => [...rs, nouvelle]);
+  };
+  const suivant = (e: React.KeyboardEvent, ensuite: () => void) => {
+    if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+    e.preventDefault();
+    ensuite();
+  };
+
   const update = (key: number, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
@@ -121,6 +141,8 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
           onChange={(e) => setTitle(e.target.value)}
           maxLength={120}
           placeholder="Poulet basquaise"
+          enterKeyHint="next"
+          onKeyDown={(e) => suivant(e, () => focaliser("personnes"))}
           className="kd-champ"
         />
       </label>
@@ -136,6 +158,9 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
           value={personnes}
           onChange={(e) => setPersonnes(e.target.value.replace(/\D/g, "").slice(0, 2))}
           placeholder="4"
+          data-champ="personnes"
+          enterKeyHint="next"
+          onKeyDown={(e) => suivant(e, () => focaliser(`${rows[0].key}-nom`))}
           aria-describedby="servings-aide"
           className="kd-champ w-28"
         />
@@ -202,6 +227,9 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
                   value={row.name}
                   onChange={(e) => update(row.key, { name: e.target.value })}
                   placeholder="Ingrédient"
+                  data-champ={`${row.key}-nom`}
+                  enterKeyHint="next"
+                  onKeyDown={(e) => suivant(e, () => focaliser(`${row.key}-qte`))}
                   className="kd-champ min-w-0 flex-1"
                 />
                 <button
@@ -220,6 +248,9 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
                   onChange={(e) => update(row.key, { quantity: e.target.value })}
                   inputMode="decimal"
                   placeholder="Qté"
+                  data-champ={`${row.key}-qte`}
+                  enterKeyHint="next"
+                  onKeyDown={(e) => suivant(e, () => focaliser(`${row.key}-unite`))}
                   className="kd-champ w-20 px-3"
                 />
                 <input
@@ -228,6 +259,15 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
                   onChange={(e) => update(row.key, { unit: e.target.value })}
                   list="units"
                   placeholder="unité"
+                  data-champ={`${row.key}-unite`}
+                  enterKeyHint="next"
+                  onKeyDown={(e) =>
+                    suivant(e, () => {
+                      const i = rows.findIndex((r) => r.key === row.key);
+                      if (i < rows.length - 1) focaliser(`${rows[i + 1].key}-nom`);
+                      else ajouterLigne();
+                    })
+                  }
                   className="kd-champ w-24 px-3"
                 />
                 <select
@@ -248,7 +288,7 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
         </ul>
         <button
           type="button"
-          onClick={() => setRows((rs) => [...rs, emptyRow(rs[rs.length - 1]?.aisle)])}
+          onClick={ajouterLigne}
           className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-bouton border-[3px] border-dashed border-encre-douce font-semibold text-encre-douce"
         >
           <IconePlus className="size-6" /> Ajouter un ingrédient

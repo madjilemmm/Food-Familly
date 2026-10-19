@@ -5,6 +5,7 @@ import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { AutoUpdate } from "@/components/pwa/AutoUpdate";
 import { Mouvement } from "@/components/Mouvement";
 import { BarreEtat } from "@/components/pwa/BarreEtat";
+import { SuiviNavigation } from "@/components/LienRetour";
 
 const rubik = Rubik({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-rubik", display: "swap" });
 
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <BarreEtat />
         <ServiceWorkerRegister />
         <AutoUpdate />
+        <SuiviNavigation />
         <Mouvement>{children}</Mouvement>
       </body>
     </html>

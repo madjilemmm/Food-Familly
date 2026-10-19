@@ -18,7 +18,7 @@ export function FamilyLayout({ me, coursesBadge, children }: { me: Profile; cour
   return (
     <AnnulerProvider>
       <RealtimeRefresher familyId={me.family_id} />
-      <main className="pb-tabbar mx-auto max-w-xl overflow-x-clip px-5">{children}</main>
+      <main className="ecran-famille pb-tabbar mx-auto max-w-xl overflow-x-clip px-5">{children}</main>
       <TabBar tabs={tabs} />
     </AnnulerProvider>
   );

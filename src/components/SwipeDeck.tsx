@@ -37,10 +37,13 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
   const top = deck[0];
 
   const proposer = useAnnuler();
+  // Lecteur d'écran : la carte suivante est annoncée, comme on la verrait arriver.
+  const [annonce, setAnnonce] = useState("");
   function decide(liked: boolean) {
     if (!top) return;
     const carte = top;
     setDeck((d) => d.slice(1));
+    setAnnonce(deck[1] ? `Plat suivant : ${deck[1].title}` : "Plus de plats pour l'instant");
     const envoi = swipe(carte.id, liked)
       .then((res) => {
         if (res.match) setMatch({ recipe: carte, avec: res.avec });
@@ -108,6 +111,10 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
           </Bouton>
         </div>
       )}
+
+      <p aria-live="polite" className="sr-only">
+        {annonce}
+      </p>
 
       {error && (
         <p role="alert" className="kd-carte p-4 text-center">

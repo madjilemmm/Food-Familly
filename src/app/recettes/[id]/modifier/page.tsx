@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfile, requireUser } from "@/lib/auth";
 import { getFamilyTastes, getRecipe } from "@/lib/data";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
+import { LienRetour } from "@/components/LienRetour";
 import { IconeRetour } from "@/components/ui";
 
 export default async function EditRecipePage({ params }: { params: Promise<{ id: string }> }) {
@@ -14,9 +14,9 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
   return (
     <>
       <div className="pt-safe">
-        <Link href={`/recettes/${recipe.id}`} className="-ml-2 inline-flex min-h-14 items-center gap-1 font-semibold text-violet">
+        <LienRetour href={`/recettes/${recipe.id}`} className="-ml-2 inline-flex min-h-14 items-center gap-1 font-semibold text-violet">
           <IconeRetour className="size-6" /> La recette
-        </Link>
+        </LienRetour>
       </div>
       <h1 className="kd-titre-1 mb-6 text-aubergine">Modifier la recette</h1>
       <RecipeForm recipe={recipe} gouts={members} />

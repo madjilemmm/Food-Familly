@@ -82,7 +82,7 @@ function Plats({ legende, detail, recettes, initialRecipeIds }: { legende: strin
         {recettes.map((r) => (
           <li key={r.id}>
             <label className="group flex cursor-pointer items-center gap-4 border-b-2 border-trait py-2 active:bg-trait/40">
-              <RecipeVisual recipe={r} className="size-14 shrink-0 rounded-pastille" />
+              <RecipeVisual recipe={r} taille="vignette" className="size-14 shrink-0 rounded-pastille" />
               <span className="min-w-0 flex-1 font-semibold">{r.title}</span>
               <input type="checkbox" name="recipe_ids" value={r.id} defaultChecked={initialRecipeIds.includes(r.id)} className="sr-only" />
               <span

@@ -6,6 +6,7 @@ import { db } from "@/lib/supabase/server";
 import { extractRecipe } from "@/lib/domain/recipe-import";
 import { safeFetch } from "@/lib/safe-fetch";
 import { RecipeVisual } from "@/components/RecipeVisual";
+import { LienRetour } from "@/components/LienRetour";
 import { IconeRetour } from "@/components/ui";
 import { Ingredients } from "./Ingredients";
 import { AvisRecette, type EtatAvis } from "./AvisRecette";
@@ -61,9 +62,9 @@ export default async function RecipePage({
   return (
     <article className="pt-safe pb-6">
       <div className="flex items-center justify-between">
-        <Link href={retour.href} className="-ml-2 inline-flex min-h-14 items-center gap-1 font-semibold text-violet">
+        <LienRetour href={retour.href} className="-ml-2 inline-flex min-h-14 items-center gap-1 font-semibold text-violet">
           <IconeRetour className="size-6" /> {retour.label}
-        </Link>
+        </LienRetour>
         <Link href={`/recettes/${recipe.id}/modifier`} className="kd-btn kd-btn--secondaire min-h-12 px-4 text-bouton">
           Modifier
         </Link>

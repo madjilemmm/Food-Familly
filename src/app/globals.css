@@ -246,6 +246,24 @@ a {
   .feuille-fond[data-ferme] .feuille { animation: none; }
 }
 
+/* Très petits écrans (320 px) : le titre du bandeau ne prend plus la moitié de l'écran. */
+@media (max-width: 359px) {
+  .bandeau .kd-titre-1 { font-size: calc(var(--taille-titre-1) * 0.8); }
+}
+
+/*
+ * Tablette : le bandeau illustré va d'un bord à l'autre de l'écran, son contenu reste
+ * aligné sur la colonne. La page entière (et non plus la colonne) empêche le défilement de côté.
+ */
+@media (min-width: 640px) {
+  body { overflow-x: clip; }
+  .ecran-famille { overflow-x: visible; }
+  .ecran-famille .bandeau {
+    margin-inline: calc(50% - 50vw);
+    padding-inline: calc(50vw - 50%);
+  }
+}
+
 /* Bandeau avec deux boutons ronds : sur les petits écrans, le titre reste sur une ligne. */
 @media (max-width: 389px) {
   .bandeau-titre-serre { font-size: calc(var(--taille-titre-1) * 0.86); }
