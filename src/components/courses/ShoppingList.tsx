@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useOptimistic, useRef, useState, useTransition } from "react";
-import { deleteItem, restoreItem } from "@/app/actions/list";
+import { apprendreArticle, corrigerArticle, deleteItem, restoreItem } from "@/app/actions/list";
 import { finishTrip } from "@/app/actions/trips";
 import { groupByAisle } from "@/lib/domain/aisles";
-import { articlesDe, lireArticle, type Article } from "@/lib/domain/articles";
+import { articlesDe, type Article } from "@/lib/domain/articles";
+import { cleProduit, lireSaisie, type Appris, type Lecture } from "@/lib/domain/reconnaissance";
 import { formatQuantity } from "@/lib/domain/shopping-list";
 import { attendreFile, mettreEnAttente, nouvelId, retirerDeLAttente, useAttente, type Entree } from "@/lib/attente";
 import type { ListItem } from "@/lib/data";
@@ -15,6 +16,10 @@ import { useErreurReseau } from "@/components/ErreurReseau";
 
 type Ajout = Entree & { sorte: "ajouter" };
 type Coche = Entree & { sorte: "cocher" };
+/** Sous le champ : « Lequel ? » (mot ambigu, faute possible), ou « déjà sur la liste ». */
+type Aide = { id: string; saisie: string; lecture: Lecture } | { deja: string };
+
+const enArticle = (l: Lecture): Article => ({ name: l.nom.slice(0, 100), quantity: l.quantite, unit: l.unite, aisle: l.rayon });
 
 /**
  * La liste en magasin. Cocher et ajouter passent par la file d'attente du téléphone
@@ -25,11 +30,15 @@ export function ShoppingList({
   tripId,
   items,
   requests,
+  appris = {},
 }: {
   tripId: string;
   items: ListItem[];
   requests: { id: string; from: string; text: string }[];
+  /** Ce que la famille a appris à Kaddie (« Kinder » = Kinder Bueno chez nous). */
+  appris?: Appris;
 }) {
+  const [aide, setAide] = useState<Aide | null>(null);
   const [, startTransition] = useTransition();
   const proposer = useAnnuler();
   const { essayer, alerte } = useErreurReseau();
@@ -54,16 +63,45 @@ export function ShoppingList({
 
   const cocher = (item: ListItem) => mettreEnAttente({ sorte: "cocher", trip: tripId, id: item.id, checked: !item.checked });
 
-  const add = (articles: Article[], source: "manual" | "request") => {
-    for (const article of articles) {
+  const add = (articles: Article[], source: "manual" | "request", id?: string) =>
+    articles.map((article) => {
+      const nouveau = id ?? nouvelId();
       mettreEnAttente({
         sorte: "ajouter",
         trip: tripId,
-        id: nouvelId(),
+        id: nouveau,
         texte: [article.quantity ?? "", article.unit, article.name].filter(Boolean).join(" "),
         source,
         article,
         le: new Date().toISOString(),
+      });
+      return nouveau;
+    });
+
+  // Corriger un article qu'on vient d'ajouter : encore sur le téléphone, on remplace ;
+  // déjà parti, on le corrige sur le serveur.
+  const remplacer = (id: string, article: Article) => {
+    const enFile = miennes.some((e) => e.sorte === "ajouter" && e.id === id && !e.envoyee);
+    if (enFile) add([article], "manual", id);
+    else startTransition(async () => void (await essayer(() => corrigerArticle(id, article))));
+  };
+  const apprendre = (saisie: string, choix: Parameters<typeof apprendreArticle>[1]) =>
+    startTransition(async () => void (await apprendreArticle(saisie, choix).catch(() => {})));
+
+  const ajouterSaisie = (valeur: string) => {
+    const lecture = lireSaisie(valeur, appris);
+    if (!lecture) return;
+    // Le même produit, pas encore pris : on ne le met pas deux fois.
+    const deja = list.find((i) => !i.checked && cleProduit(i.name, appris) === lecture.cle);
+    if (deja) return setAide({ deja: deja.name });
+    const tel = { name: valeur.trim().charAt(0).toUpperCase() + valeur.trim().slice(1), quantity: null, unit: "", aisle: lecture.rayon };
+    const [id] = add([enArticle(lecture)], "manual");
+    setAide(lecture.choix?.length ? { id, saisie: valeur, lecture } : null);
+    // Faute corrigée (« chocapik » → Chocapic) : on le dit, et on peut revenir à ce qui a été tapé.
+    if (lecture.confiance === "probable" && lecture.corrige) {
+      proposer(`${lecture.nom} (tu as tapé « ${valeur.trim()} »)`, () => {
+        remplacer(id, { ...tel, quantity: lecture.quantite, unit: lecture.unite });
+        apprendre(valeur, "tel-quel");
       });
     }
   };
@@ -95,7 +133,7 @@ export function ShoppingList({
   // Une demande écrite (« des pâtes, du Nutella ») devient un article par chose demandée.
   const alreadyAdded = new Set(list.filter((i) => i.source === "request").map((i) => i.name.trim().toLowerCase()));
   const pendingRequests = requests
-    .map((r) => ({ ...r, articles: articlesDe(r.text) }))
+    .map((r) => ({ ...r, articles: articlesDe(r.text, appris) }))
     .filter((r) => r.articles.some((a) => !alreadyAdded.has(a.name.toLowerCase())));
   // Demandés ou ajoutés à la main et pas pris : reportés sur les prochaines courses.
   const restants = list.filter((i) => !i.checked && i.source !== "recipe").length;
@@ -164,8 +202,7 @@ export function ShoppingList({
         className="mb-6 flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          const article = lireArticle(inputRef.current?.value ?? "");
-          if (article) add([article], "manual");
+          ajouterSaisie(inputRef.current?.value ?? "");
           // Le clavier reste ouvert pour enchaîner les articles.
           if (inputRef.current) {
             inputRef.current.value = "";
@@ -182,12 +219,45 @@ export function ShoppingList({
           autoComplete="off"
           autoCapitalize="sentences"
           enterKeyHint="done"
+          onChange={() => aide && setAide(null)}
           className="kd-champ min-w-0 flex-1"
         />
         <button type="submit" aria-label="Ajouter l'article" className="kd-btn kd-btn--secondaire w-14 shrink-0 px-0">
           <IconePlus />
         </button>
       </form>
+
+      {aide && "deja" in aide && (
+        <p role="status" className="-mt-3 mb-6 font-semibold text-violet">
+          {aide.deja} est déjà sur la liste.
+        </p>
+      )}
+      {aide && "lecture" in aide && (
+        // Rien ne bloque : l'article est déjà ajouté tel quel, un appui le précise.
+        <div role="group" aria-label={`Préciser ${aide.lecture.nom}`} className="-mt-3 mb-6">
+          <p className="kd-petit mb-2">{aide.lecture.choix!.length > 1 ? "Lequel ?" : "Tu voulais dire :"}</p>
+          <div className="flex flex-wrap gap-2">
+            {aide.lecture.choix!.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => {
+                  remplacer(aide.id, { name: c.nom, quantity: aide.lecture.quantite, unit: aide.lecture.unite, aisle: c.rayon });
+                  apprendre(aide.saisie, { nom: c.nom, rayon: c.rayon, produit: c.id });
+                  setAide(null);
+                  inputRef.current?.focus();
+                }}
+                className="min-h-11 rounded-bouton border-[3px] border-aubergine bg-surface px-3 font-semibold text-aubergine active:scale-95"
+              >
+                {c.nom}
+              </button>
+            ))}
+            <button type="button" onClick={() => setAide(null)} className="min-h-11 px-2 text-encre-douce underline underline-offset-4">
+              Laisser
+            </button>
+          </div>
+        </div>
+      )}
 
       {list.length === 0 && <p className="text-center text-encre-douce">La liste est vide.</p>}
 
@@ -198,47 +268,40 @@ export function ShoppingList({
             {group.done && <span className="kd-pastille kd-pastille--match ml-auto">Fini</span>}
           </h2>
           <ul className="kd-liste">
-            {group.items.map((item) => (
-              // Un article coché glisse en bas de son rayon (useGlissement).
-              <li key={item.id} data-glisse={item.id} className="kd-liste__article">
-                <button
-                  type="button"
-                  aria-pressed={item.checked}
-                  onClick={() => cocher(item)}
-                  className="flex min-h-14 flex-1 items-center gap-3 py-2 text-left"
-                >
-                  <span
-                    aria-hidden
-                    className={`grid size-7 shrink-0 place-content-center rounded-pastille border-[3px] border-aubergine transition-[background-color,transform] duration-240 ease-rebond ${
-                      item.checked ? "scale-108 bg-accent text-on-accent" : "bg-surface"
-                    }`}
+            {regrouper(group.items, appris).map((ligne) =>
+              ligne.length === 1 ? (
+                // Un article coché glisse en bas de son rayon (useGlissement).
+                <li key={ligne[0].id} data-glisse={ligne[0].id} className="kd-liste__article">
+                  <BoutonCoche
+                    coche={ligne[0].checked}
+                    onClick={() => cocher(ligne[0])}
+                    nom={ligne[0].name}
+                    quantite={ligne[0].quantity != null || ligne[0].unit ? formatQuantity(ligne[0].quantity, ligne[0].unit) : null}
+                    detail={provenance(ligne[0])}
+                    enAttente={sansReseau && enAttente.has(ligne[0].id)}
+                  />
+                  {/* Tout se retire : un ingrédient de recette qu'on a déjà ne revient pas à la mise à jour. */}
+                  <button
+                    type="button"
+                    aria-label={`Retirer ${ligne[0].name}`}
+                    onClick={() => supprimer(ligne[0])}
+                    className="flex size-14 shrink-0 items-center justify-center text-encre-douce"
                   >
-                    {item.checked && (
-                      <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
-                        <path fill="none" stroke="currentColor" strokeWidth={3.4} strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.5l5 5L19.5 7" />
-                      </svg>
-                    )}
-                  </span>
-                  <span className={`flex-1 ${item.checked ? "text-encre-douce line-through decoration-2" : ""}`}>
-                    {item.name}
-                    {item.quantity != null || item.unit ? (
-                      <span className="ml-1 text-encre-douce">({formatQuantity(item.quantity, item.unit)})</span>
-                    ) : null}
-                    {item.for_recipes && <span className="kd-petit block no-underline">pour {item.for_recipes}</span>}
-                  </span>
-                  {sansReseau && enAttente.has(item.id) && <span className="kd-pastille shrink-0">En attente</span>}
-                </button>
-                {/* Tout se retire : un ingrédient de recette qu'on a déjà ne revient pas à la mise à jour. */}
-                <button
-                  type="button"
-                  aria-label={`Retirer ${item.name}`}
-                  onClick={() => supprimer(item)}
-                  className="flex size-14 shrink-0 items-center justify-center text-encre-douce"
-                >
-                  <IconeCroix className="size-6" />
-                </button>
-              </li>
-            ))}
+                    <IconeCroix className="size-6" />
+                  </button>
+                </li>
+              ) : (
+                // Le même produit pour plusieurs raisons (recette, habituel, demande) : une ligne,
+                // chaque besoin garde sa quantité ; cocher la ligne coche tout.
+                <LigneRegroupee
+                  key={ligne[0].id}
+                  besoins={ligne}
+                  enAttente={sansReseau && ligne.some((i) => enAttente.has(i.id))}
+                  onCocher={(coche) => ligne.forEach((i) => i.checked !== coche && cocher(i))}
+                  onRetirer={supprimer}
+                />
+              ),
+            )}
           </ul>
         </section>
       ))}
@@ -254,7 +317,7 @@ export function ShoppingList({
             question="Les courses sont finies ?"
             detail={
               restants > 0
-                ? `${restants} article${restants > 1 ? "s" : ""} pas pris : ${restants > 1 ? "ils passeront" : "il passera"} dans la prochaine liste.`
+                ? `${restants} article${restants > 1 ? "s" : ""} pas pris : Kaddie ${restants > 1 ? "les" : "le"} proposera aux prochaines courses.`
                 : "La liste sera effacée pour toute la famille."
             }
             confirmLabel="Oui, c'est fini"
@@ -340,4 +403,116 @@ function useGarderPourHorsLigne(items: ListItem[]) {
     }, 2000);
     return () => clearTimeout(t);
   }, [items]);
+}
+
+/** D'où vient un article, en petit sous son nom. */
+function provenance(item: ListItem): string | null {
+  if (item.for_recipes) return `pour ${item.for_recipes}`;
+  if (item.origine === "habituel") return "habituel";
+  if (item.origine === "reporte") return "pas pris la dernière fois";
+  return null;
+}
+
+/** Regroupe les articles d'un rayon par produit (même identité), dans l'ordre de la liste. */
+function regrouper(items: ListItem[], appris: Appris): ListItem[][] {
+  const lignes = new Map<string, ListItem[]>();
+  for (const item of items) {
+    const cle = cleProduit(item.name, appris);
+    lignes.set(cle, [...(lignes.get(cle) ?? []), item]);
+  }
+  // Une ligne regroupée n'est cochée que si tous ses besoins le sont : elle se range comme telle.
+  return [...lignes.values()].sort((a, b) => Number(a.every((i) => i.checked)) - Number(b.every((i) => i.checked)));
+}
+
+function BoutonCoche({
+  coche,
+  onClick,
+  nom,
+  quantite,
+  detail,
+  enAttente,
+}: {
+  coche: boolean;
+  onClick: () => void;
+  nom: string;
+  quantite: string | null;
+  detail: string | null;
+  enAttente: boolean;
+}) {
+  return (
+    <button type="button" aria-pressed={coche} onClick={onClick} className="flex min-h-14 flex-1 items-center gap-3 py-2 text-left">
+      <span
+        aria-hidden
+        className={`grid size-7 shrink-0 place-content-center rounded-pastille border-[3px] border-aubergine transition-[background-color,transform] duration-240 ease-rebond ${
+          coche ? "scale-108 bg-accent text-on-accent" : "bg-surface"
+        }`}
+      >
+        {coche && (
+          <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
+            <path fill="none" stroke="currentColor" strokeWidth={3.4} strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.5l5 5L19.5 7" />
+          </svg>
+        )}
+      </span>
+      <span className={`flex-1 ${coche ? "text-encre-douce line-through decoration-2" : ""}`}>
+        {nom}
+        {quantite && <span className="ml-1 text-encre-douce">({quantite})</span>}
+        {detail && <span className="kd-petit block no-underline">{detail}</span>}
+      </span>
+      {enAttente && <span className="kd-pastille shrink-0">En attente</span>}
+    </button>
+  );
+}
+
+function LigneRegroupee({
+  besoins,
+  enAttente,
+  onCocher,
+  onRetirer,
+}: {
+  besoins: ListItem[];
+  enAttente: boolean;
+  onCocher: (coche: boolean) => void;
+  onRetirer: (item: ListItem) => void;
+}) {
+  const [ouvert, setOuvert] = useState(false);
+  const tousCoches = besoins.every((i) => i.checked);
+  const resume = besoins
+    .map((i) => [i.quantity != null || i.unit ? formatQuantity(i.quantity, i.unit) : null, provenance(i) ?? "ajouté"].filter(Boolean).join(" "))
+    .join(" · ");
+  return (
+    <li data-glisse={besoins[0].id} className="flex flex-col">
+      <div className="kd-liste__article">
+        <BoutonCoche coche={tousCoches} onClick={() => onCocher(!tousCoches)} nom={besoins[0].name} quantite={null} detail={resume} enAttente={enAttente} />
+        <button
+          type="button"
+          aria-expanded={ouvert}
+          aria-label={`Détail de ${besoins[0].name}`}
+          onClick={() => setOuvert(!ouvert)}
+          className="flex size-14 shrink-0 items-center justify-center text-violet"
+        >
+          <IconePlus className={`size-6 transition-transform ${ouvert ? "rotate-45" : ""}`} />
+        </button>
+      </div>
+      {ouvert && (
+        <ul className="mb-2 flex flex-col pl-10">
+          {besoins.map((i) => (
+            <li key={i.id} className="flex min-h-12 items-center gap-2">
+              <span className={`flex-1 ${i.checked ? "text-encre-douce line-through" : ""}`}>
+                {i.quantity != null || i.unit ? `${formatQuantity(i.quantity, i.unit)} · ` : ""}
+                {provenance(i) ?? "ajouté à la main"}
+              </span>
+              <button
+                type="button"
+                aria-label={`Retirer ce besoin : ${i.name}${provenance(i) ? `, ${provenance(i)}` : ""}`}
+                onClick={() => onRetirer(i)}
+                className="flex size-12 shrink-0 items-center justify-center text-encre-douce"
+              >
+                <IconeCroix className="size-5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
 }

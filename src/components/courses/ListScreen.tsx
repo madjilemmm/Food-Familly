@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/data";
-import { getCurrentTrip, getProfiles } from "@/lib/data";
+import { getAppris, getCurrentTrip, getProfiles } from "@/lib/data";
 import { BandeauScene, IconeRetour } from "@/components/ui";
 import { ShoppingList } from "./ShoppingList";
 
@@ -13,7 +13,7 @@ const jour = (iso: string) =>
  */
 export async function ListScreen({ me, retour }: { me: Profile; retour: { href: string; label: string } }) {
   // Course, réponses et articles arrivent en une seule requête, en parallèle des membres.
-  const [trip, profiles] = await Promise.all([getCurrentTrip(me.family_id), getProfiles(me.family_id)]);
+  const [trip, profiles, appris] = await Promise.all([getCurrentTrip(me.family_id), getProfiles(me.family_id), getAppris(me.family_id)]);
   if (!trip) return null;
 
   const names = new Map(profiles.map((p) => [p.id, p.name]));
@@ -40,7 +40,7 @@ export async function ListScreen({ me, retour }: { me: Profile; retour: { href: 
           est déjà pris.
         </p>
       )}
-      <ShoppingList tripId={trip.id} items={trip.shopping_list_items} requests={textRequests} />
+      <ShoppingList tripId={trip.id} items={trip.shopping_list_items} requests={textRequests} appris={appris} />
     </>
   );
 }

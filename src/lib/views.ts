@@ -2,6 +2,8 @@ import "server-only";
 import { cache } from "react";
 import {
   conflictsOf,
+  getAppris,
+  getCoursesPassees,
   getCurrentTrip,
   getFamilyEnvies,
   getFamilySwipes,
@@ -19,6 +21,8 @@ import {
 import { isPastDeadline } from "@/lib/domain/trip";
 import type { Convives } from "@/lib/domain/convives";
 import { cleMaison } from "@/lib/domain/maison";
+import { aAjouter, type Suggestion } from "@/lib/domain/habitudes";
+import { cleProduit } from "@/lib/domain/reconnaissance";
 import { lireEnvies } from "@/lib/domain/envies";
 import { classerPlats, compatibilite, oubliParMembre, scoreIndividuel, type CandidatCourse, type PlatClasse } from "@/lib/domain/reco";
 
@@ -113,8 +117,13 @@ export async function platsDeLaCourse(familyId: string, trip: Trip): Promise<Pla
     ];
   });
 
+  // Qui swipe vraiment (30 derniers jours) : seul·e, une envie suffit pour être proposée.
+  const actifs = new Set<string>();
+  for (const parMembre of avis.values()) for (const [m, a] of parMembre) if (now - a.swipedAt < 30 * JOUR) actifs.add(m);
+
   return classerPlats(candidats, {
     membres: ids,
+    actifs: actifs.size,
     oubli: oubliParMembre(hist.courses, ids),
     ouverte: trip.status !== "validated",
     max: MAX_PROPOSES,
@@ -148,6 +157,9 @@ export type TripOverview = {
   nobodyAnswered: boolean;
   /** Ingrédients des plats gardés, sans doute déjà à la maison : à vérifier avant de partir. */
   aVerifier: string[];
+  /** Pas pris la dernière fois, et achats habituels : à ajouter d'un geste (rien d'office). */
+  reportes: Suggestion[];
+  habituels: Suggestion[];
 };
 
 /**
@@ -177,7 +189,12 @@ export const getTripOverview = cache(async function getTripOverview(
       };
     });
 
-  const [plats, hist] = await Promise.all([platsDeLaCourse(familyId, trip), getHistorique(familyId)]);
+  const [plats, hist, passees, appris] = await Promise.all([
+    platsDeLaCourse(familyId, trip),
+    getHistorique(familyId),
+    getCoursesPassees(familyId),
+    getAppris(familyId),
+  ]);
   const candidates = plats.flatMap((p) => {
     const recipe = recipeById.get(p.id);
     return recipe ? [{ ...recipe, ...p }] : [];
@@ -207,5 +224,10 @@ export const getTripOverview = cache(async function getTripOverview(
     pastDeadline: isPastDeadline(trip.deadline_at),
     nobodyAnswered: requests.length === 0,
     aVerifier,
+    ...aAjouter(passees.courses, passees.reponses, {
+      surLaListe: new Set(trip.shopping_list_items.filter((i) => i.source !== "maison").map((i) => cleProduit(i.name, appris))),
+      repondusIci: passees.repondusIci,
+      now: Date.now(),
+    }),
   };
 });

@@ -24,7 +24,7 @@ const famille = ["maman", "madji", "yoalem", "papa"];
 function candidat(id: string, o: Partial<CandidatCourse> = {}): CandidatCourse {
   return { id, demandePar: [], enviePar: [], aimePar: [], exclu: false, gouts: new Map(), joursDepuisRetenu: null, ecarte: false, ...o };
 }
-const classer = (c: CandidatCourse[], o: Partial<{ membres: string[]; oubli: Map<string, number>; ouverte: boolean; max: number }> = {}) =>
+const classer = (c: CandidatCourse[], o: Partial<{ membres: string[]; oubli: Map<string, number>; ouverte: boolean; max: number; actifs: number }> = {}) =>
   classerPlats(c, { membres: famille, oubli: new Map(), ouverte: true, max: 5, ...o });
 
 describe("scores de base", () => {
@@ -263,5 +263,20 @@ describe("cas limites", () => {
   it("sans personne en particulier : pour toute la famille", () => {
     const [p] = classer([candidat("x", { choix: { selected: true, people: null, eaters: null } })]);
     expect(p).toMatchObject({ eaters: famille, people: 4, raison: { type: "famille" } });
+  });
+});
+
+describe("Utile seul — une seule personne swipe", () => {
+  it("seule dans la famille : son envie est proposée d'office", () => {
+    const [p] = classer([candidat("tacos", { enviePar: ["maman"] })], { membres: ["maman"] });
+    expect(p).toMatchObject({ propose: true, checked: true, people: 1 });
+  });
+  it("les autres ne swipent pas encore : son envie suffit aussi", () => {
+    const [p] = classer([candidat("tacos", { enviePar: ["maman"] })], { actifs: 1 });
+    expect(p).toMatchObject({ propose: true, checked: true });
+  });
+  it("à plusieurs à swiper : une envie seule reste une idée", () => {
+    const [p] = classer([candidat("tacos", { enviePar: ["maman"] })], { actifs: 3 });
+    expect(p).toMatchObject({ propose: false, checked: false });
   });
 });

@@ -264,13 +264,28 @@ export type PlatClasse = {
  *   à défaut toute la famille (le choix enregistré l'emporte) ;
  * - score : compatibilité de ce groupe + contexte (demande, envies, répétition, équité) ;
  * - proposés d'office : demandés ou envie de plusieurs (MAX au plus), les mieux classés ;
+ *   quand une seule personne swipe (seule dans la famille, ou les autres pas encore là),
+ *   son envie suffit : Kaddie est utile dès le premier jour ;
  *   le reste (« autres idées ») passe à tour de rôle par personne, pour que personne
  *   ne soit oublié parce que ses goûts sont minoritaires ;
  * - une fois la liste faite (ouverte = false), plus rien n'est coché d'office.
  */
 export function classerPlats(
   candidats: CandidatCourse[],
-  { membres, oubli, ouverte, max }: { membres: string[]; oubli: Map<string, number>; ouverte: boolean; max: number },
+  {
+    membres,
+    oubli,
+    ouverte,
+    max,
+    actifs = membres.length,
+  }: {
+    membres: string[];
+    oubli: Map<string, number>;
+    ouverte: boolean;
+    max: number;
+    /** Combien de membres swipent vraiment (récemment) ; par défaut, tous. */
+    actifs?: number;
+  },
 ): PlatClasse[] {
   const plats = candidats
     .filter((c) => !c.exclu)
@@ -296,7 +311,7 @@ export function classerPlats(
         REGLAGES.OUBLIE * equite;
       return {
         c,
-        proposable: c.demandePar.length > 0 || c.enviePar.length >= 2,
+        proposable: c.demandePar.length > 0 || c.enviePar.length >= Math.max(1, Math.min(2, actifs)),
         plat: { id: c.id, eaters, people: c.choix?.people ?? eaters.length, raison: { type, qui }, score },
       };
     });

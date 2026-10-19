@@ -3,12 +3,16 @@
 import { redirect } from "next/navigation";
 import { requireUser, type CurrentUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
-import { getCurrentTrip, getHistorique, getRecipesWithIngredients, getProfile, getProfiles, loadCurrentTrip, type Trip } from "@/lib/data";
+import { getAppris, getCoursesPassees, getCurrentTrip, getHistorique, getRecipesWithIngredients, getProfile, getProfiles, loadCurrentTrip, type Trip } from "@/lib/data";
 import { cleMaison } from "@/lib/domain/maison";
 import { platsDeLaCourse } from "@/lib/views";
 import { articlesDe } from "@/lib/domain/articles";
 import { deadlineFor, type DepartureChoice } from "@/lib/domain/trip";
-import { mergeIngredients, itemKey, scaleIngredients } from "@/lib/domain/shopping-list";
+import { mergeIngredients, itemKey, normalizeName, scaleIngredients } from "@/lib/domain/shopping-list";
+import { aAjouter, type Suggestion } from "@/lib/domain/habitudes";
+import { cleProduit } from "@/lib/domain/reconnaissance";
+import { isAisle } from "@/lib/domain/aisles";
+import { insererArticles } from "@/lib/liste";
 import { notifyTripStarted, notifyRequestReceived, notifyTakeOver } from "@/lib/notifications";
 import { ROUTES } from "@/lib/routes";
 import { changed, cleanText } from "./_shared";
@@ -49,19 +53,8 @@ export async function startTrip(choice: DepartureChoice) {
   }
 
   const deadline = deadlineFor(choice);
-  // Ce qui a été demandé ou ajouté à la main et pas pris la dernière fois (moins de 2 semaines)
-  // passe dans la nouvelle liste. Les ingrédients des recettes, eux, suivent les plats choisis.
-  const { data: dernier } = await db()
-    .from("shopping_trips")
-    .select("id, shopping_list_items(name, quantity, unit, aisle, source, for_recipes, checked)")
-    .eq("family_id", user.familyId)
-    .gte("created_at", new Date(Date.now() - 14 * 86_400_000).toISOString())
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const restes = ((dernier?.shopping_list_items ?? []) as Omit<Trip["shopping_list_items"][number], "id" | "created_at">[]).filter(
-    (i) => !i.checked && (i.source === "manual" || i.source === "request"),
-  );
+  // Ce qui n'a pas été pris la dernière fois n'est plus recopié d'office :
+  // il est proposé dans « À ajouter ? » (voir domain/habitudes.ts).
   // Une seule session à la fois par famille : les anciennes sont closes.
   await db().from("shopping_trips").update({ status: "done" }).eq("family_id", user.familyId).neq("status", "done");
   const { data: trip, error } = await db()
@@ -75,11 +68,6 @@ export async function startTrip(choice: DepartureChoice) {
     .select("id, deadline_at")
     .single();
   if (error) throw new Error(error.message);
-  if (restes.length > 0) {
-    await db()
-      .from("shopping_list_items")
-      .insert(restes.map((i) => ({ trip_id: trip.id, name: i.name, quantity: i.quantity, unit: i.unit, aisle: i.aisle, source: i.source })));
-  }
 
   changed(() => notifyTripStarted(user.familyId, user.profileId, trip.deadline_at));
   // Une redirection plutôt qu'un rafraîchissement sur place : l'écran suit même si
@@ -109,7 +97,9 @@ export async function takeOverTrip() {
 export async function finishTrip() {
   const user = await requireUser();
   const trip = await currentTripOrThrow(user);
-  await db().from("shopping_trips").update({ status: "done" }).eq("id", trip.id);
+  // finished_at : ces courses ont vraiment été faites (achats habituels, articles pas pris).
+  const { error } = await db().from("shopping_trips").update({ status: "done", finished_at: new Date().toISOString() }).eq("id", trip.id);
+  if (error) await db().from("shopping_trips").update({ status: "done" }).eq("id", trip.id);
   // Pas de redirection ici : le bouton recharge l'écran des courses (voir ConfirmButton « apres »).
   changed();
 }
@@ -172,6 +162,7 @@ export async function validateTrip() {
   await Promise.all([
     rebuildList(user.familyId, trip),
     db().from("shopping_trips").update({ status: "validated", validated_at: new Date().toISOString() }).eq("id", trip.id),
+    noterSansReponse(user.familyId, trip),
   ]);
   changed();
   redirect(ROUTES.liste);
@@ -184,7 +175,7 @@ export async function validateTrip() {
 async function rebuildList(familyId: string, known?: Trip) {
   const trip = known ?? (await loadCurrentTrip(familyId));
   if (!trip) return;
-  const [tousLesPlats, hist] = await Promise.all([platsDeLaCourse(familyId, trip), getHistorique(familyId)]);
+  const [tousLesPlats, hist, appris] = await Promise.all([platsDeLaCourse(familyId, trip), getHistorique(familyId), getAppris(familyId)]);
   const plats = tousLesPlats.filter((p) => p.checked);
   const recipes = await getRecipesWithIngredients(familyId, plats.map((p) => p.id));
   // Quantités recalculées plat par plat : pour celles et ceux qui le mangent.
@@ -204,27 +195,25 @@ async function rebuildList(familyId: string, known?: Trip) {
   const dejaLa = new Set(previous.map((i) => i.name.trim().toLowerCase()));
   const ecrites = trip.trip_requests
     .filter((r) => r.free_text && r.profile_id !== trip.created_by)
-    .flatMap((r) => articlesDe(r.free_text!))
+    .flatMap((r) => articlesDe(r.free_text!, appris))
     .filter((a) => !dejaLa.has(a.name.toLowerCase()) && Boolean(dejaLa.add(a.name.toLowerCase())));
 
   await db().from("shopping_list_items").delete().eq("trip_id", trip.id).eq("source", "recipe");
-  const { error: insertError } = await db()
-    .from("shopping_list_items")
-    .insert([
-      ...merged.map((m) => ({
-        trip_id: trip.id,
-        name: m.name,
-        quantity: m.quantity,
-        unit: m.unit,
-        aisle: m.aisle,
-        source: "recipe",
-        for_recipes: m.forRecipes.join(", "),
-        checked: wasChecked.has(m.key),
-      })),
-      // Mêmes colonnes que les ingrédients (envoi groupé) : sinon la base reçoit des vides.
-      ...ecrites.map((a) => ({ trip_id: trip.id, ...a, source: "request", for_recipes: null, checked: false })),
-    ]);
-  if (insertError) throw new Error(insertError.message);
+  await insererArticles([
+    ...merged.map((m) => ({
+      trip_id: trip.id,
+      name: m.name,
+      quantity: m.quantity,
+      unit: m.unit,
+      aisle: m.aisle,
+      source: "recipe" as const,
+      for_recipes: m.forRecipes.join(", "),
+      checked: wasChecked.has(m.key),
+      // Même regroupement que mergeIngredients : un ingrédient par nom et par unité.
+      cle: normalizeName(m.name),
+    })),
+    ...ecrites.map((a) => ({ trip_id: trip.id, ...a, source: "request" as const, cle: cleProduit(a.name, appris) })),
+  ]);
 }
 
 // ─── Les autres membres ────────────────────────────────────────────────
@@ -268,4 +257,53 @@ export async function submitRequest(
 
   changed(() => notifyRequestReceived(user.familyId, trip.created_by, user.profileId, freeText, recipeIds.length));
   return { ok: true };
+}
+
+// ─── « À ajouter ? » : achats habituels et articles pas pris ───────────
+
+/** Une proposition acceptée (« + » ou « Tout ajouter ») va sur la liste, avec sa provenance. */
+export async function ajouterSuggestions(suggestions: Suggestion[]) {
+  const user = await requireUser();
+  const trip = await currentTripOrThrow(user);
+  const propres = suggestions.slice(0, 30).flatMap((s) => {
+    const nom = typeof s?.nom === "string" ? s.nom.trim().slice(0, 100) : "";
+    if (!nom || (s.origine !== "habituel" && s.origine !== "reporte")) return [];
+    const quantite = typeof s.quantite === "number" && s.quantite > 0 ? s.quantite : null;
+    return [
+      {
+        trip_id: trip.id,
+        name: nom,
+        quantity: quantite,
+        unit: typeof s.unite === "string" ? s.unite.slice(0, 20) : "",
+        aisle: isAisle(s.rayon) ? s.rayon : "autre",
+        source: "manual" as const,
+        cle: String(s.cle).slice(0, 120),
+        origine: s.origine,
+      },
+    ];
+  });
+  await insererArticles(propres);
+  changed();
+}
+
+/** « Pas besoin » (×) : le rythme repart de ce jour ; deux fois de suite, la proposition se met en veille. */
+export async function refuserSuggestion(cle: string) {
+  const user = await requireUser();
+  const trip = await currentTripOrThrow(user);
+  await db()
+    .from("suggestions_reponses")
+    .upsert({ trip_id: trip.id, cle: String(cle).slice(0, 120), reponse: "pas_besoin" }, { onConflict: "trip_id,cle" });
+  changed();
+}
+
+/** La liste est faite : ce qui était proposé et n'a reçu aucune réponse est noté « sans réponse ». */
+async function noterSansReponse(familyId: string, trip: Trip) {
+  const [{ courses, reponses, repondusIci }, appris] = await Promise.all([getCoursesPassees(familyId), getAppris(familyId)]);
+  const surLaListe = new Set(trip.shopping_list_items.map((i) => cleProduit(i.name, appris)));
+  const { reportes, habituels } = aAjouter(courses, reponses, { surLaListe, repondusIci, now: Date.now() });
+  const ignores = [...reportes, ...habituels];
+  if (ignores.length === 0) return;
+  await db()
+    .from("suggestions_reponses")
+    .upsert(ignores.map((s) => ({ trip_id: trip.id, cle: s.cle, reponse: "sans_reponse" })), { onConflict: "trip_id,cle", ignoreDuplicates: true });
 }

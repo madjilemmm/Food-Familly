@@ -57,7 +57,7 @@ export function FileAttente() {
           // Par source (demandé / à la main), pour garder l'origine de chaque article.
           for (const source of ["manual", "request"] as const) {
             const ceux = ajouts.filter((a) => a.source === source);
-            if (!(await lot(ceux, () => addItems(ceux.map((a) => ({ id: a.id, texte: a.texte })), source)))) return;
+            if (!(await lot(ceux, () => addItems(ceux.map((a) => ({ id: a.id, texte: a.texte, article: a.article })), source)))) return;
           }
           if (!(await lot(coches, () => setItemsChecked(coches.map((c) => ({ id: c.id, checked: c.checked })))))) return;
           for (const s of swipes) if (!(await lot([s], () => swipe(s.recipeId, s.liked)))) return;

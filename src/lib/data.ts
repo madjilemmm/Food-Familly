@@ -6,6 +6,9 @@ import { correspondAuxStyles, dureeMax, lireEnvies, styleDe, type Envies } from 
 import { calculerMatchs, estEnvie, ordonnerPaquet, type Avis, type Signaux } from "@/lib/domain/reco";
 import { passagesDesIngredients, sansDouteALaMaison } from "@/lib/domain/maison";
 import type { Style } from "@/lib/session";
+import { isAisle } from "@/lib/domain/aisles";
+import { cleProduit, type Appris } from "@/lib/domain/reconnaissance";
+import type { CoursePassee, Reponse } from "@/lib/domain/habitudes";
 
 /*
  * Les lectures appelées par plusieurs composants d'une même page (mise en page,
@@ -101,6 +104,8 @@ export type ListItem = {
   for_recipes: string | null;
   checked: boolean;
   created_at: string;
+  /** Proposé par Kaddie : achat habituel, ou pas pris la dernière fois. */
+  origine?: "habituel" | "reporte" | null;
 };
 
 /** Une session non terminée plus vieille que ça est considérée comme oubliée. */
@@ -448,7 +453,7 @@ export async function loadCurrentTrip(familyId: string): Promise<Trip | null> {
         `id, created_by, departs_at, deadline_at, status, validated_at, created_at, people,
          trip_requests(id, profile_id, free_text, recipe_ids, updated_at),
          trip_recipes(*),
-         shopping_list_items(id, name, quantity, unit, aisle, source, for_recipes, checked, created_at)`,
+         shopping_list_items(*)`,
       )
       .eq("family_id", familyId)
       .neq("status", "done")
@@ -461,3 +466,71 @@ export async function loadCurrentTrip(familyId: string): Promise<Trip | null> {
       .maybeSingle(),
   );
 }
+
+// ─── Ce que la famille a appris à Kaddie sur ses articles ──────────────
+
+export const getAppris = cache(async function getAppris(familyId: string): Promise<Appris> {
+  const { data, error } = await db().from("produits_appris").select("saisie, nom, rayon, produit, tel_quel").eq("family_id", familyId);
+  // Base pas encore migrée : le catalogue seul.
+  if (error || !data) return {};
+  return Object.fromEntries(
+    data.map((r) => [
+      r.saisie as string,
+      r.tel_quel || !r.nom || !isAisle(r.rayon)
+        ? ("tel-quel" as const)
+        : { nom: r.nom as string, rayon: r.rayon, ...(r.produit ? { produit: r.produit as string } : {}) },
+    ]),
+  );
+});
+
+// ─── Courses passées : achats habituels et articles pas pris ────────────
+
+/**
+ * Les courses closes des 12 derniers mois (les plus récentes d'abord) avec leurs articles,
+ * et les réponses aux propositions (« pas besoin », sans réponse). La clé de chaque article
+ * est celle enregistrée, sinon relue avec le catalogue (anciens articles).
+ */
+export const getCoursesPassees = cache(async function getCoursesPassees(
+  familyId: string,
+): Promise<{ courses: CoursePassee[]; reponses: Reponse[]; repondusIci: Set<string>; enCours: string | null }> {
+  const since = new Date(Date.now() - 365 * JOUR).toISOString();
+  const [rows, enCours, appris] = await Promise.all([
+    // « * » : finished_at, cle et origine peuvent manquer tant que la migration n'est pas passée.
+    db()
+      .from("shopping_trips")
+      .select("*, shopping_list_items(*)")
+      .eq("family_id", familyId)
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(120)
+      .then((r) => check(r) as Record<string, unknown>[]),
+    getCurrentTrip(familyId),
+    getAppris(familyId),
+  ]);
+  const ids = rows.map((t) => t.id as string);
+  const { data: lues } = ids.length
+    ? await db().from("suggestions_reponses").select("trip_id, cle, reponse, created_at").in("trip_id", ids)
+    : { data: [] };
+  const reponses = (lues ?? []).map((r) => ({ trip: r.trip_id as string, cle: r.cle as string, reponse: r.reponse as Reponse["reponse"], le: Date.parse(r.created_at as string) }));
+  const courses: CoursePassee[] = rows
+    .filter((t) => t.id !== enCours?.id)
+    .map((t) => {
+      const items = (t.shopping_list_items as Record<string, unknown>[]).map((i) => ({
+        name: i.name as string,
+        cle: (i.source !== "recipe" && (i.cle as string | null)) || cleProduit(i.name as string, appris),
+        source: i.source as string,
+        checked: Boolean(i.checked),
+        quantity: (i.quantity as number | null) ?? null,
+        unit: (i.unit as string) ?? "",
+        aisle: (i.aisle as string) ?? "autre",
+      }));
+      const fin = (t.finished_at ?? t.validated_at ?? t.created_at) as string;
+      return { id: t.id as string, le: Date.parse(fin), finie: Boolean(t.finished_at), close: t.status === "done", items };
+    });
+  return {
+    courses,
+    reponses: reponses.filter((r) => r.trip !== enCours?.id),
+    repondusIci: new Set(reponses.filter((r) => r.trip === enCours?.id).map((r) => r.cle)),
+    enCours: enCours?.id ?? null,
+  };
+});

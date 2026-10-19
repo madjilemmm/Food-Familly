@@ -30,8 +30,11 @@ export async function CoursesScreen({ me, vue, notifications }: { me: Profile; v
   if (!overview) {
     // Personne n'y va : le même langage que Recettes et la liste (bandeau, puis des lignes),
     // avec ce qui fait envie en ce moment, pour savoir à quoi s'attendre.
-    const [profiles, matches] = await Promise.all([getProfiles(me.family_id), getMatches(me.family_id)]);
+    const [profiles, matchesFamille, mesEnvies] = await Promise.all([getProfiles(me.family_id), getMatches(me.family_id), getMyLikes(me.family_id, me.id)]);
     const others = profiles.filter((p) => p.id !== me.id).map((p) => p.name);
+    // Seul·e : ses propres envies (Kaddie les proposera), à la place des matchs.
+    const seul = others.length === 0;
+    const matches = seul ? (await forFamily(me.family_id, mesEnvies)).map((r) => ({ ...r, avec: [me.name] })) : matchesFamille;
     // Dans l'ordre des heures de départ (« ce soir » peut tomber avant « dans 2 heures »).
     const choices = departureChoices()
       .map((c) => ({ ...c, depart: deadlineFor(c.id) }))
@@ -43,7 +46,7 @@ export async function CoursesScreen({ me, vue, notifications }: { me: Profile; v
         <StartTrip choices={choices} others={others} />
         <section className="mt-10">
           <div className="mb-2 flex items-baseline justify-between gap-4">
-            <h2 className="kd-etiquette">Ce qui fait envie</h2>
+            <h2 className="kd-etiquette">{seul ? "Tes envies" : "Ce qui fait envie"}</h2>
             {matches.length > 3 && (
               <Link href={ROUTES.matchs} className="font-semibold text-violet underline underline-offset-4">
                 Tout voir
@@ -57,13 +60,13 @@ export async function CoursesScreen({ me, vue, notifications }: { me: Profile; v
                   key={m.id}
                   recipe={m}
                   depuis="/courses"
-                  infos={`Envie de ${listeDeNoms(m.avec, me.name).replace(/^Toi\b/, "toi")}`}
+                  infos={seul ? "Ton envie" : `Envie de ${listeDeNoms(m.avec, me.name).replace(/^Toi\b/, "toi")}`}
                 />
               ))}
             </ul>
           ) : (
             <p className="text-encre-douce">
-              Rien en commun pour l&apos;instant.{" "}
+              {seul ? "Pas encore d'envie." : "Rien en commun pour l'instant."}{" "}
               <Link href={ROUTES.envies} className="font-semibold text-violet underline underline-offset-4">
                 Swipe des plats
               </Link>{" "}
@@ -109,7 +112,7 @@ function PreparerView({ me, overview }: { me: Profile; overview: TripOverview })
   const enAttente = responses.filter((r) => !r.request).map((r) => r.member.name);
   // Les demandes écrites vont sur la liste toutes seules (découpées en articles).
   const ecrites = responses.filter((r) => r.request?.free_text);
-  // Déjà sur la liste avant de la faire : les articles pas pris la dernière fois, ou ajoutés à la main.
+  // Déjà sur la liste avant de la faire : ajoutés à la main, ou acceptés dans « À ajouter ? ».
   const dejaSurLaListe = trip.shopping_list_items.filter((i) => i.source === "manual" || i.source === "request").map((i) => i.name);
   const reponses =
     responses.length === 0
@@ -146,7 +149,12 @@ function PreparerView({ me, overview }: { me: Profile; overview: TripOverview })
         </ul>
       )}
 
-      <AVerifier key={overview.aVerifier.join("|")} noms={overview.aVerifier} />
+      <AVerifier
+        key={[...overview.aVerifier, ...overview.reportes.map((s) => s.cle), ...overview.habituels.map((s) => s.cle)].join("|")}
+        noms={overview.aVerifier}
+        reportes={overview.reportes}
+        habituels={overview.habituels}
+      />
 
       {/* Collé au-dessus des onglets, sur une bande lilas : le contenu passe dessous proprement. */}
       <form action={validateTrip} className="sticky bottom-[calc(4.25rem+max(env(safe-area-inset-bottom),0.75rem))] z-20 -mx-5 border-t-2 border-trait bg-fond px-5 pt-3 pb-3">
