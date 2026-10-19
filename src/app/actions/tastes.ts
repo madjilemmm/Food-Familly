@@ -70,3 +70,10 @@ export async function setStrictDislikes(strict: boolean) {
   await db().from("families").update({ strict_dislikes: Boolean(strict) }).eq("id", user.familyId);
   changed();
 }
+
+/** « Pas vraiment » dans le portrait gourmand : ce goût déclaré (j'adore / j'aime pas) est retiré. */
+export async function corrigerGout(food: string) {
+  const user = await requireUser();
+  await db().from("profile_tastes").delete().eq("profile_id", user.profileId).eq("food", String(food).slice(0, 80)).in("level", ["adore", "pas_fan"]);
+  changed();
+}

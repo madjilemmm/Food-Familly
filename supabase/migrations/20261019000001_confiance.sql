@@ -25,3 +25,6 @@ alter table public.essais_code enable row level security;
 alter table public.invitations enable row level security;
 revoke all on public.essais_code, public.invitations from anon, authenticated;
 grant all on public.essais_code, public.invitations to service_role;
+
+-- L'API voit tout de suite les nouvelles tables.
+notify pgrst, 'reload schema';

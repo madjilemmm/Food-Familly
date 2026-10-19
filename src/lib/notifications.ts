@@ -101,3 +101,54 @@ export async function sendDeadlineReminders(now = new Date()): Promise<number> {
   }
   return envoyees;
 }
+
+/** « A, B et C » */
+const enFrancais = (l: string[]) => (l.length > 1 ? `${l.slice(0, -1).join(", ")} et ${l[l.length - 1]}` : (l[0] ?? ""));
+
+/**
+ * La liste est faite : chaque membre dont l'envie ou la demande a été retenue l'apprend
+ * (« Tacos : c'est prévu, grâce à toi »). Un seul message par personne.
+ */
+export async function notifyEnviesRetenues(familyId: string, shopperId: string, plats: { title: string; qui: string[] }[]) {
+  const all = await members(familyId);
+  const shopper = all.find((m) => m.id === shopperId)?.name ?? "Quelqu'un";
+  const parMembre = new Map<string, string[]>();
+  for (const p of plats) for (const id of p.qui) if (id !== shopperId) parMembre.set(id, [...(parMembre.get(id) ?? []), p.title]);
+  await Promise.all(
+    [...parMembre].map(([id, titres]) =>
+      sendPush([id], {
+        title: `${enFrancais(titres.slice(0, 3))} : c'est prévu`,
+        body: `${shopper} l'a mis sur la liste, grâce à toi.`,
+        url: "/matchs",
+        tag: "retenu",
+      }),
+    ),
+  );
+}
+
+/**
+ * Les courses sont finies : chacun apprend ce qui a été pris pour lui (une seule fois,
+ * pas article par article), et peut dire merci d'un appui.
+ */
+export async function notifyCoursesFinies(familyId: string, shopperId: string, pris: Map<string, { pris: string[]; manquants: string[] }>) {
+  const all = await members(familyId);
+  const shopper = all.find((m) => m.id === shopperId)?.name ?? "Quelqu'un";
+  await Promise.all(
+    all
+      .filter((m) => m.id !== shopperId)
+      .map((m) => {
+        const p = pris.get(m.id);
+        const body = p?.pris.length
+          ? `${shopper} a pris ${enFrancais(p.pris.slice(0, 4))}${p.manquants.length ? ` (pas trouvé : ${enFrancais(p.manquants.slice(0, 3))})` : ""}. Dis merci ?`
+          : "Dis-lui merci d'un appui.";
+        return sendPush([m.id], { title: `${shopper} a fait les courses`, body, url: "/courses", tag: "fini" });
+      }),
+  );
+}
+
+/** Un merci : la personne qui a fait les courses le reçoit. */
+export async function notifyMerci(familyId: string, deQui: string, pourQui: string) {
+  const all = await members(familyId);
+  const nom = all.find((m) => m.id === deQui)?.name ?? "Quelqu'un";
+  await sendPush([pourQui], { title: `${nom} te dit merci`, body: "Pour les courses.", url: "/courses", tag: `merci-${deQui}` });
+}

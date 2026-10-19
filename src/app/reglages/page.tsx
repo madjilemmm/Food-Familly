@@ -13,6 +13,7 @@ export default async function SettingsPage() {
   const user = await requireUser();
   const [me, family] = await Promise.all([requireProfile(), getFamily(user.familyId)]);
   const liens = [
+    { href: "/profil/portrait", label: "Ton portrait gourmand", detail: "Ce que Kaddie a compris de toi" },
     { href: `/profil/gouts?suite=${encodeURIComponent("/reglages")}`, label: "Mes goûts", detail: "Allergies, envies, j'aime / j'aime pas" },
     { href: "/famille", label: "Ma famille", detail: family ? `${family.name} · code, membres, mode strict` : "Code, membres, mode strict" },
   ];

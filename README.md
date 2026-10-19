@@ -70,7 +70,13 @@ Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres,
    [`supabase/migrations/20261017000002_qui_mange_quoi.sql`](supabase/migrations/20261017000002_qui_mange_quoi.sql)
    (nombre de personnes par plat), puis
    [`supabase/migrations/20261017000003_envies.sql`](supabase/migrations/20261017000003_envies.sql)
-   (goût gardé après un « Bof », et qui mange chaque plat retenu ; ajouts seulement).
+   (goût gardé après un « Bof », et qui mange chaque plat retenu ; ajouts seulement), puis
+   [`supabase/migrations/20261019000001_confiance.sql`](supabase/migrations/20261019000001_confiance.sql)
+   (limite d'essais sur les codes, liens d'invitation), puis
+   [`supabase/migrations/20261019000002_courses_malignes.sql`](supabase/migrations/20261019000002_courses_malignes.sql)
+   (ce que la famille apprend à Kaddie sur ses articles, achats habituels, anti-doublon), puis
+   [`supabase/migrations/20261019000003_repas.sql`](supabase/migrations/20261019000003_repas.sql)
+   (« Ce soir, on mange quoi ? » et les mercis).
    Chaque fichier se lance dans cet ordre ; on peut les relancer sans risque.
 
    Pas besoin de données de départ : on crée sa famille directement dans l'appli. (Le fichier facultatif

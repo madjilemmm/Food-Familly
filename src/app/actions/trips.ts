@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireUser, type CurrentUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
-import { getAppris, getCoursesPassees, getCurrentTrip, getHistorique, getRecipesWithIngredients, getProfile, getProfiles, loadCurrentTrip, type Trip } from "@/lib/data";
+import { getAppris, getCoursesPassees, getCurrentTrip, getHistorique, getRecipes, getRecipesWithIngredients, getProfile, getProfiles, loadCurrentTrip, type Trip } from "@/lib/data";
 import { cleMaison } from "@/lib/domain/maison";
 import { platsDeLaCourse } from "@/lib/views";
 import { articlesDe } from "@/lib/domain/articles";
@@ -13,7 +13,7 @@ import { aAjouter, type Suggestion } from "@/lib/domain/habitudes";
 import { cleProduit } from "@/lib/domain/reconnaissance";
 import { isAisle } from "@/lib/domain/aisles";
 import { insererArticles } from "@/lib/liste";
-import { notifyTripStarted, notifyRequestReceived, notifyTakeOver } from "@/lib/notifications";
+import { notifyCoursesFinies, notifyEnviesRetenues, notifyMerci, notifyTripStarted, notifyRequestReceived, notifyTakeOver } from "@/lib/notifications";
 import { ROUTES } from "@/lib/routes";
 import { changed, cleanText } from "./_shared";
 
@@ -101,7 +101,8 @@ export async function finishTrip() {
   const { error } = await db().from("shopping_trips").update({ status: "done", finished_at: new Date().toISOString() }).eq("id", trip.id);
   if (error) await db().from("shopping_trips").update({ status: "done" }).eq("id", trip.id);
   // Pas de redirection ici : le bouton recharge l'écran des courses (voir ConfirmButton « apres »).
-  changed();
+  const shopper = trip.created_by ?? user.profileId;
+  changed(async () => notifyCoursesFinies(user.familyId, shopper, ceQuiAEtePris(trip, await getAppris(user.familyId))));
 }
 
 export async function setTripRecipe(recipeId: string, selected: boolean) {
@@ -151,6 +152,7 @@ export async function validateTrip() {
   // n'en ajoute plus d'elle-même, et on saura plus tard qui a mangé quoi (équité, répétition).
   const plats = await platsDeLaCourse(user.familyId, trip);
   const retenus = plats.filter((p) => p.checked);
+  const premiereFois = trip.status !== "validated";
   if (retenus.length > 0) {
     await db()
       .from("trip_recipes")
@@ -164,7 +166,19 @@ export async function validateTrip() {
     db().from("shopping_trips").update({ status: "validated", validated_at: new Date().toISOString() }).eq("id", trip.id),
     noterSansReponse(user.familyId, trip),
   ]);
-  changed();
+  // La première fois que la liste est faite : « Tacos : c'est prévu, grâce à toi ».
+  const titres = premiereFois ? new Map((await getRecipes(user.familyId)).map((r) => [r.id, r.title])) : null;
+  changed(() =>
+    titres
+      ? notifyEnviesRetenues(
+          user.familyId,
+          user.profileId,
+          retenus
+            .filter((p) => p.raison.type === "demande" || p.raison.type === "envie")
+            .map((p) => ({ title: titres.get(p.id) ?? "", qui: p.raison.qui })),
+        )
+      : Promise.resolve(),
+  );
   redirect(ROUTES.liste);
 }
 
@@ -326,4 +340,34 @@ export async function marquerRepas(tripId: string, recipeId: string, fait: boole
     .upsert({ trip_id: tripId, recipe_id: recipeId, fait_le: fait ? new Date().toISOString() : null }, { onConflict: "trip_id,recipe_id" });
   if (error) throw new Error(error.message);
   changed();
+}
+
+/** Pour chaque membre qui a demandé des articles : ce qui a été pris, ce qui manque. */
+function ceQuiAEtePris(trip: Trip, appris: Awaited<ReturnType<typeof getAppris>>) {
+  const surLaListe = new Map(trip.shopping_list_items.filter((i) => i.source !== "maison").map((i) => [cleProduit(i.name, appris), i.checked]));
+  const resultat = new Map<string, { pris: string[]; manquants: string[] }>();
+  for (const r of trip.trip_requests) {
+    if (!r.free_text || r.profile_id === trip.created_by) continue;
+    const bilan = { pris: [] as string[], manquants: [] as string[] };
+    for (const a of articlesDe(r.free_text, appris)) {
+      const coche = surLaListe.get(cleProduit(a.name, appris));
+      if (coche === true) bilan.pris.push(a.name);
+      else if (coche === false) bilan.manquants.push(a.name);
+    }
+    resultat.set(r.profile_id, bilan);
+  }
+  return resultat;
+}
+
+/** « Merci » à la personne qui a fait les dernières courses : un cœur par personne. */
+export async function direMerci(tripId: string) {
+  const user = await requireUser();
+  const course = await courseDeLaFamille(user, tripId);
+  if (!course.created_by || course.created_by === user.profileId) return;
+  const { data } = await db()
+    .from("mercis")
+    .upsert({ trip_id: tripId, profile_id: user.profileId }, { onConflict: "trip_id,profile_id", ignoreDuplicates: true })
+    .select("trip_id");
+  // Déjà dit : pas de deuxième notification.
+  changed(() => (data?.length ? notifyMerci(user.familyId, user.profileId, course.created_by!) : Promise.resolve()));
 }

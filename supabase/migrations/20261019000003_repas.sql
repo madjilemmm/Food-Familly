@@ -21,3 +21,6 @@ alter table public.repas enable row level security;
 alter table public.mercis enable row level security;
 revoke all on public.repas, public.mercis from anon, authenticated;
 grant all on public.repas, public.mercis to service_role;
+
+-- L'API voit tout de suite les nouvelles tables.
+notify pgrst, 'reload schema';

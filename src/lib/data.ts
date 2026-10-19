@@ -582,3 +582,71 @@ export const getRepasAchetes = cache(async function getRepasAchetes(
   });
   return { tripId: trip.id as string, plats };
 });
+
+// ─── Les dernières courses : le bilan et les mercis ────────────────────
+
+export type DerniereCourse = {
+  id: string;
+  shopper: { id: string; name: string } | null;
+  /** Articles mis dans le caddie. */
+  pris: number;
+  /** Pour qui (les mangeurs des plats et ceux dont la demande a été prise), sans la personne qui a fait les courses. */
+  pourQui: string[];
+  /** Qui a dit merci (prénoms et profils). */
+  mercis: { id: string; name: string }[];
+};
+
+/** La dernière course terminée il y a moins de 2 jours, pour son bilan et les mercis. */
+export const getDerniereCourse = cache(async function getDerniereCourse(familyId: string): Promise<DerniereCourse | null> {
+  const since = new Date(Date.now() - 2 * JOUR).toISOString();
+  const { data: t } = await db()
+    .from("shopping_trips")
+    .select("*, trip_recipes(*), trip_requests(profile_id, free_text), shopping_list_items(checked, source)")
+    .eq("family_id", familyId)
+    .eq("status", "done")
+    .gte("finished_at", since)
+    .order("finished_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!t) return null;
+  const [profiles, mercis] = await Promise.all([
+    getProfiles(familyId),
+    db().from("mercis").select("profile_id").eq("trip_id", t.id).then((r) => r.data ?? []),
+  ]);
+  const noms = new Map(profiles.map((p) => [p.id, p.name]));
+  const items = t.shopping_list_items as { checked: boolean; source: string }[];
+  const qui = new Set<string>([
+    ...(t.trip_recipes as { selected: boolean; eaters?: string[] | null }[]).filter((r) => r.selected).flatMap((r) => r.eaters ?? []),
+    ...(t.trip_requests as { profile_id: string }[]).map((r) => r.profile_id),
+  ]);
+  qui.delete(t.created_by as string);
+  return {
+    id: t.id as string,
+    shopper: t.created_by && noms.has(t.created_by) ? { id: t.created_by as string, name: noms.get(t.created_by)! } : null,
+    pris: items.filter((i) => i.checked && i.source !== "maison").length,
+    pourQui: [...qui].flatMap((id) => noms.get(id) ?? []),
+    mercis: mercis.flatMap((m) => (noms.has(m.profile_id) ? [{ id: m.profile_id as string, name: noms.get(m.profile_id)! }] : [])),
+  };
+});
+
+/** Les plats choisis ensemble cette semaine (listes faites ces 7 derniers jours), pour le récap à partager. */
+export async function getRecapSemaine(familyId: string): Promise<{ famille: string; plats: string[] } | null> {
+  const since = new Date(Date.now() - 7 * JOUR).toISOString();
+  const [famille, recipes, { data }] = await Promise.all([
+    getFamily(familyId),
+    getRecipes(familyId),
+    db()
+      .from("shopping_trips")
+      .select("trip_recipes(recipe_id, selected)")
+      .eq("family_id", familyId)
+      .gte("validated_at", since)
+      .order("validated_at", { ascending: false }),
+  ]);
+  const titres = new Map(recipes.map((r) => [r.id, r.title]));
+  const plats = [
+    ...new Set(
+      (data ?? []).flatMap((t) => (t.trip_recipes as { recipe_id: string; selected: boolean }[]).filter((r) => r.selected).flatMap((r) => titres.get(r.recipe_id) ?? [])),
+    ),
+  ];
+  return famille && plats.length ? { famille: famille.name, plats: plats.slice(0, 6) } : null;
+}
