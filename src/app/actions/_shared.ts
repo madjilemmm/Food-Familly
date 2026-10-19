@@ -1,7 +1,9 @@
 import "server-only";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { broadcastRefresh } from "@/lib/supabase/server";
+import { APPAREIL_COOKIE } from "@/lib/appareil";
 import { getSession } from "@/lib/auth";
 
 /**
@@ -12,7 +14,9 @@ export function changed(background?: () => Promise<unknown>) {
   revalidatePath("/", "layout");
   after(async () => {
     const session = await getSession().catch(() => null);
-    await Promise.allSettled([session ? broadcastRefresh(session.familyId) : Promise.resolve(), background?.()]);
+    // Le téléphone qui agit a déjà l'écran à jour (réponse de l'action) : le signal lui dit de l'ignorer.
+    const appareil = (await cookies().catch(() => null))?.get(APPAREIL_COOKIE)?.value;
+    await Promise.allSettled([session ? broadcastRefresh(session.familyId, appareil) : Promise.resolve(), background?.()]);
   });
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import { sansPlantage } from "@/lib/reseau";
 import { SubmitButton } from "@/components/SubmitButton";
 import { MessageErreur } from "@/components/ui";
 import type { Style } from "@/lib/session";
@@ -19,7 +20,7 @@ export function MemberForm({
   submitLabel?: string;
   onDone?: () => void;
 }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction] = useActionState(sansPlantage(action), {});
 
   useEffect(() => {
     if (state.ok) onDone?.();

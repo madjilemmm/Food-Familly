@@ -2,11 +2,12 @@
 
 import { useActionState } from "react";
 import { joinFamily } from "@/app/actions/auth";
+import { sansPlantage } from "@/lib/reseau";
 import { SubmitButton } from "@/components/SubmitButton";
 import { MessageErreur } from "@/components/ui";
 
 export function FamilyCodeForm() {
-  const [state, action] = useActionState(joinFamily, {});
+  const [state, action] = useActionState(sansPlantage(joinFamily), {});
   return (
     <form action={action} className="flex flex-col gap-4">
       <label htmlFor="code" className="kd-titre-3 text-aubergine">

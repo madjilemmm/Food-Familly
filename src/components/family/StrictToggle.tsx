@@ -2,11 +2,13 @@
 
 import { useOptimistic, useTransition } from "react";
 import { setStrictDislikes } from "@/app/actions/tastes";
+import { useErreurReseau } from "@/components/ErreurReseau";
 
 /** Mode strict : ce qu'un membre n'aime pas disparaît pour toute la famille. */
 export function StrictToggle({ strict }: { strict: boolean }) {
   const [, startTransition] = useTransition();
   const [on, setOn] = useOptimistic(strict);
+  const { essayer, alerte } = useErreurReseau();
   return (
     <section className="flex flex-col gap-2 border-y-2 border-trait py-4">
       <div className="flex items-center gap-4">
@@ -26,7 +28,7 @@ export function StrictToggle({ strict }: { strict: boolean }) {
           onClick={() =>
             startTransition(async () => {
               setOn(!on);
-              await setStrictDislikes(!on);
+              await essayer(() => setStrictDislikes(!on));
             })
           }
           className="flex h-14 w-20 shrink-0 items-center justify-center rounded-full"
@@ -43,6 +45,7 @@ export function StrictToggle({ strict }: { strict: boolean }) {
         </button>
       </div>
       <p className="kd-petit">Les interdits (allergies, régimes) disparaissent toujours pour tout le monde.</p>
+      {alerte}
     </section>
   );
 }

@@ -10,6 +10,7 @@ import { STYLES, type Envies, type Piquant, type Temps } from "@/lib/domain/envi
 import { CarteGeste, PILE, type Direction } from "@/components/CarteGeste";
 import { IconeCoeur, IconeCroix, MessageErreur } from "@/components/ui";
 import { Spinner } from "@/components/Spinner";
+import { messageErreur } from "@/lib/reseau";
 
 type Initial = { diets: string[]; autres: string[]; cards: Record<string, "pas_fan" | "adore"> };
 type Other = { name: string; done: boolean; tastes: Record<string, TasteLevel> };
@@ -71,7 +72,14 @@ export function Questionnaire({
   const enregistrer = (done: boolean, ensuite: () => void, vues = enviesVues) =>
     startTransition(async () => {
       setError(null);
-      const res = await saveTastes({ diets, autres, cards: piquant(cards, vues), envies: vues ? envies : undefined, done });
+      // Sans réseau, les réponses restent à l'écran : rien n'est à refaire.
+      let res: Awaited<ReturnType<typeof saveTastes>>;
+      try {
+        res = await saveTastes({ diets, autres, cards: piquant(cards, vues), envies: vues ? envies : undefined, done });
+      } catch (e) {
+        setError(messageErreur(e));
+        return;
+      }
       if (res.error) setError(res.error);
       else ensuite();
     });
@@ -80,7 +88,12 @@ export function Questionnaire({
       ? enregistrer(true, partir)
       : etape === "regime"
       ? startTransition(async () => {
-          await skipTastes();
+          try {
+            await skipTastes();
+          } catch (e) {
+            setError(messageErreur(e));
+            return;
+          }
           partir();
         })
       : enregistrer(false, partir);

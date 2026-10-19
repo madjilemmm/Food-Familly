@@ -2,6 +2,7 @@
 
 import { useOptimistic, useTransition } from "react";
 import { oublierAvis, swipe } from "@/app/actions/swipes";
+import { useErreurReseau } from "@/components/ErreurReseau";
 
 export type EtatAvis = "envie" | "aime" | "refuse" | null;
 
@@ -19,10 +20,11 @@ const TEXTE: Record<NonNullable<EtatAvis> | "aucun", string> = {
 export function AvisRecette({ recipeId, etat }: { recipeId: string; etat: EtatAvis }) {
   const [, startTransition] = useTransition();
   const [courant, setCourant] = useOptimistic(etat);
+  const { essayer, alerte } = useErreurReseau();
   const choisir = (suivant: EtatAvis, action: () => Promise<unknown>) =>
     startTransition(async () => {
       setCourant(suivant);
-      await action();
+      await essayer(action);
     });
   const bouton = (actif: boolean) =>
     `kd-btn min-h-12 flex-1 px-3 ${actif ? "" : "kd-btn--secondaire"}`;
@@ -48,6 +50,7 @@ export function AvisRecette({ recipeId, etat }: { recipeId: string; etat: EtatAv
           Effacer mon avis
         </button>
       )}
+      {alerte}
     </section>
   );
 }

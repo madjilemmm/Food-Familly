@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Spinner } from "@/components/Spinner";
+import { messageErreur } from "@/lib/reseau";
 
 /**
  * Bouton qui demande confirmation avant d'agir, dans une feuille Kaddie qui
@@ -33,6 +34,8 @@ export function ConfirmButton({
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  // Sans réseau, la feuille reste ouverte avec un message : on peut réessayer ou annuler.
+  const [erreur, setErreur] = useState<string | null>(null);
   return (
     <>
       <button
@@ -40,7 +43,10 @@ export function ConfirmButton({
         aria-label={ariaLabel}
         aria-haspopup="dialog"
         disabled={disabled || pending}
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setErreur(null);
+          setOpen(true);
+        }}
         className={`disabled:opacity-50 ${className}`}
       >
         {children}
@@ -51,10 +57,17 @@ export function ConfirmButton({
         detail={detail}
         confirmLabel={confirmLabel}
         pending={pending}
+        erreur={erreur}
         onCancel={() => setOpen(false)}
         onConfirm={() =>
           startTransition(async () => {
-            await action();
+            setErreur(null);
+            try {
+              await action();
+            } catch (e) {
+              setErreur(messageErreur(e));
+              return;
+            }
             if (apres) window.location.assign(apres);
             else setOpen(false);
           })
@@ -70,6 +83,7 @@ export function ConfirmSheet({
   detail,
   confirmLabel,
   pending,
+  erreur,
   onCancel,
   onConfirm,
 }: {
@@ -78,6 +92,7 @@ export function ConfirmSheet({
   detail?: string;
   confirmLabel: string;
   pending: boolean;
+  erreur?: string | null;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -141,6 +156,11 @@ export function ConfirmSheet({
         {detail && (
           <p id="confirm-detail" className="mt-2 text-encre-douce">
             {detail}
+          </p>
+        )}
+        {erreur && (
+          <p role="alert" className="mt-4 rounded-pastille border-[3px] border-aubergine bg-surface px-4 py-3 text-encre">
+            {erreur}
           </p>
         )}
         <div className="mt-6 flex flex-col gap-3 pb-4">

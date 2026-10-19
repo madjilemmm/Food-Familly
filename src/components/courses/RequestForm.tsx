@@ -6,7 +6,10 @@ import { submitRequest } from "@/app/actions/trips";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import { SubmitButton } from "@/components/SubmitButton";
 import { MessageErreur } from "@/components/ui";
+import { sansPlantage } from "@/lib/reseau";
 import type { Recipe } from "@/lib/data";
+
+type Etat = { ok?: boolean; error?: string; saisi?: { texte: string; plats: string[] } };
 
 export function RequestForm({
   envies,
@@ -25,7 +28,13 @@ export function RequestForm({
   alreadySent: boolean;
   shopperName: string;
 }) {
-  const [state, action] = useActionState(submitRequest, {});
+  // Après un échec (réseau, refus), le formulaire se remet à zéro : on lui redonne ce qui avait été saisi.
+  const [state, action] = useActionState(async (prev: Etat, fd: FormData): Promise<Etat> => {
+    const saisi = { texte: String(fd.get("free_text") ?? ""), plats: fd.getAll("recipe_ids").map(String) };
+    const res = await sansPlantage(submitRequest, "Pas de réseau : ta demande n'est pas encore partie. Ton texte est gardé, réessaie quand ça revient.")(prev, fd);
+    return res.ok ? res : { ...res, saisi };
+  }, {});
+  const plats = state.saisi?.plats ?? initialRecipeIds;
 
   return (
     <form action={action} className="flex flex-col gap-6">
@@ -33,7 +42,7 @@ export function RequestForm({
         <span className="kd-etiquette mb-2 block">Écris ce que tu veux</span>
         <textarea
           name="free_text"
-          defaultValue={initialText}
+          defaultValue={state.saisi?.texte ?? initialText}
           rows={3}
           maxLength={500}
           placeholder="Des pâtes carbo, des céréales, du Nutella…"
@@ -51,8 +60,8 @@ export function RequestForm({
         </p>
       ) : (
         <>
-          <Plats legende="Tes envies et tes plats aimés" detail="Pour toi" recettes={envies} initialRecipeIds={initialRecipeIds} />
-          <Plats legende="Les matchs" detail="Envies en commun" recettes={matchs} initialRecipeIds={initialRecipeIds} />
+          <Plats legende="Tes envies et tes plats aimés" detail="Pour toi" recettes={envies} initialRecipeIds={plats} />
+          <Plats legende="Les matchs" detail="Envies en commun" recettes={matchs} initialRecipeIds={plats} />
         </>
       )}
 

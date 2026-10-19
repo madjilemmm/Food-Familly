@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { importRecipeFromUrl } from "@/app/actions/recipes";
 import type { ImportedRecipe } from "@/lib/domain/recipe-import";
 import { MessageErreur } from "@/components/ui";
+import { messageErreur } from "@/lib/reseau";
 
 /**
  * Pré-remplit le formulaire à partir d'un lien Marmiton, 750g, Cuisine AZ…
@@ -24,7 +25,13 @@ export function ImportFromUrl({ onImport, compact }: { onImport: (r: ImportedRec
     setUrl(clean);
     setMessage(null);
     startTransition(async () => {
-      const res = await importRecipeFromUrl(clean);
+      let res: Awaited<ReturnType<typeof importRecipeFromUrl>>;
+      try {
+        res = await importRecipeFromUrl(clean);
+      } catch (e) {
+        setMessage({ ok: false, text: messageErreur(e) });
+        return;
+      }
       if (res.recipe) {
         onImport(res.recipe);
         const n = res.recipe.ingredients.length;

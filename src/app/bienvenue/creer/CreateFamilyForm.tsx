@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createFamily } from "@/app/actions/auth";
+import { sansPlantage } from "@/lib/reseau";
 import { SubmitButton } from "@/components/SubmitButton";
 import { IconeCroix, IconePlus, MessageErreur } from "@/components/ui";
 import type { Style } from "@/lib/session";
@@ -13,7 +14,7 @@ const EMOJIS = ["😎", "👩‍🍳", "👨‍🍳", "🤙", "🦄", "🐻", "�
 let nextKey = 1;
 
 export function CreateFamilyForm() {
-  const [state, action] = useActionState(createFamily, {});
+  const [state, action] = useActionState(sansPlantage(createFamily), {});
   const [members, setMembers] = useState<Member[]>([{ key: nextKey++, name: "", emoji: "😎", style: "fun" }]);
   const [me, setMe] = useState(0);
 

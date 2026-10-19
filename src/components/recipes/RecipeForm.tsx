@@ -11,6 +11,7 @@ import { resizeImage } from "./resizeImage";
 import { IconeCroix, IconePlus, MessageErreur } from "@/components/ui";
 import { ConfirmButton } from "@/components/courses/ConfirmButton";
 import { recipeConflicts, type MemberTastes } from "@/lib/domain/foods";
+import { sansPlantage } from "@/lib/reseau";
 
 type Row = { key: number; name: string; quantity: string; unit: string; aisle: string };
 
@@ -22,7 +23,8 @@ function emptyRow(aisle = "fruits_legumes"): Row {
 }
 
 export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredients; gouts?: MemberTastes[] }) {
-  const [state, action, saving] = useActionState(saveRecipe, {});
+  // Sans réseau, la recette reste à l'écran telle quelle (tous les champs sont gardés en mémoire).
+  const [state, action, saving] = useActionState(sansPlantage(saveRecipe, "Pas de réseau : la recette n'est pas encore enregistrée. Rien n'est perdu, réessaie quand ça revient."), {});
   const [rows, setRows] = useState<Row[]>(() =>
     recipe?.recipe_ingredients.length
       ? recipe.recipe_ingredients.map((i) => ({
@@ -82,7 +84,7 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
   const focaliser = (champ: string) => document.querySelector<HTMLElement>(`[data-champ="${champ}"]`)?.focus();
   const ajouterLigne = () => {
     const nouvelle = emptyRow(rows[rows.length - 1]?.aisle);
-    aFocaliser.current = `${nouvelle.key}-nom`;
+    aFocaliser.current = `nom-${rows.length}`;
     setRows((rs) => [...rs, nouvelle]);
   };
   const suivant = (e: React.KeyboardEvent, ensuite: () => void) => {
@@ -160,7 +162,7 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
           placeholder="4"
           data-champ="personnes"
           enterKeyHint="next"
-          onKeyDown={(e) => suivant(e, () => focaliser(`${rows[0].key}-nom`))}
+          onKeyDown={(e) => suivant(e, () => focaliser("nom-0"))}
           aria-describedby="servings-aide"
           className="kd-champ w-28"
         />
@@ -219,7 +221,7 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
           ))}
         </datalist>
         <ul className="kd-liste border-t-2 border-trait">
-          {rows.map((row) => (
+          {rows.map((row, i) => (
             <li key={row.key} className="flex flex-col gap-2 border-b-2 border-trait py-3">
               <div className="flex gap-2">
                 <input
@@ -227,9 +229,9 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
                   value={row.name}
                   onChange={(e) => update(row.key, { name: e.target.value })}
                   placeholder="Ingrédient"
-                  data-champ={`${row.key}-nom`}
+                  data-champ={`nom-${i}`}
                   enterKeyHint="next"
-                  onKeyDown={(e) => suivant(e, () => focaliser(`${row.key}-qte`))}
+                  onKeyDown={(e) => suivant(e, () => focaliser(`qte-${i}`))}
                   className="kd-champ min-w-0 flex-1"
                 />
                 <button
@@ -248,9 +250,9 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
                   onChange={(e) => update(row.key, { quantity: e.target.value })}
                   inputMode="decimal"
                   placeholder="Qté"
-                  data-champ={`${row.key}-qte`}
+                  data-champ={`qte-${i}`}
                   enterKeyHint="next"
-                  onKeyDown={(e) => suivant(e, () => focaliser(`${row.key}-unite`))}
+                  onKeyDown={(e) => suivant(e, () => focaliser(`unite-${i}`))}
                   className="kd-champ w-20 px-3"
                 />
                 <input
@@ -259,14 +261,10 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
                   onChange={(e) => update(row.key, { unit: e.target.value })}
                   list="units"
                   placeholder="unité"
-                  data-champ={`${row.key}-unite`}
+                  data-champ={`unite-${i}`}
                   enterKeyHint="next"
                   onKeyDown={(e) =>
-                    suivant(e, () => {
-                      const i = rows.findIndex((r) => r.key === row.key);
-                      if (i < rows.length - 1) focaliser(`${rows[i + 1].key}-nom`);
-                      else ajouterLigne();
-                    })
+                    suivant(e, () => (i < rows.length - 1 ? focaliser(`nom-${i + 1}`) : ajouterLigne()))
                   }
                   className="kd-champ w-24 px-3"
                 />
