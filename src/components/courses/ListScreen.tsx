@@ -40,7 +40,7 @@ export async function ListScreen({ me, retour }: { me: Profile; retour: { href: 
           est déjà pris.
         </p>
       )}
-      <ShoppingList items={trip.shopping_list_items} requests={textRequests} />
+      <ShoppingList tripId={trip.id} items={trip.shopping_list_items} requests={textRequests} />
     </>
   );
 }

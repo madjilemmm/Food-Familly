@@ -1,7 +1,11 @@
-/* Service worker « Kaddie » : notifications push + page hors connexion. */
+/* Service worker « Kaddie » : notifications push, et la liste de courses consultable sans réseau. */
 
-const CACHE = "kaddie-v1";
+const CACHE = "kaddie-v2"; // page hors connexion, police, logo
+const STATIQUES = "kaddie-statiques-v1"; // fichiers de l'appli (scripts, styles, illustrations)
+const PAGES = "kaddie-pages-v1"; // la dernière liste de courses
 const OFFLINE_URL = "/offline.html";
+const LISTE = "/courses";
+const MAX_STATIQUES = 400;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([OFFLINE_URL, "/icons/icon-192.png", "/fonts/BoldenVan.ttf", "/brand/logo/kaddie-logo-blanc.svg"])));
@@ -9,26 +13,82 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
+  const gardes = [CACHE, STATIQUES, PAGES];
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => !gardes.includes(k)).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
 
-// Les pages sont toujours chargées depuis le réseau (données en direct).
-// Sans réseau, on affiche une page d'excuse plutôt qu'une erreur Safari.
+const estStatique = (path) =>
+  path.startsWith("/_next/static/") || path.startsWith("/brand/") || path.startsWith("/fonts/") || path.startsWith("/icons/");
+
+/** Garde la page de la liste (réponse complète, pour la rouvrir sans réseau). */
+async function garderListe(res) {
+  if (!res.ok || res.redirected || !new URL(res.url).pathname.startsWith(LISTE)) return;
+  const cache = await caches.open(PAGES);
+  await cache.put(LISTE, res);
+}
+
 self.addEventListener("fetch", (event) => {
-  if (event.request.mode !== "navigate") {
-    // Police et logo de la page hors connexion
-    const path = new URL(event.request.url).pathname;
-    if (path === "/fonts/BoldenVan.ttf" || path === "/brand/logo/kaddie-logo-blanc.svg") {
-      event.respondWith(caches.match(event.request).then((hit) => hit || fetch(event.request)));
-    }
+  const req = event.request;
+  const url = new URL(req.url);
+  if (req.method !== "GET" || url.origin !== self.location.origin) return;
+
+  if (req.mode === "navigate") {
+    // Déconnecté de la famille : la liste gardée n'a plus rien à faire sur ce téléphone.
+    if (url.pathname.startsWith("/bienvenue")) caches.delete(PAGES);
+    // Toujours le réseau d'abord (données en direct). Sans réseau : la dernière liste
+    // pour l'écran des courses, sinon une page d'excuse (qui propose cette liste).
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (url.pathname === LISTE && !url.search) event.waitUntil(garderListe(res.clone()));
+          return res;
+        })
+        .catch(async () => {
+          const liste = url.pathname === LISTE ? await caches.match(LISTE, { cacheName: PAGES, ignoreVary: true }) : null;
+          return liste || caches.match(OFFLINE_URL);
+        }),
+    );
     return;
   }
-  event.respondWith(fetch(event.request).catch(() => caches.match(OFFLINE_URL)));
+
+  // Fichiers de l'appli : ceux de _next/static ne changent jamais (nom unique par version) ;
+  // les autres sont servis tout de suite depuis le téléphone, puis remis à jour en arrière-plan.
+  if (estStatique(url.pathname)) {
+    event.respondWith(
+      caches.open(STATIQUES).then(async (cache) => {
+        const garde = (await cache.match(req)) || (await caches.match(req, { cacheName: CACHE }));
+        const reseau = fetch(req).then((res) => {
+          if (res.ok) cache.put(req, res.clone());
+          return res;
+        });
+        if (garde) {
+          if (!url.pathname.startsWith("/_next/static/")) event.waitUntil(reseau.catch(() => {}));
+          return garde;
+        }
+        return reseau;
+      }),
+    );
+  }
+});
+
+// La liste est affichée : on en garde une copie à jour, et on limite la place prise.
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "garder-liste") return;
+  event.waitUntil(
+    fetch(LISTE, { credentials: "same-origin", headers: { accept: "text/html" } })
+      .then(garderListe)
+      .catch(() => {})
+      .then(async () => {
+        const cache = await caches.open(STATIQUES);
+        const cles = await cache.keys();
+        await Promise.all(cles.slice(0, Math.max(0, cles.length - MAX_STATIQUES)).map((k) => cache.delete(k)));
+      }),
+  );
 });
 
 self.addEventListener("push", (event) => {

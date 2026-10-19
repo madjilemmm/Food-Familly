@@ -1,9 +1,21 @@
 "use client";
 
 import { useEffect } from "react";
+import { lireAttente } from "@/lib/attente";
 
 const CHECK_EVERY_MS = 5 * 60 * 1000;
 const LOADED_VERSION = process.env.NEXT_PUBLIC_BUILD_ID ?? "";
+
+/** Quelqu'un est en train d'écrire (demande, article…) ou des changements attendent le réseau : on recharge plus tard. */
+function occupe(): boolean {
+  const actif = document.activeElement;
+  if (actif instanceof HTMLInputElement || actif instanceof HTMLTextAreaElement) return true;
+  const champs = document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+    "textarea, input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file])",
+  );
+  if ([...champs].some((c) => c.value !== c.defaultValue)) return true;
+  return lireAttente().some((e) => !e.envoyee);
+}
 
 /**
  * Sur iPhone, l'appli installée reste en mémoire et garde l'ancienne version
@@ -17,7 +29,7 @@ export function AutoUpdate() {
 
     async function check() {
       if (checking || document.visibilityState !== "visible") return;
-      if (location.pathname.startsWith("/recettes/")) return;
+      if (location.pathname.startsWith("/recettes/") || occupe()) return;
       checking = true;
       try {
         const res = await fetch("/api/version", { cache: "no-store" });

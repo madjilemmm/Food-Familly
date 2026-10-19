@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { swipe, undoSwipe } from "@/app/actions/swipes";
+import { swipe, undoSwipe, type SwipeAvant } from "@/app/actions/swipes";
+import { lireAttente, mettreEnAttente, retirerDeLAttente } from "@/lib/attente";
+import { estErreurReseau } from "@/lib/reseau";
 import { useAnnuler } from "@/components/Annuler";
 import { Bouton, CarteRecette, IconeJenVeux, IconePasEnvie, Logo, Scene } from "@/design-system/components/Kaddie";
 import type { Recipe } from "@/lib/data";
@@ -30,7 +32,8 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
     setDeck((d) => [...d, ...nouvelles]);
   }, [initialDeck]);
   const [match, setMatch] = useState<{ recipe: Recipe; avec: string[] } | null>(null);
-  const [error, setError] = useState(false);
+  // « attente » : pas de réseau, le choix est gardé sur le téléphone et partira tout seul.
+  const [error, setError] = useState<null | "attente" | "erreur">(null);
   const pileRef = useRef<HTMLDivElement>(null);
   const [monte, setMonte] = useState(false);
   useEffect(() => setMonte(true), []);
@@ -44,20 +47,32 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
     const carte = top;
     setDeck((d) => d.slice(1));
     setAnnonce(deck[1] ? `Plat suivant : ${deck[1].title}` : "Plus de plats pour l'instant");
-    const envoi = swipe(carte.id, liked)
+    const envoi: Promise<SwipeAvant | "attente"> = swipe(carte.id, liked)
       .then((res) => {
+        setError(null);
         if (res.match) setMatch({ recipe: carte, avec: res.avec });
         return res.avant;
       })
-      .catch(() => {
-        setError(true);
-        return null;
+      .catch((e) => {
+        if (!estErreurReseau(e)) {
+          setError("erreur");
+          return null;
+        }
+        mettreEnAttente({ sorte: "swipe", recipeId: carte.id, liked });
+        setError("attente");
+        return "attente" as const;
       });
     // Un doigt qui glisse trop vite : la carte revient, et le swipe redevient ce qu'il était.
     proposer(`${liked ? "Miam" : "Bof"} : ${carte.title}`, () => {
       setMatch((m) => (m?.recipe.id === carte.id ? null : m));
       setDeck((d) => [carte, ...d.filter((r) => r.id !== carte.id)]);
-      envoi.then((avant) => undoSwipe(carte.id, avant));
+      envoi.then((avant) => {
+        if (avant !== "attente") return undoSwipe(carte.id, avant).catch(() => {});
+        // Gardé hors connexion : s'il n'est pas encore parti, il suffit de l'oublier.
+        const enFile = lireAttente().find((e) => e.cle === `swipe:${carte.id}`);
+        if (enFile && !enFile.envoyee) retirerDeLAttente([enFile.cle]);
+        else return undoSwipe(carte.id, null).catch(() => {});
+      });
     });
   }
 
@@ -116,9 +131,14 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
         {annonce}
       </p>
 
-      {error && (
+      {error === "attente" && (
+        <p role="status" className="kd-carte p-4 text-center">
+          Pas de réseau : tes choix sont gardés et partiront tout seuls au retour du réseau.
+        </p>
+      )}
+      {error === "erreur" && (
         <p role="alert" className="kd-carte p-4 text-center">
-          Pas de réseau, un choix n&apos;est pas passé. Réessaie quand ça revient.
+          Un choix n&apos;a pas pu être enregistré. Réessaie dans un instant.
         </p>
       )}
 

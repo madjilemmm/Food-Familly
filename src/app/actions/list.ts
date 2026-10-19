@@ -14,19 +14,46 @@ async function tripId() {
   return trip.id;
 }
 
-export async function setItemChecked(itemId: string, checked: boolean) {
-  await db().from("shopping_list_items").update({ checked }).eq("id", itemId).eq("trip_id", await tripId());
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Cocher ou décocher, un article ou plusieurs d'un coup (la file d'attente du téléphone,
+ * au retour du réseau). Chaque état est absolu : renvoyer deux fois ne change rien.
+ */
+export async function setItemsChecked(changes: { id: string; checked: boolean }[]) {
+  const valides = changes.slice(0, 300).filter((c) => UUID.test(c.id) && typeof c.checked === "boolean");
+  if (valides.length === 0) return;
+  const trip = await tripId();
+  const maj = (checked: boolean) => {
+    const ids = valides.filter((c) => c.checked === checked).map((c) => c.id);
+    return ids.length ? db().from("shopping_list_items").update({ checked }).in("id", ids).eq("trip_id", trip) : null;
+  };
+  const resultats = await Promise.all([maj(true), maj(false)]);
+  const erreur = resultats.find((r) => r?.error)?.error;
+  if (erreur) throw new Error(erreur.message);
   changed();
 }
 
-/** Un ou plusieurs articles ; « 2 kg pommes » garde sa quantité, le rayon est deviné. */
-export async function addItems(texts: string[], source: "manual" | "request" = "manual") {
-  const articles = texts.slice(0, 20).map(lireArticle).filter((a) => a !== null);
-  if (articles.length === 0) return;
+/**
+ * Un ou plusieurs articles ; « 2 kg pommes » garde sa quantité, le rayon est deviné.
+ * Un article créé sur le téléphone arrive avec son identifiant : renvoyé deux fois
+ * (réseau revenu, appui répété), il n'est ajouté qu'une fois.
+ */
+export async function addItems(entries: (string | { id: string; texte: string })[], source: "manual" | "request" = "manual") {
+  if (source !== "manual" && source !== "request") return;
+  const lignes = entries.slice(0, 20).flatMap((e) => {
+    const { id, texte } = typeof e === "string" ? { id: crypto.randomUUID(), texte: e } : e;
+    const article = UUID.test(id) && typeof texte === "string" ? lireArticle(texte) : null;
+    return article ? [{ id, ...article, source }] : [];
+  });
+  if (lignes.length === 0) return;
   const trip = await tripId();
   const { error } = await db()
     .from("shopping_list_items")
-    .insert(articles.map((a) => ({ trip_id: trip, ...a, source })));
+    .upsert(
+      lignes.map((l) => ({ ...l, trip_id: trip })),
+      { onConflict: "id", ignoreDuplicates: true },
+    );
   if (error) throw new Error(error.message);
   changed();
 }

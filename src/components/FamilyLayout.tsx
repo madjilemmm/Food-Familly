@@ -1,4 +1,5 @@
 import { RealtimeRefresher } from "@/components/RealtimeRefresher";
+import { FileAttente } from "@/components/FileAttente";
 import { TabBar, type Tab } from "@/components/TabBar";
 import { AnnulerProvider } from "@/components/Annuler";
 import { IconeLivre, IconePanier, IconeSwipe } from "@/components/ui";
@@ -18,6 +19,7 @@ export function FamilyLayout({ me, coursesBadge, children }: { me: Profile; cour
   return (
     <AnnulerProvider>
       <RealtimeRefresher familyId={me.family_id} />
+      <FileAttente />
       <main className="ecran-famille pb-tabbar mx-auto max-w-xl overflow-x-clip px-5">{children}</main>
       <TabBar tabs={tabs} />
     </AnnulerProvider>
