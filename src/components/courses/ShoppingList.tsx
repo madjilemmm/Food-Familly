@@ -3,9 +3,9 @@
 import { useEffect, useLayoutEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { apprendreArticle, corrigerArticle, deleteItem, restoreItem } from "@/app/actions/list";
 import { finishTrip } from "@/app/actions/trips";
-import { groupByAisle } from "@/lib/domain/aisles";
+import { groupByAisle, isAisle } from "@/lib/domain/aisles";
 import { articlesDe, type Article } from "@/lib/domain/articles";
-import { cleProduit, lireSaisie, type Appris, type Lecture } from "@/lib/domain/reconnaissance";
+import { cleApprise, cleProduit, lireSaisie, type Appris, type Lecture } from "@/lib/domain/reconnaissance";
 import { formatQuantity } from "@/lib/domain/shopping-list";
 import { attendreFile, mettreEnAttente, nouvelId, retirerDeLAttente, useAttente, type Entree } from "@/lib/attente";
 import type { ListItem } from "@/lib/data";
@@ -30,7 +30,7 @@ export function ShoppingList({
   tripId,
   items,
   requests,
-  appris = {},
+  appris: apprisServeur = {},
 }: {
   tripId: string;
   items: ListItem[];
@@ -39,6 +39,9 @@ export function ShoppingList({
   appris?: Appris;
 }) {
   const [aide, setAide] = useState<Aide | null>(null);
+  // Ce que la famille vient d'apprendre à Kaddie compte tout de suite, sans attendre le serveur.
+  const [apprisIci, setApprisIci] = useState<Appris>({});
+  const appris = { ...apprisServeur, ...apprisIci };
   const [, startTransition] = useTransition();
   const proposer = useAnnuler();
   const { essayer, alerte } = useErreurReseau();
@@ -85,14 +88,18 @@ export function ShoppingList({
     if (enFile) add([article], "manual", id);
     else startTransition(async () => void (await essayer(() => corrigerArticle(id, article))));
   };
-  const apprendre = (saisie: string, choix: Parameters<typeof apprendreArticle>[1]) =>
+  const apprendre = (saisie: string, choix: Parameters<typeof apprendreArticle>[1]) => {
+    const rayon = choix !== "tel-quel" && isAisle(choix.rayon) ? choix.rayon : null;
+    setApprisIci((a) => ({ ...a, [cleApprise(saisie)]: choix === "tel-quel" || !rayon ? "tel-quel" : { nom: choix.nom, rayon, produit: choix.produit } }));
     startTransition(async () => void (await apprendreArticle(saisie, choix).catch(() => {})));
+  };
 
   const ajouterSaisie = (valeur: string) => {
     const lecture = lireSaisie(valeur, appris);
     if (!lecture) return;
-    // Le même produit, pas encore pris : on ne le met pas deux fois.
-    const deja = list.find((i) => !i.checked && cleProduit(i.name, appris) === lecture.cle);
+    // Le même produit, ajouté ou demandé et pas encore pris : on ne le met pas deux fois.
+    // (Le lait d'une recette et le lait de la maison sont deux besoins : une seule ligne, regroupée.)
+    const deja = list.find((i) => !i.checked && i.source !== "recipe" && cleProduit(i.name, appris) === lecture.cle);
     if (deja) return setAide({ deja: deja.name });
     const tel = { name: valeur.trim().charAt(0).toUpperCase() + valeur.trim().slice(1), quantity: null, unit: "", aisle: lecture.rayon };
     const [id] = add([enArticle(lecture)], "manual");
@@ -477,7 +484,7 @@ function LigneRegroupee({
   const [ouvert, setOuvert] = useState(false);
   const tousCoches = besoins.every((i) => i.checked);
   const resume = besoins
-    .map((i) => [i.quantity != null || i.unit ? formatQuantity(i.quantity, i.unit) : null, provenance(i) ?? "ajouté"].filter(Boolean).join(" "))
+    .map((i) => [i.quantity != null || i.unit ? formatQuantity(i.quantity, i.unit) : null, provenance(i)].filter(Boolean).join(" ") || "ajouté")
     .join(" · ");
   return (
     <li data-glisse={besoins[0].id} className="flex flex-col">

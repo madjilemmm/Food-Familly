@@ -299,7 +299,7 @@ export async function refuserSuggestion(cle: string) {
 /** La liste est faite : ce qui était proposé et n'a reçu aucune réponse est noté « sans réponse ». */
 async function noterSansReponse(familyId: string, trip: Trip) {
   const [{ courses, reponses, repondusIci }, appris] = await Promise.all([getCoursesPassees(familyId), getAppris(familyId)]);
-  const surLaListe = new Set(trip.shopping_list_items.map((i) => cleProduit(i.name, appris)));
+  const surLaListe = new Set(trip.shopping_list_items.filter((i) => i.source === "manual" || i.source === "request").map((i) => cleProduit(i.name, appris)));
   const { reportes, habituels } = aAjouter(courses, reponses, { surLaListe, repondusIci, now: Date.now() });
   const ignores = [...reportes, ...habituels];
   if (ignores.length === 0) return;

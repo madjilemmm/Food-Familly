@@ -230,7 +230,7 @@ export const getTripOverview = cache(async function getTripOverview(
     nobodyAnswered: requests.length === 0,
     aVerifier,
     ...aAjouter(passees.courses, passees.reponses, {
-      surLaListe: new Set(trip.shopping_list_items.filter((i) => i.source !== "maison").map((i) => cleProduit(i.name, appris))),
+      surLaListe: new Set(trip.shopping_list_items.filter((i) => i.source === "manual" || i.source === "request").map((i) => cleProduit(i.name, appris))),
       repondusIci: passees.repondusIci,
       now: Date.now(),
     }),
