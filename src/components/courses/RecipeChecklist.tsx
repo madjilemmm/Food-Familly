@@ -126,6 +126,7 @@ function Plat({
           <span className="min-w-0 flex-1">
             <span className="block font-semibold">{r.title}</span>
             {!r.checked && <span className="kd-petit block">{raison}</span>}
+            {r.attention && <span className="kd-petit block font-semibold text-violet">{r.attention}</span>}
           </span>
           <span
             aria-hidden

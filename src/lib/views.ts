@@ -23,6 +23,8 @@ import type { Convives } from "@/lib/domain/convives";
 import { cleMaison } from "@/lib/domain/maison";
 import { aAjouter, type Suggestion } from "@/lib/domain/habitudes";
 import { cleProduit } from "@/lib/domain/reconnaissance";
+import { nAimePas } from "@/lib/domain/foods";
+import { listeDeNoms } from "@/lib/domain/convives";
 import { lireEnvies } from "@/lib/domain/envies";
 import { classerPlats, compatibilite, oubliParMembre, scoreIndividuel, type CandidatCourse, type PlatClasse } from "@/lib/domain/reco";
 
@@ -45,6 +47,8 @@ export type PlatDeLaCourse = {
   convives: Convives;
   /** Pourquoi il est là : demandé par…, envie de…, aimé par…, pour toute la famille. */
   raison: PlatClasse["raison"];
+  /** Choisi malgré un interdit ou un « j'aime pas » (mode strict) : « Interdit pour Madji ». */
+  attention: string | null;
 };
 
 /**
@@ -133,6 +137,7 @@ export async function platsDeLaCourse(familyId: string, trip: Trip): Promise<Pla
     propose: p.propose,
     eaters: p.eaters,
     raison: p.raison,
+    attention: p.attention ? attentionPour(conflits.get(p.id)) : null,
     convives: {
       noms: p.eaters.length >= ids.length ? "famille" : p.eaters.flatMap((id) => noms.get(id) ?? []),
       n: p.people,
@@ -231,3 +236,10 @@ export const getTripOverview = cache(async function getTripOverview(
     }),
   };
 });
+
+/** L'avertissement d'un plat choisi malgré les goûts de la famille. */
+function attentionPour(c: ReturnType<typeof conflictsOf> | undefined): string {
+  if (c?.interditPar.length) return `Attention : interdit pour ${listeDeNoms(c.interditPar)}`;
+  if (c?.pasFanDe.length) return `Attention : ${nAimePas(c.pasFanDe)}`;
+  return "Attention : écarté par les goûts de la famille";
+}

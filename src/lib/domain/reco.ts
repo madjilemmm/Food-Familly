@@ -256,6 +256,8 @@ export type PlatClasse = {
   /** Pourquoi il est là, en clair. */
   raison: { type: "demande" | "envie" | "aime" | "famille"; qui: string[] };
   score: number;
+  /** Choisi à la main alors qu'il contient un interdit (ou un « j'aime pas » en mode strict) : on prévient. */
+  attention?: boolean;
 };
 
 /**
@@ -287,8 +289,10 @@ export function classerPlats(
     actifs?: number;
   },
 ): PlatClasse[] {
+  // Un plat exclu par les goûts n'est jamais proposé… sauf s'il a été choisi à la main :
+  // un choix ne disparaît jamais en silence (il est gardé, avec un avertissement).
   const plats = candidats
-    .filter((c) => !c.exclu)
+    .filter((c) => !c.exclu || c.choix?.selected)
     .map((c) => {
       const voulu = [...new Set([...c.demandePar, ...c.enviePar])];
       const derives = voulu.length ? voulu : c.aimePar.length ? c.aimePar : membres;
@@ -312,7 +316,7 @@ export function classerPlats(
       return {
         c,
         proposable: c.demandePar.length > 0 || c.enviePar.length >= Math.max(1, Math.min(2, actifs)),
-        plat: { id: c.id, eaters, people: c.choix?.people ?? eaters.length, raison: { type, qui }, score },
+        plat: { id: c.id, eaters, people: c.choix?.people ?? eaters.length, raison: { type, qui }, score, ...(c.exclu ? { attention: true } : {}) },
       };
     });
 

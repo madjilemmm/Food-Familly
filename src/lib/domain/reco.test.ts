@@ -280,3 +280,13 @@ describe("Utile seul — une seule personne swipe", () => {
     expect(p).toMatchObject({ propose: false, checked: false });
   });
 });
+
+describe("Un plat choisi à la main ne disparaît jamais", () => {
+  it("exclu par les goûts mais choisi : gardé, avec un avertissement (ses ingrédients vont sur la liste)", () => {
+    const [p] = classer([candidat("quiche", { exclu: true, choix: { selected: true, people: 3, eaters: null } })], { ouverte: false });
+    expect(p).toMatchObject({ id: "quiche", checked: true, attention: true });
+  });
+  it("exclu et pas choisi : jamais proposé", () => {
+    expect(classer([candidat("quiche", { exclu: true, enviePar: famille })])).toEqual([]);
+  });
+});
