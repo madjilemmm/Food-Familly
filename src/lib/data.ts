@@ -3,7 +3,7 @@ import { cache } from "react";
 import { db } from "@/lib/supabase/server";
 import { nAimePas, recipeConflicts, type Conflicts, type MemberTastes, type TasteLevel } from "@/lib/domain/foods";
 import { correspondAuxStyles, dureeMax, lireEnvies, styleDe, type Envies } from "@/lib/domain/envies";
-import { calculerMatchs, estEnvie, ordonnerPaquet, type Avis, type Signaux } from "@/lib/domain/reco";
+import { calculerMatchs, estEnvie, ordonnerPaquet, type Avis, type Moment, type Signaux } from "@/lib/domain/reco";
 import { passagesDesIngredients, sansDouteALaMaison } from "@/lib/domain/maison";
 import type { Style } from "@/lib/session";
 import { isAisle } from "@/lib/domain/aisles";
@@ -407,7 +407,7 @@ export async function enviesPour(familyId: string, recipeId: string): Promise<st
  * mes goûts, ce dont les autres ont envie et la découverte devant ; mes favoris
  * qui reviennent de temps en temps ; ce qu'un autre n'aime pas, à la fin.
  */
-export async function getDeck(familyId: string, profileId: string): Promise<Recipe[]> {
+export async function getDeck(familyId: string, profileId: string, moment: Moment = null): Promise<Recipe[]> {
   const [recipes, avis, envies, ctx, profiles] = await Promise.all([
     getRecipes(familyId),
     getFamilySwipes(familyId),
@@ -430,9 +430,10 @@ export async function getDeck(familyId: string, profileId: string): Promise<Reci
       enviesDesAutres: (envies.get(r.id) ?? []).filter((id) => id !== profileId).length,
       vuParLaFamille: (avis.get(r.id)?.size ?? 0) > 0,
       style: styleDe(texts),
+      minutes: r.total_minutes,
     };
   });
-  return ordonnerPaquet(cartes, Date.now()).map(({ cache: _c, fin, avis: _a, signaux: _s, enviesDesAutres: _e, vuParLaFamille: _v, style: _st, ...r }) => {
+  return ordonnerPaquet(cartes, Date.now(), moment).map(({ cache: _c, fin, avis: _a, signaux: _s, enviesDesAutres: _e, vuParLaFamille: _v, style: _st, minutes: _m, ...r }) => {
     const c = conflicts.get(r.id)!;
     return fin && c.pasFanDe.length ? { ...r, pastille: nAimePas(c.pasFanDe) } : r;
   });
@@ -533,4 +534,51 @@ export const getCoursesPassees = cache(async function getCoursesPassees(
     repondusIci: new Set(reponses.filter((r) => r.trip === enCours?.id).map((r) => r.cle)),
     enCours: enCours?.id ?? null,
   };
+});
+
+// ─── Après les courses : les repas achetés ─────────────────────────────
+
+export type RepasAchete = Recipe & {
+  /** Déjà cuisiné (« C'est fait »). */
+  fait: boolean;
+  /** Qui le mange (prénoms). */
+  mangeurs: string[];
+};
+
+/**
+ * Les plats achetés à la dernière course terminée (moins de 10 jours) : de quoi répondre
+ * à « ce soir, on mange quoi ? » sans réfléchir. Vide s'il n'y a rien de récent.
+ */
+export const getRepasAchetes = cache(async function getRepasAchetes(
+  familyId: string,
+): Promise<{ tripId: string; plats: RepasAchete[] } | null> {
+  const since = new Date(Date.now() - 10 * JOUR).toISOString();
+  const { data: trip } = await db()
+    .from("shopping_trips")
+    .select("id, trip_recipes(*)")
+    .eq("family_id", familyId)
+    .eq("status", "done")
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!trip) return null;
+  const choisis = (trip.trip_recipes as { recipe_id: string; selected: boolean; eaters?: string[] | null }[]).filter((r) => r.selected);
+  if (choisis.length === 0) return null;
+  const [recipes, profiles, repas] = await Promise.all([
+    getRecipes(familyId),
+    getProfiles(familyId),
+    // Base pas encore migrée : aucun repas noté, la liste reste utile.
+    db().from("repas").select("recipe_id, fait_le").eq("trip_id", trip.id).then((r) => r.data ?? []),
+  ]);
+  const parId = new Map(recipes.map((r) => [r.id, r]));
+  const noms = new Map(profiles.map((p) => [p.id, p.name]));
+  const notes = new Map(repas.map((r) => [r.recipe_id as string, r]));
+  const plats = choisis.flatMap((c) => {
+    const r = parId.get(c.recipe_id);
+    if (!r) return [];
+    const note = notes.get(c.recipe_id);
+    return [{ ...r, fait: Boolean(note?.fait_le), mangeurs: (c.eaters ?? []).flatMap((id) => noms.get(id) ?? []) }];
+  });
+  return { tripId: trip.id as string, plats };
 });

@@ -7,8 +7,20 @@ import { IconePlus } from "@/components/ui";
 type Ingredient = { id: string; name: string; quantity: number | null; unit: string };
 
 /** Les ingrédients, ajustés au nombre de personnes (celui des courses en cours, ou toute la famille). */
-export function Ingredients({ ingredients, servings, people }: { ingredients: Ingredient[]; servings: number | null; people: number }) {
-  const [n, setN] = useState(people);
+export function Ingredients({
+  ingredients,
+  servings,
+  people,
+  nombre,
+}: {
+  ingredients: Ingredient[];
+  servings: number | null;
+  people: number;
+  /** Nombre de personnes partagé avec le mode cuisine (sinon, gardé ici). */
+  nombre?: [number, (n: number) => void];
+}) {
+  const local = useState(people);
+  const [n, setN] = nombre ?? local;
   const liste = scaleIngredients(ingredients, servings, n);
   return (
     <section className="mt-8">

@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfile, requireUser } from "@/lib/auth";
-import { getCurrentTrip, getFamilyEnvies, getFamilySwipes, getProfiles, getRecipe, type RecipeWithIngredients } from "@/lib/data";
+import { getCurrentTrip, getFamilyEnvies, getFamilySwipes, getProfiles, getRecipe, getRepasAchetes, type RecipeWithIngredients } from "@/lib/data";
 import { db } from "@/lib/supabase/server";
 import { extractRecipe } from "@/lib/domain/recipe-import";
 import { safeFetch } from "@/lib/safe-fetch";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import { LienRetour } from "@/components/LienRetour";
 import { IconeRetour } from "@/components/ui";
-import { Ingredients } from "./Ingredients";
+import { Cuisiner } from "./Cuisiner";
 import { AvisRecette, type EtatAvis } from "./AvisRecette";
 
 export const metadata = { title: "La recette — Kaddie" };
@@ -44,17 +44,20 @@ export default async function RecipePage({
   const retour = depuis && RETOURS[depuis] ? { href: depuis, label: RETOURS[depuis] } : { href: "/recettes", label: "Les recettes" };
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const user = await requireUser();
-  const [, found, members, trip, swipes, envies] = await Promise.all([
+  const [, found, members, trip, swipes, envies, repas] = await Promise.all([
     requireProfile(),
     getRecipe(user.familyId, id),
     getProfiles(user.familyId),
     getCurrentTrip(user.familyId),
     getFamilySwipes(user.familyId),
     getFamilyEnvies(user.familyId),
+    getRepasAchetes(user.familyId),
   ]);
   if (!found) notFound();
+  // Acheté aux dernières courses : on le cuisine pour celles et ceux qui le mangent.
+  const achete = repas?.plats.find((p) => p.id === id && !p.fait);
   const recipe = await completer(found);
-  const people = trip?.people ?? Math.max(1, members.length);
+  const people = achete?.mangeurs.length || trip?.people || Math.max(1, members.length);
   const monAvis = swipes.get(id)?.get(user.profileId);
   const etat: EtatAvis = envies.get(id)?.includes(user.profileId) ? "envie" : monAvis?.likedAt != null ? "aime" : monAvis ? "refuse" : null;
   const infos = [recipe.total_minutes && duree(recipe.total_minutes), recipe.servings && `prévue pour ${recipe.servings}`].filter(Boolean);
@@ -76,7 +79,14 @@ export default async function RecipePage({
 
       <AvisRecette key={etat ?? "aucun"} recipeId={recipe.id} etat={etat} />
 
-      <Ingredients ingredients={recipe.recipe_ingredients} servings={recipe.servings} people={people} />
+      <Cuisiner
+        recipeId={recipe.id}
+        ingredients={recipe.recipe_ingredients}
+        servings={recipe.servings}
+        people={people}
+        steps={recipe.steps ?? []}
+        repasTripId={achete ? repas!.tripId : null}
+      />
 
       <section className="mt-8">
         <h2 className="kd-titre-2 mb-4 text-aubergine">Les étapes</h2>

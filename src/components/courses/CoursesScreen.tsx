@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/data";
-import { forFamily, getMatches, getMyLikes, getPlatsAimes, getProfiles, getRecipes } from "@/lib/data";
+import { forFamily, getMatches, getMyLikes, getPlatsAimes, getProfiles, getRecipes, getRepasAchetes } from "@/lib/data";
+import { CeSoir } from "./CeSoir";
 import { getTripOverview, type TripOverview } from "@/lib/views";
 import { deadlineFor, departureChoices, formatTime } from "@/lib/domain/trip";
 import { ROUTES } from "@/lib/routes";
@@ -30,7 +31,12 @@ export async function CoursesScreen({ me, vue, notifications }: { me: Profile; v
   if (!overview) {
     // Personne n'y va : le même langage que Recettes et la liste (bandeau, puis des lignes),
     // avec ce qui fait envie en ce moment, pour savoir à quoi s'attendre.
-    const [profiles, matchesFamille, mesEnvies] = await Promise.all([getProfiles(me.family_id), getMatches(me.family_id), getMyLikes(me.family_id, me.id)]);
+    const [profiles, matchesFamille, mesEnvies, repas] = await Promise.all([
+      getProfiles(me.family_id),
+      getMatches(me.family_id),
+      getMyLikes(me.family_id, me.id),
+      getRepasAchetes(me.family_id),
+    ]);
     const others = profiles.filter((p) => p.id !== me.id).map((p) => p.name);
     // Seul·e : ses propres envies (Kaddie les proposera), à la place des matchs.
     const seul = others.length === 0;
@@ -43,6 +49,7 @@ export async function CoursesScreen({ me, vue, notifications }: { me: Profile; v
     return (
       <>
         <BandeauScene fond="courses" illustration="courses" etiquette={`Salut ${me.name}`} titre="On y va ?" actions={notifications} />
+        {repas && <CeSoir tripId={repas.tripId} plats={repas.plats} moi={me.name} />}
         <StartTrip choices={choices} others={others} />
         <section className="mt-10">
           <div className="mb-2 flex items-baseline justify-between gap-4">

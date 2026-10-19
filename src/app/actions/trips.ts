@@ -307,3 +307,23 @@ async function noterSansReponse(familyId: string, trip: Trip) {
     .from("suggestions_reponses")
     .upsert(ignores.map((s) => ({ trip_id: trip.id, cle: s.cle, reponse: "sans_reponse" })), { onConflict: "trip_id,cle", ignoreDuplicates: true });
 }
+
+// ─── Après les courses : les repas ─────────────────────────────────────
+
+/** Une course passée de la famille (pas forcément la course en cours). */
+async function courseDeLaFamille(user: CurrentUser, tripId: string) {
+  const { data } = await db().from("shopping_trips").select("id, created_by").eq("id", tripId).eq("family_id", user.familyId).maybeSingle();
+  if (!data) throw new Error("Course inconnue");
+  return data as { id: string; created_by: string | null };
+}
+
+/** « C'est fait » (ou « pas encore ») pour un plat acheté. */
+export async function marquerRepas(tripId: string, recipeId: string, fait: boolean) {
+  const user = await requireUser();
+  await courseDeLaFamille(user, tripId);
+  const { error } = await db()
+    .from("repas")
+    .upsert({ trip_id: tripId, recipe_id: recipeId, fait_le: fait ? new Date().toISOString() : null }, { onConflict: "trip_id,recipe_id" });
+  if (error) throw new Error(error.message);
+  changed();
+}

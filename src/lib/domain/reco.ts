@@ -44,6 +44,12 @@ export const REGLAGES = {
   DESACCORD: 0.5,
 
   // ─── Contexte ───
+  /** Paquet du moment (soir de semaine) : un plat rapide avance, un plat long recule. */
+  MOMENT_RAPIDE: 0.35,
+  MOMENT_LONG: -0.35,
+  /** « Rapide » : 30 min ou moins ; « long » : plus de 45 min. */
+  RAPIDE_MINUTES: 30,
+  LONG_MINUTES: 45,
   /** Pour une course : part du groupe qui en a envie maintenant. */
   ENVIE: 0.5,
   /** Demandé pour cette course : la plus forte des envies. */
@@ -169,7 +175,20 @@ export type CartePaquet = {
   vuParLaFamille: boolean;
   /** Style du plat (pour varier), null si inconnu. */
   style: string | null;
+  /** Durée totale (minutes), si connue : sert au paquet du moment. */
+  minutes?: number | null;
 };
+
+/** Le moment : un soir de semaine, on a peu de temps ; le reste du temps, on a le temps de découvrir. */
+export type Moment = "rapide" | null;
+
+/** Lundi à jeudi, à partir de 15 h (heure de Paris) : le paquet favorise les plats rapides. */
+export function momentDe(date: Date): Moment {
+  const parts = new Intl.DateTimeFormat("fr-FR", { weekday: "short", hour: "numeric", hour12: false, timeZone: "Europe/Paris" }).formatToParts(date);
+  const jour = parts.find((p) => p.type === "weekday")?.value ?? "";
+  const heure = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  return ["lun.", "mar.", "mer.", "jeu."].includes(jour) && heure >= 15 ? "rapide" : null;
+}
 
 /**
  * Mon paquet : d'abord des plats jamais vus, les plus pertinents pour moi d'abord
@@ -178,7 +197,7 @@ export type CartePaquet = {
  * pas plus de deux plats du même style d'affilée quand on peut l'éviter ;
  * les plats qu'un autre n'aime pas à la fin. Le paquet ne s'épuise jamais.
  */
-export function ordonnerPaquet<C extends CartePaquet>(cartes: C[], now: number): C[] {
+export function ordonnerPaquet<C extends CartePaquet>(cartes: C[], now: number, moment: Moment = null): C[] {
   const disponible = (c: C) => {
     if (!c.avis) return true;
     const jours = c.avis.likedAt != null ? REGLAGES.RETOUR_AIME_JOURS : REGLAGES.RETOUR_REFUSE_JOURS;
@@ -188,7 +207,14 @@ export function ordonnerPaquet<C extends CartePaquet>(cartes: C[], now: number):
     (scoreIndividuel(c.signaux, now) ?? 0) +
     REGLAGES.ENVIE_DES_AUTRES * Math.min(1, c.enviesDesAutres / 2) +
     (c.vuParLaFamille ? 0 : REGLAGES.DECOUVERTE) +
-    (c.fin ? REGLAGES.AUTRE_PAS_FAN : 0);
+    (c.fin ? REGLAGES.AUTRE_PAS_FAN : 0) +
+    (moment === "rapide" && c.minutes
+      ? c.minutes <= REGLAGES.RAPIDE_MINUTES
+        ? REGLAGES.MOMENT_RAPIDE
+        : c.minutes > REGLAGES.LONG_MINUTES
+          ? REGLAGES.MOMENT_LONG
+          : 0
+      : 0);
   const scores = new Map(cartes.map((c) => [c.id, score(c)]));
   const parScore = (a: C, b: C) => scores.get(b.id)! - scores.get(a.id)! || b.created_at.localeCompare(a.created_at);
 

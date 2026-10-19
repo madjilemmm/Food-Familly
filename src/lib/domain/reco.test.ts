@@ -7,6 +7,7 @@ import {
   estEnvie,
   oubliParMembre,
   ordonnerPaquet,
+  momentDe,
   scoreIndividuel,
   type Avis,
   type CandidatCourse,
@@ -288,5 +289,29 @@ describe("Un plat choisi à la main ne disparaît jamais", () => {
   });
   it("exclu et pas choisi : jamais proposé", () => {
     expect(classer([candidat("quiche", { exclu: true, enviePar: famille })])).toEqual([]);
+  });
+});
+
+describe("Paquet du moment", () => {
+  const carte = (id: string, minutes: number): CartePaquet & { id: string } => ({
+    id,
+    created_at: "2026-10-01",
+    cache: false,
+    fin: false,
+    signaux: {},
+    enviesDesAutres: 0,
+    vuParLaFamille: false,
+    style: null,
+    minutes,
+  });
+  it("un soir de semaine : les plats rapides d'abord ; sinon, aucune différence", () => {
+    const cartes = [carte("tartiflette", 90), carte("pates", 15)];
+    expect(ordonnerPaquet(cartes, now, "rapide").map((c) => c.id)[0]).toBe("pates");
+    expect(ordonnerPaquet(cartes, now, null).map((c) => c.id)[0]).toBe("tartiflette");
+  });
+  it("lundi à jeudi après 15 h (Paris) seulement", () => {
+    expect(momentDe(new Date("2026-10-20T16:00:00+02:00"))).toBe("rapide"); // mardi
+    expect(momentDe(new Date("2026-10-20T11:00:00+02:00"))).toBeNull();
+    expect(momentDe(new Date("2026-10-24T18:00:00+02:00"))).toBeNull(); // samedi
   });
 });
