@@ -29,6 +29,9 @@ export default function WelcomePage() {
             Créer ma famille
           </Link>
         </InstallFirst>
+        <Link href="/confidentialite" className="kd-petit mt-2 flex min-h-11 items-center justify-center text-blanc underline underline-offset-4">
+          Confidentialité
+        </Link>
       </div>
     </Scene>
   );

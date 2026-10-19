@@ -7,7 +7,7 @@ import { isPastDeadline } from "@/lib/domain/trip";
 import { Countdown } from "@/components/Countdown";
 import { SwipeDeck } from "@/components/SwipeDeck";
 import { BandeauScene, IconePanier } from "@/components/ui";
-import { BoutonMatchs, CarteGouts } from "@/components/Envies";
+import { BoutonMatchs, CarteGouts, CarteInviter } from "@/components/Envies";
 import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 
 // Laisse le temps à l'import Marmiton (lancé après l'affichage) de finir.
@@ -47,7 +47,7 @@ export default async function Envies() {
           </>
         }
       />
-      {/* Un seul bandeau à la fois : la course en cours d'abord, sinon le questionnaire. */}
+      {/* Un seul bandeau à la fois : la course en cours, sinon inviter la famille, sinon le questionnaire. */}
       {bandeauCourse && trip && (
         <Link
           href="/courses"
@@ -67,7 +67,8 @@ export default async function Envies() {
           </span>
         </Link>
       )}
-      {!bandeauCourse && !me.tastes_done_at && <CarteGouts retour="/envies" />}
+      {!bandeauCourse && members.length === 1 && <CarteInviter />}
+      {!bandeauCourse && members.length > 1 && !me.tastes_done_at && <CarteGouts retour="/envies" />}
       <SwipeDeck initialDeck={deck} />
     </div>
   );

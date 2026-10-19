@@ -12,6 +12,18 @@ export const dynamic = "force-dynamic";
 export default async function ProfilePage() {
   const session = await requireFamily();
   const [family, profiles] = await Promise.all([getFamily(session.familyId), getProfiles(session.familyId)]);
+  // La famille a été supprimée (depuis un autre téléphone) : on repart de l'accueil.
+  if (!family) {
+    return (
+      <main className="pt-safe pb-safe mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-5 px-5">
+        <h1 className="kd-titre-1 text-aubergine">Cette famille n&apos;existe plus</h1>
+        <p className="text-encre-douce">Elle a été supprimée, avec toutes ses données.</p>
+        <form action={leaveFamily}>
+          <button className="kd-btn kd-btn--large w-full">Revenir à l&apos;accueil</button>
+        </form>
+      </main>
+    );
+  }
   return (
     <main className="pt-safe pb-safe mx-auto flex min-h-dvh max-w-md flex-col gap-5 px-5">
       <div className="pt-6 text-violet">
@@ -19,7 +31,7 @@ export default async function ProfilePage() {
       </div>
       <div>
         <h1 className="kd-titre-1 text-aubergine">C&apos;est qui&nbsp;?</h1>
-        {family && <p className="mt-2 text-encre-douce">{family.name}</p>}
+        <p className="mt-2 text-encre-douce">{family.name}</p>
       </div>
       {/* Une liste, comme les recettes : une vignette de la scène, le prénom, un filet. */}
       <ul className="kd-liste border-t-2 border-trait">

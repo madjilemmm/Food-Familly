@@ -27,7 +27,7 @@ export function FamilyCodeForm() {
       />
       {state.error && <MessageErreur>{state.error}</MessageErreur>}
       <SubmitButton>C&apos;est parti</SubmitButton>
-      <p className="kd-petit text-center">À taper une seule fois sur ce téléphone.</p>
+      <p className="kd-petit text-center">À taper une seule fois sur ce téléphone. Un lien d&apos;invitation marche aussi : colle-le ici.</p>
     </form>
   );
 }

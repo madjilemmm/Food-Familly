@@ -12,7 +12,7 @@ export default function CreateFamilyPage() {
       </Link>
       <h1 className="kd-titre-1 mt-2 text-aubergine">Créer ma famille</h1>
       <p className="mt-3 mb-6 text-encre-douce">
-        Ajoute chaque personne de la maison. Chacun pourra faire les courses, swiper et demander ses plats.
+        Tu commences seul·e : swipe des plats, fais ta liste. Ta famille te rejoint quand elle veut.
       </p>
       <CreateFamilyForm />
     </main>

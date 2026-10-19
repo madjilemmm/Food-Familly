@@ -3,12 +3,13 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
+import { BUCKET_PHOTOS, cheminDansLeStockage } from "@/lib/photos";
 import { isAisle } from "@/lib/domain/aisles";
 import { extractRecipe, type ImportedRecipe } from "@/lib/domain/recipe-import";
 import { safeFetch } from "@/lib/safe-fetch";
 import { changed, cleanText } from "./_shared";
 
-const BUCKET = "recipe-photos";
+const BUCKET = BUCKET_PHOTOS;
 const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
 
 type IngredientInput = { name: string; quantity: number | null; unit: string; aisle: string };
@@ -34,13 +35,6 @@ function parseIngredients(raw: FormDataEntryValue | null): IngredientInput[] {
       },
     ];
   });
-}
-
-function storagePath(publicUrl: string | null): string | null {
-  if (!publicUrl) return null;
-  const marker = `/object/public/${BUCKET}/`;
-  const i = publicUrl.indexOf(marker);
-  return i === -1 ? null : decodeURIComponent(publicUrl.slice(i + marker.length));
 }
 
 const IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -135,7 +129,7 @@ export async function saveRecipe(_prev: { error?: string }, formData: FormData):
     else if (removePhoto) photoUrl = null;
     if (photoUrl !== undefined) {
       await db().from("recipes").update({ photo_url: photoUrl }).eq("id", recipeId);
-      const oldPath = storagePath(oldPhoto);
+      const oldPath = cheminDansLeStockage(oldPhoto);
       if (oldPath) await db().storage.from(BUCKET).remove([oldPath]);
     }
 
@@ -166,7 +160,7 @@ export async function deleteRecipe(recipeId: string) {
     .maybeSingle();
   if (!data) return;
   await db().from("recipes").delete().eq("id", recipeId).eq("family_id", user.familyId);
-  const path = storagePath(data?.photo_url ?? null);
+  const path = cheminDansLeStockage(data?.photo_url ?? null);
   if (path) await db().storage.from(BUCKET).remove([path]);
   changed();
   redirect("/recettes");

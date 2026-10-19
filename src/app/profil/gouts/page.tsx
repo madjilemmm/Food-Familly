@@ -12,7 +12,7 @@ function safeNext(raw: string | undefined, fallback: string) {
   return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : fallback;
 }
 
-export default async function TastesPage({ searchParams }: { searchParams: Promise<{ suite?: string; nouvelles?: string; envies?: string }> }) {
+export default async function TastesPage({ searchParams }: { searchParams: Promise<{ suite?: string; nouvelles?: string; envies?: string; regime?: string }> }) {
   const me = await requireProfile();
   const [{ members }, profiles, params] = await Promise.all([getFamilyTastes(me.family_id), getProfiles(me.family_id), searchParams]);
   const mine = members.find((m) => m.id === me.id)?.tastes ?? {};
@@ -23,6 +23,7 @@ export default async function TastesPage({ searchParams }: { searchParams: Promi
     <Questionnaire
       nouvelles={params.nouvelles === "1" && doitVoirNouvellesCartes(me.tastes_done_at)}
       enviesSeules={params.envies === "1" && Boolean(me.tastes_done_at) && !me.envies_done_at}
+      regimeSeul={params.regime === "1"}
       commencerParEnvies={!me.envies_done_at}
       initialEnvies={{
         ...lireEnvies(me.envies),

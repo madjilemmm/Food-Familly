@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireProfile, requireUser } from "@/lib/auth";
 import { getFamily } from "@/lib/data";
-import { forgetProfile, leaveFamily } from "@/app/actions/auth";
+import { deleteFamily, forgetProfile, leaveFamily } from "@/app/actions/auth";
 import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 import { IconeRetour } from "@/components/ui";
 import { ConfirmButton } from "@/components/courses/ConfirmButton";
@@ -51,7 +51,29 @@ export default async function SettingsPage() {
         ))}
       </ul>
 
-      <div className="text-center">
+      <section className="flex flex-col gap-1">
+        <h2 className="kd-etiquette">Vos données</h2>
+        <p className="kd-petit mb-1">Elles restent dans la famille : pas de publicité, rien n&apos;est revendu.</p>
+        <ul className="kd-liste border-t-2 border-trait">
+          <li>
+            <a href="/api/export" download className="kd-liste__article min-h-16 justify-between active:bg-trait/40">
+              <span className="min-w-0">
+                <span className="block font-semibold">Exporter les données de la famille</span>
+                <span className="kd-petit block">Un fichier avec membres, goûts, recettes et courses</span>
+              </span>
+              <IconeRetour className="size-6 shrink-0 -rotate-90 text-violet" />
+            </a>
+          </li>
+          <li>
+            <Link href="/confidentialite" className="kd-liste__article min-h-16 justify-between active:bg-trait/40">
+              <span className="block font-semibold">Confidentialité</span>
+              <IconeRetour className="size-6 shrink-0 rotate-180 text-violet" />
+            </Link>
+          </li>
+        </ul>
+      </section>
+
+      <div className="flex flex-col items-center gap-2 text-center">
         <ConfirmButton
           action={leaveFamily}
           question={`Quitter ${family?.name ?? "cette famille"} ?`}
@@ -60,6 +82,15 @@ export default async function SettingsPage() {
           className="min-h-14 px-2 text-encre-douce underline underline-offset-4"
         >
           Quitter cette famille sur ce téléphone
+        </ConfirmButton>
+        <ConfirmButton
+          action={deleteFamily}
+          question={`Supprimer ${family?.name ?? "la famille"} ?`}
+          detail="Membres, goûts, recettes et courses sont effacés pour toute la famille, sur tous les téléphones. C'est définitif : exporte d'abord si tu veux garder une copie."
+          confirmLabel="Oui, tout supprimer"
+          className="min-h-14 px-2 text-encre-douce underline underline-offset-4"
+        >
+          Supprimer la famille et ses données
         </ConfirmButton>
       </div>
     </main>

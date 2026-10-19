@@ -5,6 +5,8 @@ import { resolveAlias } from "@/lib/routes";
 const WEEK = 7 * 24 * 60 * 60;
 /** Accessibles sans famille : rejoindre ou créer une famille. */
 const PUBLIC = ["/bienvenue", "/bienvenue/creer"];
+/** Accessibles à tous, avec ou sans famille : un lien d'invitation, la page de confidentialité. */
+const OUVERTES = (pathname: string) => pathname.startsWith("/rejoindre/") || pathname === "/confidentialite";
 /** Accessibles avec une famille mais sans profil choisi. */
 const NO_PROFILE = ["/profil", "/profil/nouveau"];
 
@@ -18,6 +20,7 @@ export async function middleware(req: NextRequest) {
   if (pathname === "/api/version") return NextResponse.next();
   // Relances « plus que 10 min », appelées par Supabase sans session.
   if (pathname === "/api/cron/relance") return NextResponse.next();
+  if (OUVERTES(pathname)) return NextResponse.next();
   const isApi = pathname.startsWith("/api/");
   const session = await decodeAnySession(req.cookies.get(SESSION_COOKIE)?.value);
 

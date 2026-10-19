@@ -29,6 +29,7 @@ export function Questionnaire({
   others,
   nouvelles = false,
   enviesSeules = false,
+  regimeSeul = false,
   commencerParEnvies = false,
   initialEnvies,
 }: {
@@ -39,6 +40,8 @@ export function Questionnaire({
   nouvelles?: boolean;
   /** A déjà répondu avant l'écran « Tes envies » : seulement celui-là. */
   enviesSeules?: boolean;
+  /** Première arrivée : seulement régime et allergies, le reste s'apprend en swipant. */
+  regimeSeul?: boolean;
   /** Nouvelles cartes ET écran des envies jamais vu : les envies d'abord. */
   commencerParEnvies?: boolean;
   initialEnvies: Envies;
@@ -126,7 +129,9 @@ export function Questionnaire({
           setDiets={setDiets}
           autres={autres}
           setAutres={setAutres}
-          onNext={() => setEtape("envies")}
+          seul={regimeSeul}
+          pending={pending}
+          onNext={() => (regimeSeul ? enregistrer(false, partir) : setEtape("envies"))}
         />
       )}
 
@@ -190,12 +195,16 @@ function EtapeRegime({
   setDiets,
   autres,
   setAutres,
+  seul,
+  pending,
   onNext,
 }: {
   diets: string[];
   setDiets: (fn: (d: string[]) => string[]) => void;
   autres: string[];
   setAutres: (fn: (a: string[]) => string[]) => void;
+  seul: boolean;
+  pending: boolean;
   onNext: () => void;
 }) {
   const champ = useRef<HTMLInputElement>(null);
@@ -212,8 +221,9 @@ function EtapeRegime({
   return (
     <div className="kd-monte flex flex-1 flex-col gap-5">
       <div>
-        <p className="kd-etiquette text-blanc">Étape 1 sur 4</p>
+        <p className="kd-etiquette text-blanc">{seul ? "Une seule question" : "Étape 1 sur 4"}</p>
         <h1 className="kd-titre-2 mt-2">Ce que tu ne peux pas manger</h1>
+        {seul && <p className="mt-1">Le reste, Kaddie l&apos;apprend en te regardant swiper.</p>}
       </div>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Régime et allergies">
         {DIETS.map((d) => {
@@ -258,8 +268,8 @@ function EtapeRegime({
         Visible seulement par ta famille. Sert uniquement à trier les recettes. Pour une allergie, vérifie toujours les étiquettes.
       </p>
       <div className="mt-auto pb-4">
-        <Bouton variante="secondaire" large onClick={onNext}>
-          {diets.length + autres.length ? "Suivant" : "Rien de tout ça"}
+        <Bouton variante="secondaire" large disabled={pending} onClick={onNext}>
+          {seul ? (diets.length + autres.length ? "C'est parti" : "Rien de tout ça, c'est parti") : diets.length + autres.length ? "Suivant" : "Rien de tout ça"}
         </Bouton>
       </div>
     </div>

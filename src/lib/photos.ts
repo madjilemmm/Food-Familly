@@ -7,3 +7,14 @@ export function photoALaTaille(url: string, largeur: number): string {
   if (!url.startsWith("https://assets.afcdn.com/")) return url;
   return url.replace(/_w\d+(h\d+)?(?=[a-z_.])/, (_, carre?: string) => `_w${largeur}${carre ? `h${largeur}` : ""}`);
 }
+
+/** Les photos envoyées par les familles (stockage Supabase). */
+export const BUCKET_PHOTOS = "recipe-photos";
+
+/** Le chemin d'une photo dans notre stockage ; null pour une photo venue d'ailleurs. */
+export function cheminDansLeStockage(publicUrl: string | null): string | null {
+  if (!publicUrl) return null;
+  const marker = `/object/public/${BUCKET_PHOTOS}/`;
+  const i = publicUrl.indexOf(marker);
+  return i === -1 ? null : decodeURIComponent(publicUrl.slice(i + marker.length));
+}

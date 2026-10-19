@@ -8,6 +8,8 @@ import { getProfile } from "@/lib/data";
 import { requireFamily, requireUser, setSession } from "@/lib/auth";
 import { SESSION_COOKIE, newSession, type Style } from "@/lib/session";
 import { STARTER_RECIPES } from "@/lib/starter-recipes";
+import { BUCKET_PHOTOS, cheminDansLeStockage } from "@/lib/photos";
+import { annulerInvitations, familleInvitee, jetonDe, noterEssaiRate, tropDEssais } from "@/lib/acces";
 import { cleanText, changed } from "./_shared";
 
 const CODE_WORDS = [
@@ -42,39 +44,46 @@ function cleanEmoji(value: unknown, fallback = "🙂") {
 // ─── Rejoindre ou créer une famille ────────────────────────────────────
 
 export async function joinFamily(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
-  const code = await normalizeJoinCode(String(formData.get("code") ?? ""));
-  const { data: family } = code
-    ? await db().from("families").select("id").eq("join_code", code).maybeSingle()
-    : { data: null };
+  if (await tropDEssais()) return { error: "Trop d'essais. Attends un quart d'heure avant de réessayer." };
+  const saisie = String(formData.get("code") ?? "");
+  // Un lien d'invitation collé dans le champ marche aussi (iPhone : l'appli installée ne voit pas Safari).
+  const jeton = jetonDe(saisie);
+  const code = jeton ? "" : await normalizeJoinCode(saisie);
+  const family = jeton
+    ? await familleInvitee(jeton)
+    : code
+      ? (await db().from("families").select("id").eq("join_code", code).maybeSingle()).data
+      : null;
   if (!family) {
+    await noterEssaiRate().catch(() => {});
     // Ralentit les essais au hasard.
     await new Promise((r) => setTimeout(r, 1000));
-    return { error: "Ce code ne correspond à aucune famille. Vérifiez-le auprès d'un membre." };
+    return {
+      error: jeton
+        ? "Ce lien a expiré. Demande un nouveau lien, ou tape le code famille."
+        : "Ce code ne correspond à aucune famille. Vérifiez-le auprès d'un membre.",
+    };
   }
   await setSession(newSession(family.id));
   redirect("/profil");
 }
 
-type NewMember = { name: string; emoji: string; style: Style };
+/** Depuis un lien d'invitation : on entre dans la famille, puis on choisit son prénom. */
+export async function joinByInvitation(jeton: string) {
+  const family = await familleInvitee(jeton);
+  if (!family) redirect(`/rejoindre/${encodeURIComponent(jeton)}`);
+  await setSession(newSession(family.id));
+  redirect("/profil");
+}
 
+/**
+ * Créer sa famille en quelques secondes : son prénom, et c'est tout (le nom de la famille
+ * est facultatif). Les autres arrivent ensuite avec le lien d'invitation.
+ */
 export async function createFamily(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
-  const familyName = cleanText(formData.get("family_name"), 60);
-  let members: NewMember[] = [];
-  try {
-    const raw = JSON.parse(String(formData.get("members") ?? "[]")) as unknown[];
-    members = raw.slice(0, 20).flatMap((m) => {
-      const item = m as Record<string, unknown>;
-      const name = typeof item?.name === "string" ? item.name.trim().slice(0, 40) : "";
-      return name ? [{ name, emoji: cleanEmoji(item.emoji), style: cleanStyle(item.style) }] : [];
-    });
-  } catch {
-    members = [];
-  }
-  const meIndex = Number(formData.get("me") ?? 0);
-
-  if (!familyName) return { error: "Donnez un nom à votre famille." };
-  if (members.length === 0) return { error: "Ajoutez au moins une personne." };
-  if (!(meIndex >= 0 && meIndex < members.length)) return { error: "Indiquez qui vous êtes dans la liste." };
+  const prenom = cleanText(formData.get("prenom"), 40);
+  if (!prenom) return { error: "Indique ton prénom." };
+  const familyName = cleanText(formData.get("family_name"), 60) || `Famille de ${prenom}`;
 
   // Code unique (on réessaie en cas de collision, très improbable).
   let familyId: string | null = null;
@@ -89,19 +98,21 @@ export async function createFamily(_prev: { error?: string }, formData: FormData
   }
   if (!familyId) return { error: "La création a échoué. Réessayez." };
 
-  const { data: profiles, error } = await db()
+  const style: Style = "fun";
+  const { data: me, error } = await db()
     .from("profiles")
-    .insert(members.map((m, i) => ({ ...m, family_id: familyId, sort_order: i })))
-    .select("id, sort_order");
-  if (error || !profiles) {
+    .insert({ name: prenom, emoji: "😎", style, family_id: familyId, sort_order: 0 })
+    .select("id")
+    .single();
+  if (error || !me) {
     await db().from("families").delete().eq("id", familyId);
     return { error: "La création a échoué. Réessayez." };
   }
   await addStarterRecipes(familyId);
 
-  const me = profiles.find((p) => p.sort_order === meIndex)!;
-  await setSession(newSession(familyId, me.id as string, members[meIndex].style));
-  redirect(`/profil/gouts?suite=${encodeURIComponent("/famille?bienvenue=1")}`);
+  await setSession(newSession(familyId, me.id as string, style));
+  // Une seule question (régime, allergies), puis directement les plats à swiper.
+  redirect(`/profil/gouts?regime=1&suite=${encodeURIComponent("/envies")}`);
 }
 
 /** 10 recettes classiques pour qu'une nouvelle famille puisse swiper tout de suite. */
@@ -129,7 +140,7 @@ export async function chooseProfile(profileId: string) {
   if (!profile) throw new Error("Profil introuvable");
   await setSession(newSession(session.familyId, profile.id, profile.style));
   // Première fois sur ce profil : le questionnaire de goûts d'abord.
-  redirect(profile.tastes_seen_at ? "/" : "/profil/gouts");
+  redirect(profile.tastes_seen_at ? "/" : "/profil/gouts?regime=1");
 }
 
 /** « Je ne suis pas dans la liste » : on s'ajoute soi-même à la famille. */
@@ -146,7 +157,7 @@ export async function addMyself(_prev: { error?: string }, formData: FormData): 
   if (error || !data) return { error: "L'ajout a échoué. Réessayez." };
   await setSession(newSession(session.familyId, data.id as string, style));
   changed();
-  redirect("/profil/gouts");
+  redirect("/profil/gouts?regime=1");
 }
 
 export async function forgetProfile() {
@@ -206,5 +217,23 @@ export async function regenerateJoinCode() {
     const { error } = await db().from("families").update({ join_code: generateJoinCode() }).eq("id", user.familyId);
     if (!error) break;
   }
+  await annulerInvitations(user.familyId);
   changed();
+}
+
+/**
+ * Supprimer la famille et tout ce qu'elle contient (membres, goûts, recettes, courses,
+ * notifications), pour tout le monde. Les photos envoyées partent d'abord du stockage.
+ */
+export async function deleteFamily() {
+  const user = await requireUser();
+  const { data: photos } = await db().from("recipes").select("photo_url").eq("family_id", user.familyId).not("photo_url", "is", null);
+  const chemins = (photos ?? []).flatMap((r) => cheminDansLeStockage(r.photo_url as string) ?? []);
+  if (chemins.length) await db().storage.from(BUCKET_PHOTOS).remove(chemins);
+  const { error } = await db().from("families").delete().eq("id", user.familyId);
+  if (error) throw new Error("La suppression a échoué. Réessaie.");
+  // Les autres téléphones se rafraîchissent et voient que la famille n'existe plus.
+  changed();
+  (await cookies()).delete(SESSION_COOKIE);
+  redirect("/bienvenue");
 }
