@@ -105,7 +105,17 @@ export async function reconstruireListe(familyId: string): Promise<Trip> {
     .filter((m) => !aLaMaison.has(m.key))
     // Sans doute toujours à la maison (sel, huile…) : à vérifier avant de partir, pas d'office sur la liste.
     .filter((m) => !hist.aLaMaison.has(cleMaison(m.name)));
-  const wasChecked = new Set(previous.filter((i) => i.source === "recipe" && i.checked).map((i) => itemKey(i.name, i.unit)));
+  // Les ingrédients déjà sur la liste gardent leur ligne (et donc leur coche, et les coches
+  // en attente sur un téléphone sans réseau) : seules les quantités changent.
+  const existants = new Map<string, (typeof previous)[number]>();
+  const enTrop: string[] = [];
+  for (const i of previous.filter((i) => i.source === "recipe")) {
+    const cle = itemKey(i.name, i.unit);
+    if (existants.has(cle)) enTrop.push(i.id);
+    else existants.set(cle, i);
+  }
+  const voulus = new Set(merged.map((m) => m.key));
+  for (const [cle, i] of existants) if (!voulus.has(cle)) enTrop.push(i.id);
   // Les demandes écrites vont sur la liste toutes seules (sauf ce qui y est déjà, ou a été retiré).
   const dejaLa = new Set(previous.map((i) => i.name.trim().toLowerCase()));
   const ecrites = trip.trip_requests
@@ -113,20 +123,31 @@ export async function reconstruireListe(familyId: string): Promise<Trip> {
     .flatMap((r) => articlesDe(r.free_text!, appris))
     .filter((a) => !dejaLa.has(a.name.toLowerCase()) && Boolean(dejaLa.add(a.name.toLowerCase())));
 
-  await db().from("shopping_list_items").delete().eq("trip_id", trip.id).eq("source", "recipe");
+  const forRecipes = (m: (typeof merged)[number]) => m.forRecipes.join(", ");
+  const aMettreAJour = merged.filter((m) => {
+    const i = existants.get(m.key);
+    return i && (i.quantity !== m.quantity || i.for_recipes !== forRecipes(m) || i.aisle !== m.aisle);
+  });
+  await Promise.all([
+    enTrop.length ? db().from("shopping_list_items").delete().in("id", enTrop).eq("trip_id", trip.id) : null,
+    ...aMettreAJour.map((m) =>
+      db().from("shopping_list_items").update({ quantity: m.quantity, for_recipes: forRecipes(m), aisle: m.aisle }).eq("id", existants.get(m.key)!.id),
+    ),
+  ]);
   await insererArticles([
-    ...merged.map((m) => ({
-      trip_id: trip.id,
-      name: m.name,
-      quantity: m.quantity,
-      unit: m.unit,
-      aisle: m.aisle,
-      source: "recipe" as const,
-      for_recipes: m.forRecipes.join(", "),
-      checked: wasChecked.has(m.key),
-      // Même regroupement que mergeIngredients : un ingrédient par nom et par unité.
-      cle: normalizeName(m.name),
-    })),
+    ...merged
+      .filter((m) => !existants.has(m.key))
+      .map((m) => ({
+        trip_id: trip.id,
+        name: m.name,
+        quantity: m.quantity,
+        unit: m.unit,
+        aisle: m.aisle,
+        source: "recipe" as const,
+        for_recipes: forRecipes(m),
+        // Même regroupement que mergeIngredients : un ingrédient par nom et par unité.
+        cle: normalizeName(m.name),
+      })),
     ...ecrites.map((a) => ({ trip_id: trip.id, ...a, source: "request" as const, cle: cleProduit(a.name, appris) })),
   ]);
   return (await loadCurrentTrip(familyId)) ?? trip;

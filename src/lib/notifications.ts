@@ -27,10 +27,10 @@ export async function notifyTripStarted(familyId: string, shopperId: string) {
  * Nouveau match : seules les autres personnes qui ont envie du plat sont prévenues
  * (celle qui vient de swiper le voit déjà ; les autres ne sont pas concernées).
  */
-export async function notifyMatch(familyId: string, recipeId: string, autres: string[]) {
+export async function notifyMatch(familyId: string, recipeId: string, autres: string[], auMenu: boolean) {
   if (autres.length === 0) return;
   const recipe = await db().from("recipes").select("title").eq("id", recipeId).eq("family_id", familyId).maybeSingle();
-  await sendPush(autres, { title: "C'est un match !", body: recipe.data?.title ? `${recipe.data.title} : au Menu, les ingrédients sont sur la liste.` : "", url: "/menu", tag: "match" });
+  await sendPush(autres, { title: "C'est un match !", body: recipe.data?.title ? (auMenu ? `${recipe.data.title} : au Menu, les ingrédients sont sur la liste.` : recipe.data.title) : "", url: "/menu", tag: "match" });
 }
 
 /**

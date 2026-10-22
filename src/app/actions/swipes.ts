@@ -46,8 +46,9 @@ export async function swipe(
   // Un « Miam » peut faire entrer le plat au Menu (et ses ingrédients sur la liste).
   const menu = liked ? await synchroniserMenu(user.familyId) : null;
   const ajoutes = menu?.ajoutes ?? [];
+  const auMenu = menu ? platsDuMenu(menu.trip).includes(recipeId) : false;
   // Les autres téléphones ne sont prévenus (et rafraîchis) que si quelque chose change pour eux.
-  if (nouveau) changed(() => notifyMatch(user.familyId, recipeId, autres));
+  if (nouveau) changed(() => notifyMatch(user.familyId, recipeId, autres, auMenu));
   else if (ajoutes.length) changed();
   else revalidatePath("/", "layout");
   const noms = new Map((await getProfiles(user.familyId)).map((p) => [p.id, p.name]));
@@ -55,7 +56,7 @@ export async function swipe(
     match: likers != null,
     avec: autres.flatMap((id) => noms.get(id) ?? []),
     avant: (avant as SwipeAvant) ?? null,
-    auMenu: menu ? platsDuMenu(menu.trip).includes(recipeId) : false,
+    auMenu,
     entre: ajoutes.includes(recipeId),
   };
 }
