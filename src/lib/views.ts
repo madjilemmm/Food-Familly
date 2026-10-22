@@ -10,6 +10,8 @@ import {
   getHistorique,
   getRecipesWithIngredients,
   getTasteContext,
+  getEtiquettes,
+  getProfilsGouts,
   getProfiles,
   getRecipes,
   signauxDe,
@@ -23,6 +25,7 @@ import type { Convives } from "@/lib/domain/convives";
 import { cleMaison } from "@/lib/domain/maison";
 import { aAjouter, type Suggestion } from "@/lib/domain/habitudes";
 import { cleProduit } from "@/lib/domain/reconnaissance";
+import { prediction } from "@/lib/domain/profil-gouts";
 import { nAimePas } from "@/lib/domain/foods";
 import { listeDeNoms } from "@/lib/domain/convives";
 import { lireEnvies } from "@/lib/domain/envies";
@@ -58,13 +61,15 @@ export type PlatDeLaCourse = {
  * Sert à l'écran de préparation ET au calcul de la liste : les deux voient la même chose.
  */
 export async function platsDeLaCourse(familyId: string, trip: Trip): Promise<PlatDeLaCourse[]> {
-  const [members, envies, avis, hist, recipes, tastes] = await Promise.all([
+  const [members, envies, avis, hist, recipes, tastes, etiquettes, profils] = await Promise.all([
     getProfiles(familyId),
     getFamilyEnvies(familyId),
     getFamilySwipes(familyId),
     getHistorique(familyId),
     getRecipes(familyId),
     getTasteContext(familyId),
+    getEtiquettes(familyId),
+    getProfilsGouts(familyId),
   ]);
   const now = Date.now();
   const ids = members.map((m) => m.id);
@@ -83,7 +88,10 @@ export async function platsDeLaCourse(familyId: string, trip: Trip): Promise<Pla
     new Map(
       ids.map((id) => [
         id,
-        scoreIndividuel(signauxDe(id, r, conflitsDe(r), enviesDe.get(id)!, tastes.texts.get(r.id) ?? [r.title], avis.get(r.id)?.get(id)), now),
+        scoreIndividuel(
+          signauxDe(id, r, conflitsDe(r), enviesDe.get(id)!, tastes.texts.get(r.id) ?? [r.title], avis.get(r.id)?.get(id), prediction(profils.get(id) ?? new Map(), etiquettes.get(r.id) ?? [])),
+          now,
+        ),
       ]),
     );
   const aimePar = (id: string) => [...(avis.get(id) ?? [])].filter(([, a]) => a.likedAt != null).map(([m]) => m);

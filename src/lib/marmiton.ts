@@ -3,8 +3,10 @@ import { broadcastRefresh, db } from "@/lib/supabase/server";
 import { extractRecipe, type ImportedRecipe } from "@/lib/domain/recipe-import";
 import { safeFetch } from "@/lib/safe-fetch";
 import { recipeConflicts } from "@/lib/domain/foods";
-import { getFamilyTastes, getProfiles } from "@/lib/data";
-import { dureeMax, lireEnvies, pourJeunes, recherchesPour } from "@/lib/domain/envies";
+import { getFamilyEnvies, getFamilyTastes, getProfiles, getProfilsGouts, getRecipes } from "@/lib/data";
+import { dureeMax, lireEnvies, pourJeunes } from "@/lib/domain/envies";
+import { etiquettesPreferees } from "@/lib/domain/profil-gouts";
+import { termesDeRecherche, tropProche } from "@/lib/domain/recherche";
 
 /*
  * Recettes importées toutes seules depuis Marmiton, pour que le swipe ne
@@ -81,17 +83,29 @@ async function chercher(terme: string): Promise<string[]> {
 }
 
 async function importer(familyId: string, combien: number): Promise<number> {
-  const [{ members, strict }, profiles, dejaLa] = await Promise.all([
+  const [{ members, strict }, profiles, dejaLa, recipes, profils, enviesDuMoment] = await Promise.all([
     getFamilyTastes(familyId),
     getProfiles(familyId),
     db().from("recipes").select("source_url").eq("family_id", familyId).not("source_url", "is", null),
+    getRecipes(familyId),
+    getProfilsGouts(familyId),
+    getFamilyEnvies(familyId),
   ]);
   const envies = profiles.map((p) => lireEnvies(p.envies));
   const maxi = dureeMax(envies);
   const connus = new Set((dejaLa.data ?? []).map((r) => r.source_url as string));
+  const titres = recipes.map((r) => r.title);
 
-  // Quelques recherches, en privilégiant les styles de la famille.
-  const termes = melange(recherchesPour(envies).slice(0, 30)).slice(0, RECHERCHES_PAR_IMPORT);
+  // Quelques recherches ciblées (domain/recherche.ts) : plats voisins des envies du moment,
+  // styles que la famille aime vraiment, saison ; un peu de hasard parmi les suivantes.
+  const titresEnvies = recipes.filter((r) => enviesDuMoment.has(r.id)).map((r) => r.title);
+  const tous = termesDeRecherche({
+    envies,
+    stylesAimes: etiquettesPreferees([...profils.values()], "style:", 3),
+    matchs: melange(titresEnvies),
+    mois: new Date().getMonth(),
+  });
+  const termes = [...tous.slice(0, 2), ...melange(tous.slice(2, 30))].slice(0, RECHERCHES_PAR_IMPORT);
   // Les résultats des recherches en alternance : pas dix gratins de pâtes d'affilée.
   const parTerme = (await Promise.all(termes.map(chercher))).map((liens) => melange(liens.filter((l) => !connus.has(l))));
   const aEssayer = [...new Set(alterner(parTerme))].slice(0, ESSAIS_MAX);
@@ -107,11 +121,13 @@ async function importer(familyId: string, combien: number): Promise<number> {
     const lot = await Promise.all(aEssayer.slice(i, i + 6).map(lireRecette));
     for (const [url, recette] of lot) {
       if (ajoutees >= combien || !recette || !estUnBonPlat(recette) || !convient(recette)) continue;
-      if (await enregistrer(familyId, url, recette)) ajoutees++;
+      // Pas un énième « gratin dauphinois facile » quand le gratin dauphinois est déjà là.
+      if (tropProche(recette.title, titres)) continue;
+      if (await enregistrer(familyId, url, recette)) (ajoutees++, titres.push(recette.title));
     }
   }
   // Une trace dans les journaux : sans elle, un import bloqué passe inaperçu (paquet vide).
-  console.info(`Import Marmiton : ${termes.length} recherches, ${aEssayer.length} recettes trouvées, ${ajoutees} ajoutées`);
+  console.info(`Import Marmiton : ${termes.join(" / ")} → ${aEssayer.length} recettes trouvées, ${ajoutees} ajoutées`);
   return ajoutees;
 }
 

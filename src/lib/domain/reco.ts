@@ -40,12 +40,20 @@ export const REGLAGES = {
   TROP_LONG: -0.2,
   /** Un avis compte moitié moins au bout de 90 jours. */
   DEMI_VIE_GOUT_JOURS: 90,
+  /** Un « non » sur un plat s'efface plus vite (« pas ce soir ») : moitié moins au bout de 30 jours. */
+  DEMI_VIE_REFUS_JOURS: 30,
+  /** Note prédite par les caractéristiques (style, aliments, temps), pour un plat jamais swipé. */
+  PREDICTION: 0.5,
 
   // ─── Compatibilité d'un groupe ───
   /** Pénalité appliquée au pire avis négatif du groupe (un désaccord pèse). */
   DESACCORD: 0.5,
 
   // ─── Contexte ───
+  /** Paquet : un autre membre l'aimerait probablement (prédiction) — viser les matchs. */
+  MATCH_PROBABLE: 0.3,
+  /** Paquet : ce style a déjà été retenu cette semaine — il recule (par fois, au plus 2). */
+  LASSITUDE: 0.15,
   /** Paquet du moment (soir de semaine) : un plat rapide avance, un plat long recule. */
   MOMENT_RAPIDE: 0.35,
   MOMENT_LONG: -0.35,
@@ -88,6 +96,8 @@ export type Signaux = {
   /** Ses envies : le plat est dans ses styles / plus long que son temps. */
   style?: boolean;
   tropLong?: boolean;
+  /** Note prédite par ses goûts sur les caractéristiques du plat (profil-gouts.ts), −1 à 1. */
+  prediction?: number | null;
 };
 
 /** Goût durable d'une personne pour un plat, de −1 à 1. null : aucune information (jamais un refus). */
@@ -97,8 +107,9 @@ export function scoreIndividuel(s: Signaux, now: number): number | null {
   if (s.avis) {
     connu = true;
     if (s.avis.likedAt != null) score += REGLAGES.AIME * demiVie((now - s.avis.likedAt) / JOUR, REGLAGES.DEMI_VIE_GOUT_JOURS);
-    else if (!s.avis.liked) score += REGLAGES.REFUSE * demiVie((now - s.avis.swipedAt) / JOUR, REGLAGES.DEMI_VIE_GOUT_JOURS);
+    else if (!s.avis.liked) score += REGLAGES.REFUSE * demiVie((now - s.avis.swipedAt) / JOUR, REGLAGES.DEMI_VIE_REFUS_JOURS);
   }
+  if (s.prediction != null) (score += REGLAGES.PREDICTION * s.prediction), (connu = true);
   if (s.adore) (score += REGLAGES.INGREDIENT_ADORE), (connu = true);
   if (s.pasFan) (score += REGLAGES.INGREDIENT_PAS_FAN), (connu = true);
   if (s.style) (score += REGLAGES.STYLE_VOULU), (connu = true);
@@ -179,6 +190,10 @@ export type CartePaquet = {
   style: string | null;
   /** Durée totale (minutes), si connue : sert au paquet du moment. */
   minutes?: number | null;
+  /** Chance qu'un autre membre en ait envie (sa note prédite, 0 à 1). */
+  matchProbable?: number;
+  /** Combien de plats de ce style ont été retenus cette semaine. */
+  lassitude?: number;
 };
 
 /** Le moment : un soir de semaine, on a peu de temps ; le reste du temps, on a le temps de découvrir. */
@@ -210,6 +225,8 @@ export function ordonnerPaquet<C extends CartePaquet>(cartes: C[], now: number, 
     REGLAGES.ENVIE_DES_AUTRES * Math.min(1, c.enviesDesAutres / 2) +
     (c.vuParLaFamille ? 0 : REGLAGES.DECOUVERTE) +
     (c.fin ? REGLAGES.AUTRE_PAS_FAN : 0) +
+    REGLAGES.MATCH_PROBABLE * (c.matchProbable ?? 0) -
+    REGLAGES.LASSITUDE * Math.min(2, c.lassitude ?? 0) +
     (moment === "rapide" && c.minutes
       ? c.minutes <= REGLAGES.RAPIDE_MINUTES
         ? REGLAGES.MOMENT_RAPIDE
@@ -245,7 +262,7 @@ export function ordonnerPaquet<C extends CartePaquet>(cartes: C[], now: number, 
           .filter((c) => !c.cache && !c.fin && !disponible(c))
           .sort((a, b) => Number(b.avis!.likedAt != null) - Number(a.avis!.likedAt != null) || a.avis!.swipedAt - b.avis!.swipedAt)
           .slice(0, REGLAGES.PAQUET_MIN - melange.length - finales.length);
-  return [...varier(melange), ...enAvance, ...finales];
+  return [...varier(melange), ...finales, ...enAvance];
 }
 
 /** Évite trois plats du même style d'affilée, en avançant le suivant d'un autre style (fenêtre de 3). */

@@ -9,6 +9,7 @@ import type { Style } from "@/lib/session";
 import { isAisle } from "@/lib/domain/aisles";
 import { cleProduit, type Appris } from "@/lib/domain/reconnaissance";
 import type { CoursePassee, Reponse } from "@/lib/domain/habitudes";
+import { etiquettesDe, prediction, profilDe, type ProfilGouts } from "@/lib/domain/profil-gouts";
 
 /*
  * Les lectures appelées par plusieurs composants d'une même page (mise en page,
@@ -305,6 +306,21 @@ export const getHistorique = cache(async function getHistorique(familyId: string
   return h;
 });
 
+/** Les étiquettes de chaque recette (style, aliments, temps) : la base des goûts par caractéristiques. */
+export const getEtiquettes = cache(async function getEtiquettes(familyId: string): Promise<Map<string, string[]>> {
+  const [recipes, texts] = await Promise.all([getRecipes(familyId), getRecipeTexts(familyId)]);
+  return new Map(recipes.map((r) => [r.id, etiquettesDe(texts.get(r.id) ?? [r.title], r.total_minutes)]));
+});
+
+/** Le profil de goûts de chaque membre (étiquette → −1 à 1), appris de ses swipes. */
+export const getProfilsGouts = cache(async function getProfilsGouts(familyId: string): Promise<Map<string, ProfilGouts>> {
+  const [profiles, avis, etiquettes] = await Promise.all([getProfiles(familyId), getFamilySwipes(familyId), getEtiquettes(familyId)]);
+  const now = Date.now();
+  return new Map(
+    profiles.map((p) => [p.id, profilDe([...avis].flatMap(([recipeId, parMembre]) => (parMembre.has(p.id) ? [[recipeId, parMembre.get(p.id)!] as [string, Avis]] : [])), etiquettes, now)]),
+  );
+});
+
 /** Ce qu'on sait d'un membre face à une recette : son swipe, son questionnaire, ses envies. */
 export function signauxDe(
   memberId: string,
@@ -313,9 +329,12 @@ export function signauxDe(
   envies: Envies,
   texts: string[],
   avis: Avis | undefined,
+  /** Note prédite par ses goûts sur les caractéristiques (seulement pour un plat qu'il n'a pas swipé). */
+  predite: number | null = null,
 ): Signaux {
   return {
     avis,
+    prediction: avis ? null : predite,
     adore: conflits.adoreIds.includes(memberId),
     pasFan: conflits.pasFanIds.includes(memberId),
     style: envies.styles.length > 0 && correspondAuxStyles(texts, envies.styles),
@@ -408,36 +427,60 @@ export async function enviesPour(familyId: string, recipeId: string): Promise<st
  * qui reviennent de temps en temps ; ce qu'un autre n'aime pas, à la fin.
  */
 export async function getDeck(familyId: string, profileId: string, moment: Moment = null): Promise<(Recipe & { dejaVu?: boolean })[]> {
-  const [recipes, avis, envies, ctx, profiles] = await Promise.all([
+  const [recipes, avis, envies, ctx, profiles, etiquettes, profils, hist] = await Promise.all([
     getRecipes(familyId),
     getFamilySwipes(familyId),
     getFamilyEnvies(familyId),
     getTasteContext(familyId),
     getProfiles(familyId),
+    getEtiquettes(familyId),
+    getProfilsGouts(familyId),
+    getHistorique(familyId),
   ]);
+  const now = Date.now();
   const mesEnvies = lireEnvies(profiles.find((p) => p.id === profileId)?.envies);
   const conflicts = new Map(recipes.map((r) => [r.id, conflictsOf(ctx, r, profileId)]));
+  const monProfil = profils.get(profileId) ?? new Map();
+  const autres = profiles.filter((p) => p.id !== profileId).map((p) => p.id);
+  // Lassitude : les styles des plats retenus ces 7 derniers jours.
+  const stylesRecents = new Map<string, number>();
+  for (const [recipeId, quand] of hist.retenus) {
+    if (now - quand > 7 * JOUR) continue;
+    const st = styleDe(ctx.texts.get(recipeId) ?? []);
+    if (st) stylesRecents.set(st, (stylesRecents.get(st) ?? 0) + 1);
+  }
   const cartes = recipes.map((r) => {
     const c = conflicts.get(r.id)!;
     const texts = ctx.texts.get(r.id) ?? [r.title];
+    const tags = etiquettes.get(r.id) ?? [];
     const monAvis = avis.get(r.id)?.get(profileId);
+    const style = styleDe(texts);
+    // Viser les matchs : la meilleure note prédite chez les autres qui ne l'ont pas encore swipé.
+    const matchProbable = Math.max(
+      0,
+      ...autres.filter((id) => !avis.get(r.id)?.has(id)).map((id) => prediction(profils.get(id) ?? new Map(), tags) ?? 0),
+    );
     return {
       ...r,
       cache: c.verdict === "cache",
       fin: c.verdict === "fin",
       avis: monAvis,
-      signaux: signauxDe(profileId, r, c, mesEnvies, texts, monAvis),
+      signaux: signauxDe(profileId, r, c, mesEnvies, texts, monAvis, prediction(monProfil, tags)),
       enviesDesAutres: (envies.get(r.id) ?? []).filter((id) => id !== profileId).length,
       vuParLaFamille: (avis.get(r.id)?.size ?? 0) > 0,
-      style: styleDe(texts),
+      style,
       minutes: r.total_minutes,
+      matchProbable,
+      lassitude: style ? (stylesRecents.get(style) ?? 0) : 0,
     };
   });
-  return ordonnerPaquet(cartes, Date.now(), moment).map(({ cache: _c, fin, avis, signaux: _s, enviesDesAutres: _e, vuParLaFamille: _v, style: _st, minutes: _m, ...r }) => {
-    const c = conflicts.get(r.id)!;
-    const carte = { ...r, ...(avis ? { dejaVu: true } : {}) };
-    return fin && c.pasFanDe.length ? { ...carte, pastille: nAimePas(c.pasFanDe) } : carte;
-  });
+  return ordonnerPaquet(cartes, now, moment).map(
+    ({ cache: _c, fin, avis, signaux: _s, enviesDesAutres: _e, vuParLaFamille: _v, style: _st, minutes: _m, matchProbable: _mp, lassitude: _l, ...r }) => {
+      const c = conflicts.get(r.id)!;
+      const carte = { ...r, ...(avis ? { dejaVu: true } : {}) };
+      return fin && c.pasFanDe.length ? { ...carte, pastille: nAimePas(c.pasFanDe) } : carte;
+    },
+  );
 }
 
 // ─── Courses ───────────────────────────────────────────────────────────
