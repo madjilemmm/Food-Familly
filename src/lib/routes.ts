@@ -3,6 +3,7 @@ export const ROUTES = {
   envies: "/envies",
   courses: "/courses",
   matchs: "/matchs",
+  ceSoir: "/ce-soir",
   liste: "/courses?vue=liste",
 } as const;
 

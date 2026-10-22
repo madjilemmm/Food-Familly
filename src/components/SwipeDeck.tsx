@@ -19,7 +19,10 @@ import { RecipeVisual } from "./RecipeVisual";
  * Le geste lui-même (DESIGN.md §7) est dans CarteGeste.
  */
 
-export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Recipe[]; toutCache?: boolean }) {
+/** « hier » : le plat mangé hier, redemandé en premier (« C'était bon ? »). */
+type CarteDuPaquet = Recipe & { hier?: boolean };
+
+export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: CarteDuPaquet[]; toutCache?: boolean }) {
   // L'état local n'est pas réinitialisé par les rafraîchissements de la page :
   // le paquet reste stable pendant qu'on swipe.
   const [deck, setDeck] = useState(initialDeck);
@@ -159,7 +162,7 @@ function Carte({
   onDecide,
   register,
 }: {
-  recipe: Recipe;
+  recipe: CarteDuPaquet;
   rang: number;
   pileRef: React.RefObject<HTMLDivElement | null>;
   onDecide: (liked: boolean) => void;
@@ -172,7 +175,7 @@ function Carte({
       onDecide={(d) => onDecide(d === "droite")}
       register={register ? (fn) => register((liked) => fn(liked ? "droite" : "gauche")) : undefined}
       tampons={{
-        droite: <span className="kd-tampon kd-tampon--like">Miam</span>,
+        droite: <span className="kd-tampon kd-tampon--like">{recipe.hier ? "On le refait" : "Miam"}</span>,
         gauche: <span className="kd-tampon kd-tampon--nope">Bof</span>,
       }}
     >
@@ -180,8 +183,12 @@ function Carte({
         className="kd-carte--pleine"
         titre={recipe.title}
         photo={recipe.photo_url}
-        pastille={recipe.pastille}
-        infos={[recipe.total_minutes && `${recipe.total_minutes} min`, recipe.source_url && "Recette Marmiton"].filter(Boolean).join(" · ") || undefined}
+        pastille={recipe.hier ? "Mangé hier" : recipe.pastille}
+        infos={
+          recipe.hier
+            ? "C'était bon ? Miam : on le refait"
+            : [recipe.total_minutes && `${recipe.total_minutes} min`, recipe.source_url && "Recette Marmiton"].filter(Boolean).join(" · ") || undefined
+        }
       />
     </CarteGeste>
   );

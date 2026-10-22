@@ -8,8 +8,8 @@ const heure = () => Number(new Intl.DateTimeFormat("fr-FR", { hour: "numeric", h
 
 /**
  * Kaddie s'ouvre là où il y a quelque chose à faire : sur les courses si je les fais
- * ou si je n'ai pas encore dit ce que je veux ; en fin de journée, sur « Ce soir, on mange
- * quoi ? » s'il reste des plats achetés à cuisiner ; sinon sur les envies.
+ * ou si je n'ai pas encore dit ce que je veux ; en fin de journée, sur « Ce soir » (une
+ * réponse à « on mange quoi ? ») s'il reste des plats achetés à cuisiner ; sinon sur les envies.
  */
 export default async function Accueil() {
   const user = await requireUser();
@@ -19,7 +19,7 @@ export default async function Accueil() {
   const h = heure();
   if (!trip && h >= 16 && h < 21) {
     const repas = await getRepasAchetes(user.familyId);
-    if (repas?.plats.some((p) => !p.fait)) redirect(ROUTES.courses);
+    if (repas?.plats.some((p) => !p.fait)) redirect(ROUTES.ceSoir);
   }
   redirect(ROUTES.envies);
 }

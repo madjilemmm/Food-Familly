@@ -7,6 +7,7 @@ import { marquerRepas } from "@/app/actions/trips";
 import { formatQuantity, scaleIngredients } from "@/lib/domain/shopping-list";
 import { IconeCroix, IconeRetour } from "@/components/ui";
 import { dureeDans } from "@/lib/domain/cuisine";
+import { AppelerATable } from "@/components/ATable";
 import { Ingredients } from "./Ingredients";
 
 type Ingredient = { id: string; name: string; quantity: number | null; unit: string };
@@ -17,22 +18,31 @@ type Ingredient = { id: string; name: string; quantity: number | null; unit: str
  */
 export function Cuisiner({
   recipeId,
+  titre,
   ingredients,
   servings,
   people,
   steps,
   repasTripId,
+  ouvrir = false,
 }: {
   recipeId: string;
+  titre: string;
   ingredients: Ingredient[];
   servings: number | null;
   people: number;
   steps: string[];
   /** Le plat a été acheté à la dernière course : « C'est fait » le range dans « Ce soir ». */
   repasTripId: string | null;
+  /** Arrivé par « Je cuisine » (écran Ce soir) : le mode cuisine s'ouvre tout de suite. */
+  ouvrir?: boolean;
 }) {
   const nombre = useState(people);
   const [ouvert, setOuvert] = useState(false);
+  // Après le premier rendu : le mode cuisine s'affiche dans <body>, qui n'existe pas côté serveur.
+  useEffect(() => {
+    if (ouvrir && steps.length > 0) setOuvert(true);
+  }, [ouvrir, steps.length]);
   return (
     <>
       {steps.length > 0 && (
@@ -44,6 +54,7 @@ export function Cuisiner({
       {ouvert && (
         <ModeCuisine
           recipeId={recipeId}
+          titre={titre}
           ingredients={scaleIngredients(ingredients, servings, nombre[0])}
           pour={nombre[0]}
           steps={steps}
@@ -57,6 +68,7 @@ export function Cuisiner({
 
 function ModeCuisine({
   recipeId,
+  titre,
   ingredients,
   pour,
   steps,
@@ -64,6 +76,7 @@ function ModeCuisine({
   onFermer,
 }: {
   recipeId: string;
+  titre: string;
   ingredients: Ingredient[];
   pour: number;
   steps: string[];
@@ -154,6 +167,9 @@ function ModeCuisine({
         {i === total - 1 && (
           <div className="flex flex-col items-start gap-5">
             <h2 className="kd-titre-1">Bon appétit&nbsp;!</h2>
+            <div className="w-full">
+              <AppelerATable titre={titre} large />
+            </div>
             {repasTripId ? (
               <button
                 type="button"

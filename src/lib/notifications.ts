@@ -152,3 +152,25 @@ export async function notifyMerci(familyId: string, deQui: string, pourQui: stri
   const nom = all.find((m) => m.id === deQui)?.name ?? "Quelqu'un";
   await sendPush([pourQui], { title: `${nom} te dit merci`, body: "Pour les courses.", url: "/courses", tag: `merci-${deQui}` });
 }
+
+/** « À table ! » : tout le monde sauf la personne qui cuisine. */
+export async function notifyATable(familyId: string, cuisinierId: string, minutes: number, titre: string | null) {
+  const all = await members(familyId);
+  const nom = all.find((m) => m.id === cuisinierId)?.name ?? "Quelqu'un";
+  await sendPush(
+    all.filter((m) => m.id !== cuisinierId).map((m) => m.id),
+    {
+      title: minutes ? `À table dans ${minutes} min !` : "À table !",
+      body: `${nom} a cuisiné${titre ? ` : ${titre}` : ""}. Tu arrives ?`,
+      url: "/ce-soir",
+      tag: "a-table",
+    },
+  );
+}
+
+/** Une réponse à « À table ! » : la personne qui cuisine la reçoit. */
+export async function notifyReponseATable(familyId: string, deQui: string, cuisinierId: string, reponse: "arrive" | "retard") {
+  const all = await members(familyId);
+  const nom = all.find((m) => m.id === deQui)?.name ?? "Quelqu'un";
+  await sendPush([cuisinierId], { title: reponse === "arrive" ? `${nom} arrive` : `${nom} : 5 min`, body: "", url: "/ce-soir", tag: `a-table-${deQui}` });
+}

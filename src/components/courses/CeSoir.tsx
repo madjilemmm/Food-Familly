@@ -56,7 +56,14 @@ export function CeSoir({ tripId, plats, moi }: { tripId: string; plats: RepasAch
 
   return (
     <section className="mb-10">
-      <h2 className="kd-etiquette">Ce soir, on mange quoi ?</h2>
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 className="kd-etiquette">Ce soir, on mange quoi ?</h2>
+        {aFaire.length > 1 && (
+          <Link href="/ce-soir" className="min-h-11 shrink-0 font-semibold text-violet underline underline-offset-4">
+            Choisis pour moi
+          </Link>
+        )}
+      </div>
       <p className="kd-petit mb-2">
         {aFaire.length > 0 ? "Aux dernières courses, vous avez acheté pour :" : "Tout ce qui a été acheté est cuisiné. Bravo !"}
       </p>

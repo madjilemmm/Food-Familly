@@ -4,6 +4,8 @@ import { db } from "@/lib/supabase/server";
 import { nAimePas, recipeConflicts, type Conflicts, type MemberTastes, type TasteLevel } from "@/lib/domain/foods";
 import { correspondAuxStyles, dureeMax, lireEnvies, styleDe, type Envies } from "@/lib/domain/envies";
 import { calculerMatchs, estEnvie, ordonnerPaquet, type Avis, type Moment, type Signaux } from "@/lib/domain/reco";
+import { aRedemander } from "@/lib/domain/ce-soir";
+import { bilanAnnee, type Annee } from "@/lib/domain/annee";
 import { passagesDesIngredients, sansDouteALaMaison } from "@/lib/domain/maison";
 import type { Style } from "@/lib/session";
 import { isAisle } from "@/lib/domain/aisles";
@@ -426,8 +428,37 @@ export async function enviesPour(familyId: string, recipeId: string): Promise<st
  * mes goûts, ce dont les autres ont envie et la découverte devant ; mes favoris
  * qui reviennent de temps en temps ; ce qu'un autre n'aime pas, à la fin.
  */
-export async function getDeck(familyId: string, profileId: string, moment: Moment = null): Promise<(Recipe & { dejaVu?: boolean })[]> {
-  const [recipes, avis, envies, ctx, profiles, etiquettes, profils, hist] = await Promise.all([
+/** Les plats cuisinés ces deux derniers jours (« C'est fait »), et pour qui (null : tout le monde). */
+async function getCuisinesRecemment(familyId: string): Promise<{ recipeId: string; faitLe: number; mangeurs: string[] | null }[]> {
+  const { data: trips } = await db()
+    .from("shopping_trips")
+    .select("id, trip_recipes(recipe_id, eaters)")
+    .eq("family_id", familyId)
+    .eq("status", "done")
+    .gte("created_at", new Date(Date.now() - 14 * JOUR).toISOString());
+  if (!trips?.length) return [];
+  // Base pas encore migrée : pas de repas notés.
+  const { data: repas } = await db()
+    .from("repas")
+    .select("trip_id, recipe_id, fait_le")
+    .in("trip_id", trips.map((t) => t.id))
+    .gte("fait_le", new Date(Date.now() - 2 * JOUR).toISOString());
+  const mangeurs = new Map(
+    trips.flatMap((t) => (t.trip_recipes as { recipe_id: string; eaters?: string[] | null }[]).map((r) => [`${t.id}:${r.recipe_id}`, r.eaters?.length ? r.eaters : null])),
+  );
+  return (repas ?? []).map((r) => ({
+    recipeId: r.recipe_id as string,
+    faitLe: Date.parse(r.fait_le as string),
+    mangeurs: mangeurs.get(`${r.trip_id}:${r.recipe_id}`) ?? null,
+  }));
+}
+
+export async function getDeck(
+  familyId: string,
+  profileId: string,
+  moment: Moment = null,
+): Promise<(Recipe & { dejaVu?: boolean; hier?: boolean })[]> {
+  const [recipes, avis, envies, ctx, profiles, etiquettes, profils, hist, cuisines] = await Promise.all([
     getRecipes(familyId),
     getFamilySwipes(familyId),
     getFamilyEnvies(familyId),
@@ -436,6 +467,7 @@ export async function getDeck(familyId: string, profileId: string, moment: Momen
     getEtiquettes(familyId),
     getProfilsGouts(familyId),
     getHistorique(familyId),
+    getCuisinesRecemment(familyId),
   ]);
   const now = Date.now();
   const mesEnvies = lireEnvies(profiles.find((p) => p.id === profileId)?.envies);
@@ -474,13 +506,17 @@ export async function getDeck(familyId: string, profileId: string, moment: Momen
       lassitude: style ? (stylesRecents.get(style) ?? 0) : 0,
     };
   });
-  return ordonnerPaquet(cartes, now, moment).map(
+  const paquet = ordonnerPaquet(cartes, now, moment).map(
     ({ cache: _c, fin, avis, signaux: _s, enviesDesAutres: _e, vuParLaFamille: _v, style: _st, minutes: _m, matchProbable: _mp, lassitude: _l, ...r }) => {
       const c = conflicts.get(r.id)!;
       const carte = { ...r, ...(avis ? { dejaVu: true } : {}) };
       return fin && c.pasFanDe.length ? { ...carte, pastille: nAimePas(c.pasFanDe) } : carte;
     },
   );
+  // Le plat d'hier passe devant, même s'il ne serait pas revenu de sitôt.
+  const idHier = aRedemander(cuisines, profileId, (id) => avis.get(id)?.get(profileId));
+  const hier = idHier && conflicts.get(idHier)?.verdict !== "cache" ? recipes.find((r) => r.id === idHier) : undefined;
+  return hier ? [{ ...hier, hier: true, dejaVu: true }, ...paquet.filter((r) => r.id !== hier.id)] : paquet;
 }
 
 // ─── Courses ───────────────────────────────────────────────────────────
@@ -595,11 +631,11 @@ export type RepasAchete = Recipe & {
  */
 export const getRepasAchetes = cache(async function getRepasAchetes(
   familyId: string,
-): Promise<{ tripId: string; plats: RepasAchete[] } | null> {
+): Promise<{ tripId: string; le: number; plats: RepasAchete[] } | null> {
   const since = new Date(Date.now() - 10 * JOUR).toISOString();
   const { data: trip } = await db()
     .from("shopping_trips")
-    .select("id, trip_recipes(*)")
+    .select("*, trip_recipes(*)")
     .eq("family_id", familyId)
     .eq("status", "done")
     .gte("created_at", since)
@@ -624,7 +660,7 @@ export const getRepasAchetes = cache(async function getRepasAchetes(
     const note = notes.get(c.recipe_id);
     return [{ ...r, fait: Boolean(note?.fait_le), mangeurs: (c.eaters ?? []).flatMap((id) => noms.get(id) ?? []) }];
   });
-  return { tripId: trip.id as string, plats };
+  return { tripId: trip.id as string, le: Date.parse((trip.finished_at ?? trip.validated_at ?? trip.created_at) as string), plats };
 });
 
 // ─── Les dernières courses : le bilan et les mercis ────────────────────
@@ -694,3 +730,91 @@ export async function getRecapSemaine(familyId: string): Promise<{ famille: stri
   ];
   return famille && plats.length ? { famille: famille.name, plats: plats.slice(0, 6) } : null;
 }
+
+// ─── Notre année à table ───────────────────────────────────────────────
+
+/** Le 1er janvier de l'année en cours, à Paris. */
+export function debutDeLAnnee(now = new Date()): number {
+  const an = Number(new Intl.DateTimeFormat("fr-FR", { year: "numeric", timeZone: "Europe/Paris" }).format(now));
+  return Date.parse(`${an}-01-01T00:00:00+01:00`);
+}
+
+/** Le bilan de l'année (règles : domain/annee.ts), avec les noms. */
+export async function getAnnee(familyId: string): Promise<
+  | (Annee & { an: number; famille: string; cuisines: number; mercis: number; noms: Map<string, string>; titres: Map<string, string> })
+  | null
+> {
+  const debut = debutDeLAnnee();
+  const [famille, recipes, profiles, avis, { data: trips }] = await Promise.all([
+    getFamily(familyId),
+    getRecipes(familyId),
+    getProfiles(familyId),
+    getFamilySwipes(familyId),
+    db()
+      .from("shopping_trips")
+      .select("id, created_by, trip_recipes(recipe_id, selected)")
+      .eq("family_id", familyId)
+      .not("validated_at", "is", null)
+      .gte("created_at", new Date(debut).toISOString()),
+  ]);
+  if (!famille) return null;
+  const ids = (trips ?? []).map((t) => t.id as string);
+  // Base pas encore migrée : ni repas ni mercis, le reste du bilan tient.
+  const [cuisines, mercis] = ids.length
+    ? await Promise.all([
+        db().from("repas").select("recipe_id", { count: "exact", head: true }).in("trip_id", ids).not("fait_le", "is", null).then((r) => r.count ?? 0),
+        db().from("mercis").select("profile_id", { count: "exact", head: true }).in("trip_id", ids).then((r) => r.count ?? 0),
+      ])
+    : [0, 0];
+  const bilan = bilanAnnee(
+    (trips ?? []).map((t) => ({
+      shopper: (t.created_by as string | null) ?? null,
+      plats: (t.trip_recipes as { recipe_id: string; selected: boolean }[]).filter((r) => r.selected).map((r) => r.recipe_id),
+    })),
+    avis,
+    debut,
+  );
+  return {
+    ...bilan,
+    an: new Date(debut + 7 * JOUR).getFullYear(),
+    famille: famille.name,
+    cuisines,
+    mercis,
+    noms: new Map(profiles.map((p) => [p.id, p.name])),
+    titres: new Map(recipes.map((r) => [r.id, r.title])),
+  };
+}
+
+// ─── « À table ! » ─────────────────────────────────────────────────────
+
+export type ATable = {
+  id: string;
+  cuisinier: { id: string; name: string } | null;
+  titre: string | null;
+  /** L'heure du repas (ms). */
+  a: number;
+  reponses: { id: string; name: string; reponse: "arrive" | "retard" }[];
+};
+
+/** Un appel reste affiché 20 minutes après l'heure du repas. */
+export const A_TABLE_DUREE_MS = 20 * 60_000;
+
+/** L'appel « À table ! » en cours dans la famille, s'il y en a un. */
+export const getATable = cache(async function getATable(familyId: string): Promise<ATable | null> {
+  const { data } = await db()
+    .from("a_table")
+    .select("*, a_table_reponses(*)")
+    .eq("family_id", familyId)
+    .gte("a", new Date(Date.now() - A_TABLE_DUREE_MS).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  // Base pas encore migrée : pas d'appel, rien ne casse.
+  if (!data) return null;
+  const noms = new Map((await getProfiles(familyId)).map((p) => [p.id, p.name]));
+  const reponses = (data.a_table_reponses as { profile_id: string; reponse: "arrive" | "retard" }[]).flatMap((r) =>
+    noms.has(r.profile_id) ? [{ id: r.profile_id, name: noms.get(r.profile_id)!, reponse: r.reponse }] : [],
+  );
+  const cuisinier = data.cuisinier && noms.has(data.cuisinier) ? { id: data.cuisinier as string, name: noms.get(data.cuisinier)! } : null;
+  return { id: data.id as string, cuisinier, titre: (data.titre as string | null) ?? null, a: Date.parse(data.a as string), reponses };
+});

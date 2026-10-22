@@ -31,16 +31,16 @@ async function completer(recipe: RecipeWithIngredients): Promise<RecipeWithIngre
 const duree = (min: number) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${String(min % 60).padStart(2, "0")}` : ""}`);
 
 /** Le retour ramène à l'écran d'où l'on vient (Matchs, Courses…), sinon aux recettes. */
-const RETOURS: Record<string, string> = { "/matchs": "Les matchs", "/courses": "Les courses", "/envies": "Les envies" };
+const RETOURS: Record<string, string> = { "/matchs": "Les matchs", "/courses": "Les courses", "/envies": "Les envies", "/ce-soir": "Ce soir" };
 
 export default async function RecipePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ depuis?: string }>;
+  searchParams: Promise<{ depuis?: string; cuisine?: string }>;
 }) {
-  const [{ id }, { depuis }] = await Promise.all([params, searchParams]);
+  const [{ id }, { depuis, cuisine }] = await Promise.all([params, searchParams]);
   const retour = depuis && RETOURS[depuis] ? { href: depuis, label: RETOURS[depuis] } : { href: "/recettes", label: "Les recettes" };
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const user = await requireUser();
@@ -81,6 +81,8 @@ export default async function RecipePage({
 
       <Cuisiner
         recipeId={recipe.id}
+        titre={recipe.title}
+        ouvrir={cuisine === "1"}
         ingredients={recipe.recipe_ingredients}
         servings={recipe.servings}
         people={people}
