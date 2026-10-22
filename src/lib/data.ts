@@ -407,7 +407,7 @@ export async function enviesPour(familyId: string, recipeId: string): Promise<st
  * mes goûts, ce dont les autres ont envie et la découverte devant ; mes favoris
  * qui reviennent de temps en temps ; ce qu'un autre n'aime pas, à la fin.
  */
-export async function getDeck(familyId: string, profileId: string, moment: Moment = null): Promise<Recipe[]> {
+export async function getDeck(familyId: string, profileId: string, moment: Moment = null): Promise<(Recipe & { dejaVu?: boolean })[]> {
   const [recipes, avis, envies, ctx, profiles] = await Promise.all([
     getRecipes(familyId),
     getFamilySwipes(familyId),
@@ -433,9 +433,10 @@ export async function getDeck(familyId: string, profileId: string, moment: Momen
       minutes: r.total_minutes,
     };
   });
-  return ordonnerPaquet(cartes, Date.now(), moment).map(({ cache: _c, fin, avis: _a, signaux: _s, enviesDesAutres: _e, vuParLaFamille: _v, style: _st, minutes: _m, ...r }) => {
+  return ordonnerPaquet(cartes, Date.now(), moment).map(({ cache: _c, fin, avis, signaux: _s, enviesDesAutres: _e, vuParLaFamille: _v, style: _st, minutes: _m, ...r }) => {
     const c = conflicts.get(r.id)!;
-    return fin && c.pasFanDe.length ? { ...r, pastille: nAimePas(c.pasFanDe) } : r;
+    const carte = { ...r, ...(avis ? { dejaVu: true } : {}) };
+    return fin && c.pasFanDe.length ? { ...carte, pastille: nAimePas(c.pasFanDe) } : carte;
   });
 }
 

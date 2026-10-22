@@ -2,7 +2,7 @@ import Link from "next/link";
 import { after } from "next/server";
 import { requireProfile, requireUser } from "@/lib/auth";
 import { remplirSiBesoin } from "@/lib/marmiton";
-import { getCurrentTrip, getDeck, getMatches, getProfiles } from "@/lib/data";
+import { getCurrentTrip, getDeck, getMatches, getProfiles, getRecipes } from "@/lib/data";
 import { isPastDeadline } from "@/lib/domain/trip";
 import { momentDe } from "@/lib/domain/reco";
 import { Countdown } from "@/components/Countdown";
@@ -36,7 +36,10 @@ export default async function Envies({ searchParams }: { searchParams: Promise<{
   const bandeauCourse = Boolean(trip && (iAmShopper || (!answered && trip.status === "open")));
 
   // Presque plus rien à découvrir : de nouvelles recettes arrivent de Marmiton, sans rien faire.
-  after(() => remplirSiBesoin(user.familyId, deck.length));
+  // (Seules les cartes jamais vues comptent : les plats qui reviennent ne sont pas des nouveautés.)
+  after(() => remplirSiBesoin(user.familyId, deck.filter((r) => !r.dejaVu).length));
+  // Paquet vide alors que la famille a des recettes : ce sont les goûts qui cachent tout.
+  const toutCache = deck.length === 0 && (await getRecipes(user.familyId)).length > 0;
 
   return (
     // Comme Recettes : le bandeau illustré, puis la pile de cartes sur le lilas, jusqu'aux onglets.
@@ -83,7 +86,7 @@ export default async function Envies({ searchParams }: { searchParams: Promise<{
           </Link>
         </p>
       )}
-      <SwipeDeck initialDeck={deck} />
+      <SwipeDeck initialDeck={deck} toutCache={toutCache} />
     </div>
   );
 }

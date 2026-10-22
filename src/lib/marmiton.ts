@@ -110,6 +110,8 @@ async function importer(familyId: string, combien: number): Promise<number> {
       if (await enregistrer(familyId, url, recette)) ajoutees++;
     }
   }
+  // Une trace dans les journaux : sans elle, un import bloqué passe inaperçu (paquet vide).
+  console.info(`Import Marmiton : ${termes.length} recherches, ${aEssayer.length} recettes trouvées, ${ajoutees} ajoutées`);
   return ajoutees;
 }
 

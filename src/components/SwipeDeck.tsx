@@ -19,7 +19,7 @@ import { RecipeVisual } from "./RecipeVisual";
  * Le geste lui-même (DESIGN.md §7) est dans CarteGeste.
  */
 
-export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
+export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Recipe[]; toutCache?: boolean }) {
   // L'état local n'est pas réinitialisé par les rafraîchissements de la page :
   // le paquet reste stable pendant qu'on swipe.
   const [deck, setDeck] = useState(initialDeck);
@@ -96,7 +96,7 @@ export function SwipeDeck({ initialDeck }: { initialDeck: Recipe[] }) {
       {/* Jamais moins de 12rem, même sur iPhone SE : la page défile alors un peu. */}
       <div ref={pileRef} className="relative mx-auto min-h-[12rem] w-full flex-1 sm:max-h-[36rem] sm:max-w-sm">
         {deck.length === 0 ? (
-          <PileVide />
+          <PileVide toutCache={toutCache} />
         ) : (
           <AnimatePresence initial={false}>
             {deck
@@ -187,7 +187,20 @@ function Carte({
   );
 }
 
-function PileVide() {
+function PileVide({ toutCache }: { toutCache: boolean }) {
+  if (toutCache) {
+    return (
+      <div className="kd-carte h-full justify-center gap-4 p-6 text-center">
+        <p className="kd-titre-2 text-aubergine">Tous les plats sont cachés</p>
+        <p className="text-encre-douce">
+          Les régimes, allergies ou « j&apos;aime pas » de la famille écartent toutes les recettes. Vérifie ce qui a été coché dans les goûts.
+        </p>
+        <Link href={`/profil/gouts?suite=${encodeURIComponent("/envies")}`} className="kd-btn kd-btn--large">
+          Voir mes goûts
+        </Link>
+      </div>
+    );
+  }
   return (
     <div className="kd-carte h-full justify-center gap-4 p-6 text-center">
       <p className="kd-titre-2 text-aubergine">De nouvelles recettes arrivent…</p>
