@@ -72,8 +72,10 @@ export const REGLAGES = {
   /** Équité : par course récente (3 au plus) sans aucun plat pour cette personne. */
   OUBLIE: 0.15,
   OUBLIE_MAX: 3,
-  /** Paquet : d'autres en ont envie (aide les matchs à naître). */
-  ENVIE_DES_AUTRES: 0.3,
+  /** Paquet : d'autres en ont envie (aide les matchs à naître). Une vraie envie passe avant une prédiction. */
+  ENVIE_DES_AUTRES: 0.6,
+  /** Paquet : au plus ce nombre de plats « Ta voix fait le match » passent en tête. */
+  VOIX_MANQUANTE_MAX: 3,
   /** Paquet : personne de la famille ne l'a encore vu. */
   DECOUVERTE: 0.1,
   /** Paquet : un autre membre n'aime pas un ingrédient (hors mode strict). */
@@ -263,6 +265,28 @@ export function ordonnerPaquet<C extends CartePaquet>(cartes: C[], now: number, 
           .sort((a, b) => Number(b.avis!.likedAt != null) - Number(a.avis!.likedAt != null) || a.avis!.swipedAt - b.avis!.swipedAt)
           .slice(0, REGLAGES.PAQUET_MIN - melange.length - finales.length);
   return [...varier(melange), ...finales, ...enAvance];
+}
+
+/**
+ * « Ta voix fait le match » : un plat dont une seule autre personne a envie devient un match
+ * si j'en ai envie aussi. Ces plats passent en tête du paquet (au plus VOIX_MANQUANTE_MAX),
+ * dans l'ordre du paquet ; seulement ceux qui y sont déjà (disponibles pour moi), et jamais
+ * un plat qu'un autre membre n'aime pas (exclu). Renvoie aussi, pour chacun, qui en a envie.
+ */
+export function avancerLesVoixManquantes<C extends { id: string }>(
+  paquet: C[],
+  envies: Map<string, string[]>,
+  moi: string,
+  exclu: (id: string) => boolean = () => false,
+): { paquet: C[]; voix: Map<string, string> } {
+  const voix = new Map<string, string>();
+  for (const c of paquet) {
+    if (voix.size >= REGLAGES.VOIX_MANQUANTE_MAX) break;
+    const qui = envies.get(c.id) ?? [];
+    if (qui.length === 1 && qui[0] !== moi && !exclu(c.id)) voix.set(c.id, qui[0]);
+  }
+  if (voix.size === 0) return { paquet, voix };
+  return { paquet: [...paquet.filter((c) => voix.has(c.id)), ...paquet.filter((c) => !voix.has(c.id))], voix };
 }
 
 /** Évite trois plats du même style d'affilée, en avançant le suivant d'un autre style (fenêtre de 3). */

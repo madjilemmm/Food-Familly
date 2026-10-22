@@ -27,12 +27,19 @@ export type CandidatSoir = {
   minutes: number | null;
 };
 
-export function choisirCeSoir<C extends CandidatSoir>(candidats: C[], { semaine }: { semaine: boolean }): C[] {
+/** « Autre idée » : un plat écarté ne revient pas en premier pendant ce nombre de jours. */
+export const PAS_CE_SOIR_JOURS = 2;
+
+export function choisirCeSoir<C extends CandidatSoir>(
+  candidats: C[],
+  { semaine, pasCeSoir = new Set() }: { semaine: boolean; pasCeSoir?: Set<string> },
+): C[] {
   const note = (c: C) =>
     (c.achete ? CE_SOIR.ACHETE + Math.min(CE_SOIR.ANCIENNETE_MAX, CE_SOIR.PAR_JOUR * c.joursDepuisAchat) : 0) +
     CE_SOIR.PAR_ENVIE * c.envies +
     (semaine && c.minutes ? (c.minutes <= 30 ? CE_SOIR.RAPIDE : c.minutes > 60 ? CE_SOIR.LONG : 0) : 0);
-  return [...candidats].sort((a, b) => note(b) - note(a) || a.id.localeCompare(b.id));
+  // Un plat écarté (« Autre idée ») passe après les autres, sans disparaître.
+  return [...candidats].sort((a, b) => Number(pasCeSoir.has(a.id)) - Number(pasCeSoir.has(b.id)) || note(b) - note(a) || a.id.localeCompare(b.id));
 }
 
 /**

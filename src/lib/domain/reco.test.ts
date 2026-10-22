@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  avancerLesVoixManquantes,
   REGLAGES,
   calculerMatchs,
   classerPlats,
@@ -218,7 +219,8 @@ describe("paquet de swipe", () => {
       [carte("a"), carte("b", { cache: true }), carte("c", { fin: true }), carte("d", { signaux: { adore: true } }), carte("e", { enviesDesAutres: 2 })],
       now,
     );
-    expect(p.map((c) => c.id)).toEqual(["d", "e", "a", "c"]);
+    // Deux autres en ont vraiment envie : il passe même devant un ingrédient adoré.
+    expect(p.map((c) => c.id)).toEqual(["e", "d", "a", "c"]);
   });
   it("un plat aimé revient après 3 semaines, un refusé après 6 ; jamais avant tant qu'il y a de quoi swiper", () => {
     const nouveautes = Array.from({ length: 12 }, (_, i) => carte(`nouveau-${i}`));
@@ -336,5 +338,29 @@ describe("Le paquet ne s'épuise jamais", () => {
   });
   it("un plat caché (interdit) ne revient jamais", () => {
     expect(ordonnerPaquet([{ ...vue("x", true, 2), cache: true }], now)).toEqual([]);
+  });
+});
+
+describe("Ta voix fait le match", () => {
+  const p = (id: string) => ({ id });
+  const envies = new Map([
+    ["tacos", ["leo"]],
+    ["gratin", ["leo", "anne"]],
+    ["ramen", ["moi"]],
+    ["quiche", ["anne"]],
+  ]);
+  it("les plats dont une seule autre personne a envie passent devant, dans l'ordre du paquet", () => {
+    const r = avancerLesVoixManquantes([p("pates"), p("quiche"), p("gratin"), p("tacos"), p("ramen")], envies, "moi");
+    expect(r.paquet.map((c) => c.id)).toEqual(["quiche", "tacos", "pates", "gratin", "ramen"]);
+    expect(r.voix.get("tacos")).toBe("leo");
+  });
+  it("pas un plat déjà en match, ni ma propre envie, ni un plat exclu", () => {
+    const r = avancerLesVoixManquantes([p("gratin"), p("ramen"), p("tacos")], envies, "moi", (id) => id === "tacos");
+    expect(r.voix.size).toBe(0);
+  });
+  it("au plus trois en tête", () => {
+    const beaucoup = new Map(["a", "b", "c", "d", "e"].map((id) => [id, ["leo"]]));
+    const r = avancerLesVoixManquantes(["a", "b", "c", "d", "e"].map(p), beaucoup, "moi");
+    expect(r.voix.size).toBe(3);
   });
 });

@@ -2,6 +2,9 @@ import "server-only";
 import { db } from "@/lib/supabase/server";
 import { sendPush } from "@/lib/push";
 import { formatTime } from "@/lib/domain/trip";
+import { conflictsOf, getEtiquettes, getFamilySwipes, getProfilsGouts, getTasteContext } from "@/lib/data";
+import { prediction } from "@/lib/domain/profil-gouts";
+import { heureAParis } from "@/lib/domain/heure";
 
 async function members(familyId: string) {
   const { data } = await db().from("profiles").select("id, name").eq("family_id", familyId);
@@ -122,4 +125,65 @@ export async function notifyReponseATable(familyId: string, deQui: string, cuisi
   const all = await members(familyId);
   const nom = all.find((m) => m.id === deQui)?.name ?? "Quelqu'un";
   await sendPush([cuisinierId], { title: reponse === "arrive" ? `${nom} arrive` : `${nom} : 5 min`, body: "", url: "/ce-soir", tag: `a-table-${deQui}` });
+}
+
+// ─── « Ta voix fait le match » ─────────────────────────────────────────
+
+const JOUR = 86_400_000;
+/** Une relance peut partir de 9 h à 21 h (heure de Paris), au plus une par 20 h et par personne. */
+export const RELANCES = { DE: 9, A: 21, ECART_MS: 20 * 60 * 60 * 1000, BOF_RESPECTE_JOURS: 45 } as const;
+
+
+/**
+ * Quelqu'un vient d'avoir envie d'un plat dont personne d'autre n'a envie : un « Miam » de plus
+ * et c'est un match. Les autres membres qui l'aimeraient sans doute sont prévenus, une seule fois
+ * par plat, au plus une fois par jour, jamais la nuit ; pas ceux qui ont dit « bof » récemment,
+ * ni ceux qui n'aiment pas un ingrédient. Sans la table « relances » (base pas encore migrée),
+ * rien ne part : on ne peut pas garantir la limite.
+ */
+export async function relancerDernierVote(familyId: string, recipeId: string, deQui: string, now = new Date()) {
+  const h = heureAParis(now);
+  if (h < RELANCES.DE || h >= RELANCES.A) return;
+  const [all, { data: recipe }, ctx, profils, etiquettes, avis] = await Promise.all([
+    members(familyId),
+    db().from("recipes").select("id, title").eq("id", recipeId).eq("family_id", familyId).maybeSingle(),
+    getTasteContext(familyId),
+    getProfilsGouts(familyId),
+    getEtiquettes(familyId),
+    getFamilySwipes(familyId),
+  ]);
+  if (!recipe) return;
+  const avisRecette = avis.get(recipeId);
+  const tags = etiquettes.get(recipeId) ?? [];
+  const nom = all.find((m) => m.id === deQui)?.name ?? "Quelqu'un";
+  const cibles = all.filter((m) => {
+    if (m.id === deQui) return false;
+    const a = avisRecette?.get(m.id);
+    if (a && !a.liked && now.getTime() - a.swipedAt < RELANCES.BOF_RESPECTE_JOURS * JOUR) return false;
+    const verdict = conflictsOf(ctx, recipe as { id: string; title: string }, m.id).verdict;
+    if (verdict === "cache" || verdict === "fin") return false;
+    const note = prediction(profils.get(m.id) ?? new Map(), tags);
+    return note == null || note >= 0;
+  });
+  for (const m of cibles) {
+    const { count, error } = await db()
+      .from("relances")
+      .select("profile_id", { count: "exact", head: true })
+      .eq("profile_id", m.id)
+      .gte("envoyee_le", new Date(now.getTime() - RELANCES.ECART_MS).toISOString());
+    if (error) return;
+    if (count) continue;
+    // Réservée avant l'envoi : une seule fois par plat, même si deux swipes arrivent ensemble.
+    const { data: reservee } = await db()
+      .from("relances")
+      .upsert({ profile_id: m.id, recipe_id: recipeId, envoyee_le: now.toISOString() }, { onConflict: "profile_id,recipe_id", ignoreDuplicates: true })
+      .select("profile_id");
+    if (!reservee?.length) continue;
+    await sendPush([m.id], {
+      title: "Ta voix fait le match",
+      body: `${nom} a envie de ${recipe.title} : un « Miam » et c'est un match.`,
+      url: "/envies",
+      tag: `voix-${recipeId}`,
+    });
+  }
 }

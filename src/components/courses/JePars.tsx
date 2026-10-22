@@ -9,7 +9,7 @@ export function JePars() {
   const [pending, startTransition] = useTransition();
   const [fait, setFait] = useState(false);
   const { essayer, alerte } = useErreurReseau("Pas de réseau : la famille n'a pas été prévenue. Réessaie quand ça revient.");
-  if (fait) return <p className="mb-6 font-semibold">C&apos;est noté : la famille est prévenue.</p>;
+  if (fait) return <p className="mb-6 font-semibold">La famille est prévenue : une dernière envie peut encore arriver sur la liste.</p>;
   return (
     <div className="mb-6">
       <button

@@ -58,7 +58,12 @@ export async function CoursesScreen({ me, notifications }: { me: Profile; notifi
         </Link>
       </p>
 
-      {!enCourse && !seul && <JePars />}
+      {/* Après « Je pars », l'écran se met à jour : la confirmation reste, le bouton disparaît. */}
+      {enCourse === me.id && !seul ? (
+        <p className="mb-6 font-semibold">La famille est prévenue : une dernière envie peut encore arriver sur la liste.</p>
+      ) : (
+        !enCourse && !seul && <JePars />
+      )}
 
       <AVerifier
         key={[...prep.aVerifier, ...prep.reportes.map((s) => s.cle), ...prep.habituels.map((s) => s.cle)].join("|")}

@@ -2,9 +2,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getCurrentTrip, getRepasAchetes } from "@/lib/data";
 import { ROUTES } from "@/lib/routes";
+import { heureAParis } from "@/lib/domain/heure";
 
-/** L'heure à Paris (0-23). */
-const heure = () => Number(new Intl.DateTimeFormat("fr-FR", { hour: "numeric", hour12: false, timeZone: "Europe/Paris" }).format(new Date()));
 
 /** « Je pars faire les courses » : pendant quelques heures, Kaddie s'ouvre sur la liste. */
 const EN_COURSE_MS = 6 * 60 * 60 * 1000;
@@ -18,7 +17,7 @@ export default async function Accueil() {
   const user = await requireUser();
   const trip = await getCurrentTrip(user.familyId);
   if (trip?.created_by === user.profileId && Date.now() - Date.parse(trip.departs_at) < EN_COURSE_MS) redirect(ROUTES.courses);
-  const h = heure();
+  const h = heureAParis();
   if (h >= 16 && h < 21) {
     const repas = await getRepasAchetes(user.familyId);
     if (repas?.plats.some((p) => !p.fait)) redirect(ROUTES.ceSoir);

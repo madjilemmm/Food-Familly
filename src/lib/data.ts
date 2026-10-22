@@ -3,7 +3,7 @@ import { cache } from "react";
 import { db } from "@/lib/supabase/server";
 import { nAimePas, recipeConflicts, type Conflicts, type MemberTastes, type TasteLevel } from "@/lib/domain/foods";
 import { correspondAuxStyles, dureeMax, lireEnvies, styleDe, type Envies } from "@/lib/domain/envies";
-import { calculerMatchs, estEnvie, ordonnerPaquet, type Avis, type Moment, type Signaux } from "@/lib/domain/reco";
+import { avancerLesVoixManquantes, calculerMatchs, estEnvie, ordonnerPaquet, type Avis, type Moment, type Signaux } from "@/lib/domain/reco";
 import { aRedemander } from "@/lib/domain/ce-soir";
 import { bilanAnnee, type Annee } from "@/lib/domain/annee";
 import { passagesDesIngredients, sansDouteALaMaison } from "@/lib/domain/maison";
@@ -457,7 +457,7 @@ export async function getDeck(
   familyId: string,
   profileId: string,
   moment: Moment = null,
-): Promise<(Recipe & { dejaVu?: boolean; hier?: boolean })[]> {
+): Promise<(Recipe & { dejaVu?: boolean; hier?: boolean; voix?: string })[]> {
   const [recipes, avis, envies, ctx, profiles, etiquettes, profils, hist, cuisines] = await Promise.all([
     getRecipes(familyId),
     getFamilySwipes(familyId),
@@ -506,13 +506,18 @@ export async function getDeck(
       lassitude: style ? (stylesRecents.get(style) ?? 0) : 0,
     };
   });
-  const paquet = ordonnerPaquet(cartes, now, moment).map(
+  const ordonne = ordonnerPaquet(cartes, now, moment).map(
     ({ cache: _c, fin, avis, signaux: _s, enviesDesAutres: _e, vuParLaFamille: _v, style: _st, minutes: _m, matchProbable: _mp, lassitude: _l, ...r }) => {
       const c = conflicts.get(r.id)!;
       const carte = { ...r, ...(avis ? { dejaVu: true } : {}) };
       return fin && c.pasFanDe.length ? { ...carte, pastille: nAimePas(c.pasFanDe) } : carte;
     },
   );
+  // « Ta voix fait le match » : ce dont une seule autre personne a envie passe devant
+  // (jamais un plat qu'un autre membre n'aime pas).
+  const noms = new Map(profiles.map((p) => [p.id, p.name]));
+  const { paquet: avance, voix } = avancerLesVoixManquantes(ordonne, envies, profileId, (id) => conflicts.get(id)?.verdict === "fin");
+  const paquet = avance.map((r) => (voix.has(r.id) ? { ...r, voix: noms.get(voix.get(r.id)!) ?? "Quelqu'un" } : r));
   // Le plat d'hier passe devant, même s'il ne serait pas revenu de sitôt.
   const idHier = aRedemander(cuisines, profileId, (id) => avis.get(id)?.get(profileId));
   const hier = idHier && conflicts.get(idHier)?.verdict !== "cache" ? recipes.find((r) => r.id === idHier) : undefined;
@@ -784,6 +789,14 @@ export async function getAnnee(familyId: string): Promise<
     titres: new Map(recipes.map((r) => [r.id, r.title])),
   };
 }
+
+// ─── « Autre idée » ───────────────────────────────────────────────────
+
+/** Les plats écartés de « Ce soir » par la famille, pas encore revenus (base pas migrée : aucun). */
+export const getPasCeSoir = cache(async function getPasCeSoir(familyId: string): Promise<Set<string>> {
+  const { data } = await db().from("pas_ce_soir").select("recipe_id").eq("family_id", familyId).gt("jusqu_a", new Date().toISOString());
+  return new Set((data ?? []).map((r) => r.recipe_id as string));
+});
 
 // ─── « À table ! » ─────────────────────────────────────────────────────
 

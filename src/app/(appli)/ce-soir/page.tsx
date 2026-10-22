@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
-import { forFamily, getFamilyEnvies, getProfiles, getRecipes, getRepasAchetes } from "@/lib/data";
+import { forFamily, getFamilyEnvies, getPasCeSoir, getProfiles, getRecipes, getRepasAchetes } from "@/lib/data";
 import { choisirCeSoir } from "@/lib/domain/ce-soir";
 import { listeDeNoms } from "@/lib/domain/convives";
 import { BandeauScene, EtatVide } from "@/components/ui";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import { AppelerATable } from "@/components/ATable";
+import { autreIdee } from "@/app/actions/ce-soir";
 
 export const metadata = { title: "Ce soir — Kaddie" };
 export const dynamic = "force-dynamic";
@@ -21,16 +22,17 @@ const enSemaine = () =>
 
 /**
  * « Ce soir » : une seule réponse à « on mange quoi ? » (règles : domain/ce-soir.ts).
- * Un appui pour cuisiner ; « Autre idée » pour la suivante.
+ * Un appui pour cuisiner ; « Autre idée » pour la suivante (le plat écarté attend deux jours).
  */
 export default async function CeSoir({ searchParams }: { searchParams: Promise<{ i?: string }> }) {
   const me = await requireProfile();
-  const [repas, envies, recipes, profiles, params] = await Promise.all([
+  const [repas, envies, recipes, profiles, params, pasCeSoir] = await Promise.all([
     getRepasAchetes(me.family_id),
     getFamilyEnvies(me.family_id),
     getRecipes(me.family_id),
     getProfiles(me.family_id),
     searchParams,
+    getPasCeSoir(me.family_id),
   ]);
   const noms = new Map(profiles.map((p) => [p.id, p.name]));
   const parId = new Map(recipes.map((r) => [r.id, r]));
@@ -58,7 +60,7 @@ export default async function CeSoir({ searchParams }: { searchParams: Promise<{
         minutes: r.total_minutes,
       })),
     ],
-    { semaine: enSemaine() },
+    { semaine: enSemaine(), pasCeSoir },
   );
   const i = Math.max(0, Number(params.i) || 0);
   const plat = choix.length ? choix[i % choix.length] : null;
@@ -89,9 +91,11 @@ export default async function CeSoir({ searchParams }: { searchParams: Promise<{
             Je cuisine
           </Link>
           {choix.length > 1 && (
-            <Link href={`/ce-soir?i=${i + 1}`} className="kd-btn kd-btn--secondaire kd-btn--large">
-              Autre idée
-            </Link>
+            <form action={autreIdee.bind(null, plat.id, i)}>
+              <button type="submit" className="kd-btn kd-btn--secondaire kd-btn--large w-full">
+                Autre idée
+              </button>
+            </form>
           )}
           <AppelerATable titre={plat.title} />
         </section>

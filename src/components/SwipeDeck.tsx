@@ -19,8 +19,11 @@ import { RecipeVisual } from "./RecipeVisual";
  * Le geste lui-même (DESIGN.md §7) est dans CarteGeste.
  */
 
-/** « hier » : le plat mangé hier, redemandé en premier (« C'était bon ? »). */
-type CarteDuPaquet = Recipe & { hier?: boolean };
+/**
+ * « hier » : le plat mangé hier, redemandé en premier (« C'était bon ? »).
+ * « voix » : une seule autre personne en a envie (son prénom) ; un « Miam » et c'est un match.
+ */
+type CarteDuPaquet = Recipe & { hier?: boolean; voix?: string };
 
 export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: CarteDuPaquet[]; toutCache?: boolean }) {
   // L'état local n'est pas réinitialisé par les rafraîchissements de la page :
@@ -184,11 +187,13 @@ function Carte({
         className="kd-carte--pleine"
         titre={recipe.title}
         photo={recipe.photo_url}
-        pastille={recipe.hier ? "Mangé hier" : recipe.pastille}
+        pastille={recipe.hier ? "Mangé hier" : recipe.voix ? "Ta voix fait le match" : recipe.pastille}
         infos={
           recipe.hier
             ? "C'était bon ? Miam : on le refait"
-            : [recipe.total_minutes && `${recipe.total_minutes} min`, recipe.source_url && "Recette Marmiton"].filter(Boolean).join(" · ") || undefined
+            : [recipe.voix && `Envie de ${recipe.voix}`, recipe.total_minutes && `${recipe.total_minutes} min`, !recipe.voix && recipe.source_url && "Recette Marmiton"]
+                .filter(Boolean)
+                .join(" · ") || undefined
         }
       />
     </CarteGeste>

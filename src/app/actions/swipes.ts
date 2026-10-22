@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
 import { enviesPour, getProfiles } from "@/lib/data";
-import { notifyMatch } from "@/lib/notifications";
+import { notifyMatch, relancerDernierVote } from "@/lib/notifications";
 import { oublierDuMenu, platsDuMenu, synchroniserMenu } from "@/lib/menu";
 import { changed } from "./_shared";
 
@@ -51,6 +52,8 @@ export async function swipe(
   if (nouveau) changed(() => notifyMatch(user.familyId, recipeId, autres, auMenu));
   else if (ajoutes.length) changed();
   else revalidatePath("/", "layout");
+  // Seul à en avoir envie : un « Miam » de plus ferait un match. On prévient qui l'aimerait sans doute.
+  if (liked && likers == null) after(() => relancerDernierVote(user.familyId, recipeId, user.profileId).catch(() => {}));
   const noms = new Map((await getProfiles(user.familyId)).map((p) => [p.id, p.name]));
   return {
     match: likers != null,
