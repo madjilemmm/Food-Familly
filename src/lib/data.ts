@@ -111,8 +111,8 @@ export type ListItem = {
   origine?: "habituel" | "reporte" | null;
 };
 
-/** Une session non terminée plus vieille que ça est considérée comme oubliée. */
-const TRIP_MAX_AGE_MS = 36 * 60 * 60 * 1000;
+/** La liste reste ouverte jusqu'aux courses finies ; plus vieille que ça, elle est considérée comme oubliée. */
+export const TRIP_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 const RECIPE_FIELDS = "id, title, emoji, photo_url, source_url, servings, total_minutes, created_at";
 
@@ -435,7 +435,7 @@ async function getCuisinesRecemment(familyId: string): Promise<{ recipeId: strin
     .select("id, trip_recipes(recipe_id, eaters)")
     .eq("family_id", familyId)
     .eq("status", "done")
-    .gte("created_at", new Date(Date.now() - 14 * JOUR).toISOString());
+    .gte("finished_at", new Date(Date.now() - 14 * JOUR).toISOString());
   if (!trips?.length) return [];
   // Base pas encore migrée : pas de repas notés.
   const { data: repas } = await db()
@@ -638,8 +638,8 @@ export const getRepasAchetes = cache(async function getRepasAchetes(
     .select("*, trip_recipes(*)")
     .eq("family_id", familyId)
     .eq("status", "done")
-    .gte("created_at", since)
-    .order("created_at", { ascending: false })
+    .gte("finished_at", since)
+    .order("finished_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (!trip) return null;

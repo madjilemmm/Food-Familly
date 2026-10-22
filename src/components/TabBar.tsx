@@ -33,9 +33,9 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
     };
   }, [router, pathname, hrefs]);
 
-  // Les matchs font partie des envies : l'onglet Envies reste allumé.
+  // Les recettes et « Ce soir » s'ouvrent depuis le Menu : l'onglet Menu reste allumé.
   const matches = (href: string, path: string) =>
-    path === href || path.startsWith(`${href}/`) || (href === "/envies" && path === "/matchs");
+    path === href || path.startsWith(`${href}/`) || (href === "/menu" && (path === "/ce-soir" || path.startsWith("/recettes")));
   const isActive = (href: string) => (pressed ? pressed === href : matches(href, pathname));
 
   return (

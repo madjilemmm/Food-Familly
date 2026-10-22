@@ -34,7 +34,7 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
     nouvelles.forEach((r) => vues.current.add(r.id));
     setDeck((d) => [...d, ...nouvelles]);
   }, [initialDeck]);
-  const [match, setMatch] = useState<{ recipe: Recipe; avec: string[] } | null>(null);
+  const [match, setMatch] = useState<{ recipe: Recipe; avec: string[]; auMenu: boolean } | null>(null);
   // « attente » : pas de réseau, le choix est gardé sur le téléphone et partira tout seul.
   const [error, setError] = useState<null | "attente" | "erreur">(null);
   const pileRef = useRef<HTMLDivElement>(null);
@@ -50,11 +50,12 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
     const carte = top;
     setDeck((d) => d.slice(1));
     setAnnonce(deck[1] ? `Plat suivant : ${deck[1].title}` : "Plus de plats pour l'instant");
-    const envoi: Promise<SwipeAvant | "attente"> = swipe(carte.id, liked)
+    const envoi: Promise<{ avant: SwipeAvant; auMenu: boolean } | "attente" | null> = swipe(carte.id, liked)
       .then((res) => {
         setError(null);
-        if (res.match) setMatch({ recipe: carte, avec: res.avec });
-        return res.avant;
+        if (res.match) setMatch({ recipe: carte, avec: res.avec, auMenu: res.auMenu });
+        // « Annuler » ne sort du Menu qu'un plat que ce swipe vient d'y faire entrer.
+        return { avant: res.avant, auMenu: res.auMenu && res.entre };
       })
       .catch((e) => {
         if (!estErreurReseau(e)) {
@@ -69,8 +70,8 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
     proposer(`${liked ? "Miam" : "Bof"} : ${carte.title}`, () => {
       setMatch((m) => (m?.recipe.id === carte.id ? null : m));
       setDeck((d) => [carte, ...d.filter((r) => r.id !== carte.id)]);
-      envoi.then((avant) => {
-        if (avant !== "attente") return undoSwipe(carte.id, avant).catch(() => {});
+      envoi.then((res) => {
+        if (res !== "attente") return undoSwipe(carte.id, res?.avant ?? null, res?.auMenu ?? false).catch(() => {});
         // Gardé hors connexion : s'il n'est pas encore parti, il suffit de l'oublier.
         const enFile = lireAttente().find((e) => e.cle === `swipe:${carte.id}`);
         if (enFile && !enFile.envoyee) retirerDeLAttente([enFile.cle]);
@@ -148,7 +149,7 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
       {/* Au-dessus de tout (la scène isole ses calques) : rendu directement dans <body>. */}
       {monte &&
         createPortal(
-          <AnimatePresence>{match && <EcranMatch recipe={match.recipe} avec={match.avec} onClose={() => setMatch(null)} />}</AnimatePresence>,
+          <AnimatePresence>{match && <EcranMatch recipe={match.recipe} avec={match.avec} auMenu={match.auMenu} onClose={() => setMatch(null)} />}</AnimatePresence>,
           document.body,
         )}
     </div>
@@ -220,7 +221,7 @@ function PileVide({ toutCache }: { toutCache: boolean }) {
 }
 
 /** « C'est un match » : monogramme qui éclot, puis la carte qui monte (120 ms après). */
-function EcranMatch({ recipe, avec, onClose }: { recipe: Recipe; avec: string[]; onClose: () => void }) {
+function EcranMatch({ recipe, avec, auMenu, onClose }: { recipe: Recipe; avec: string[]; auMenu: boolean; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -248,6 +249,7 @@ function EcranMatch({ recipe, avec, onClose }: { recipe: Recipe; avec: string[];
           </div>
           <h2 className="kd-display text-[56px]!">C&apos;est un match&nbsp;!</h2>
           <p className="kd-titre-3">{avec.length ? `${listeDeNoms(avec)} et toi en avez envie.` : "Vous êtes plusieurs à en avoir envie."}</p>
+          {auMenu && <p className="font-semibold">Au Menu : les ingrédients sont sur la liste.</p>}
         </div>
         {/* La carte du plat, à hauteur fixe : le nom reste visible et tout tient sur l'écran. */}
         <div className="kd-carte kd-monte shrink-0 text-left [animation-delay:120ms]">

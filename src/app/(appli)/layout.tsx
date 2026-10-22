@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { FamilyLayout } from "@/components/FamilyLayout";
 import { doitVoirNouvellesCartes } from "@/lib/domain/foods";
 
-/** Envies, Courses, Matchs : les mêmes écrans pour tout le monde. */
+/** Envies, Menu, Courses : les mêmes écrans pour tout le monde. */
 export default async function AppliLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser(); // cookie seulement : les requêtes partent ensemble
   const [me, trip, appel] = await Promise.all([requireProfile(), getCurrentTrip(user.familyId), getATable(user.familyId)]);
@@ -15,7 +15,7 @@ export default async function AppliLayout({ children }: { children: React.ReactN
   // Questionnaire rempli avant l'écran « Tes envies » : seulement celui-là, une fois.
   if (me.tastes_done_at && !me.envies_done_at) redirect("/profil/gouts?envies=1");
   return (
-    <FamilyLayout me={me} aTable={appel} coursesBadge={Boolean(trip && (trip.created_by === me.id || !trip.trip_requests.some((r) => r.profile_id === me.id)))}>
+    <FamilyLayout me={me} aTable={appel} coursesBadge={Boolean(trip?.created_by && trip.created_by !== me.id && Date.now() - Date.parse(trip.departs_at) < 6 * 60 * 60 * 1000)}>
       {children}
     </FamilyLayout>
   );

@@ -8,49 +8,19 @@ async function members(familyId: string) {
   return data ?? [];
 }
 
-/** Quelqu'un part faire les courses : on prévient tous les autres. */
-export async function notifyTripStarted(familyId: string, shopperId: string, deadline: string) {
+/** Quelqu'un part faire les courses : la liste est prête, les autres ont une dernière chance pour une envie. */
+export async function notifyTripStarted(familyId: string, shopperId: string) {
   const all = await members(familyId);
   const shopper = all.find((m) => m.id === shopperId)?.name ?? "Quelqu'un";
   await sendPush(
     all.filter((m) => m.id !== shopperId).map((m) => m.id),
     {
       title: `${shopper} part faire les courses`,
-      body: `Dis-lui ce que tu veux manger avant ${formatTime(deadline)} !`,
+      body: "Une envie ? Ajoute-la à la liste, ou swipe vite : un match va tout seul au Menu.",
       url: "/courses",
       tag: "trip",
     },
   );
-}
-
-/** Quelqu'un prend le relais : la personne qui devait y aller est prévenue. */
-export async function notifyTakeOver(familyId: string, newShopperId: string, oldShopperId: string | null) {
-  if (!oldShopperId) return;
-  const all = await members(familyId);
-  const name = all.find((m) => m.id === newShopperId)?.name ?? "Quelqu'un";
-  await sendPush([oldShopperId], {
-    title: `${name} fait les courses à ta place`,
-    body: "Tu n'as plus rien à faire. Merci qui ?",
-    url: "/courses",
-    tag: "trip",
-  });
-}
-
-/** Un membre a répondu : on prévient la personne qui fait les courses. */
-export async function notifyRequestReceived(
-  familyId: string,
-  shopperId: string | null,
-  memberId: string,
-  freeText: string | null,
-  recipeCount: number,
-) {
-  if (!shopperId) return;
-  const all = await members(familyId);
-  const name = all.find((m) => m.id === memberId)?.name ?? "Quelqu'un";
-  const parts: string[] = [];
-  if (recipeCount > 0) parts.push(recipeCount === 1 ? "1 plat" : `${recipeCount} plats`);
-  if (freeText) parts.push(`« ${freeText.slice(0, 80)} »`);
-  await sendPush([shopperId], { title: `${name} a répondu`, body: parts.join(" et "), url: "/courses", tag: `request-${memberId}` });
 }
 
 /**
@@ -60,7 +30,7 @@ export async function notifyRequestReceived(
 export async function notifyMatch(familyId: string, recipeId: string, autres: string[]) {
   if (autres.length === 0) return;
   const recipe = await db().from("recipes").select("title").eq("id", recipeId).eq("family_id", familyId).maybeSingle();
-  await sendPush(autres, { title: "C'est un match !", body: recipe.data?.title ?? "", url: "/matchs", tag: "match" });
+  await sendPush(autres, { title: "C'est un match !", body: recipe.data?.title ? `${recipe.data.title} : au Menu, les ingrédients sont sur la liste.` : "", url: "/menu", tag: "match" });
 }
 
 /**
@@ -104,27 +74,6 @@ export async function sendDeadlineReminders(now = new Date()): Promise<number> {
 
 /** « A, B et C » */
 const enFrancais = (l: string[]) => (l.length > 1 ? `${l.slice(0, -1).join(", ")} et ${l[l.length - 1]}` : (l[0] ?? ""));
-
-/**
- * La liste est faite : chaque membre dont l'envie ou la demande a été retenue l'apprend
- * (« Tacos : c'est prévu, grâce à toi »). Un seul message par personne.
- */
-export async function notifyEnviesRetenues(familyId: string, shopperId: string, plats: { title: string; qui: string[] }[]) {
-  const all = await members(familyId);
-  const shopper = all.find((m) => m.id === shopperId)?.name ?? "Quelqu'un";
-  const parMembre = new Map<string, string[]>();
-  for (const p of plats) for (const id of p.qui) if (id !== shopperId) parMembre.set(id, [...(parMembre.get(id) ?? []), p.title]);
-  await Promise.all(
-    [...parMembre].map(([id, titres]) =>
-      sendPush([id], {
-        title: `${enFrancais(titres.slice(0, 3))} : c'est prévu`,
-        body: `${shopper} l'a mis sur la liste, grâce à toi.`,
-        url: "/matchs",
-        tag: "retenu",
-      }),
-    ),
-  );
-}
 
 /**
  * Les courses sont finies : chacun apprend ce qui a été pris pour lui (une seule fois,

@@ -29,7 +29,7 @@ export function CeSoir({ tripId, plats, moi }: { tripId: string; plats: RepasAch
 
   const ligne = (p: RepasAchete) => (
     <li key={p.id} className="flex items-center gap-3 border-b-2 border-trait py-2">
-      <Link href={`/recettes/${p.id}?depuis=/courses&cuisine=1`} className="flex min-h-14 min-w-0 flex-1 items-center gap-3 active:opacity-80">
+      <Link href={`/recettes/${p.id}?depuis=/menu&cuisine=1`} className="flex min-h-14 min-w-0 flex-1 items-center gap-3 active:opacity-80">
         <RecipeVisual recipe={p} taille="vignette" className="size-14 shrink-0 rounded-pastille" />
         <span className="min-w-0 flex-1">
           <span className={`block font-semibold ${p.fait ? "text-encre-douce line-through" : ""}`}>{p.title}</span>

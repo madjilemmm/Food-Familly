@@ -31,7 +31,7 @@ async function completer(recipe: RecipeWithIngredients): Promise<RecipeWithIngre
 const duree = (min: number) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${String(min % 60).padStart(2, "0")}` : ""}`);
 
 /** Le retour ramène à l'écran d'où l'on vient (Matchs, Courses…), sinon aux recettes. */
-const RETOURS: Record<string, string> = { "/matchs": "Les matchs", "/courses": "Les courses", "/envies": "Les envies", "/ce-soir": "Ce soir" };
+const RETOURS: Record<string, string> = { "/courses": "Les courses", "/envies": "Les envies", "/ce-soir": "Ce soir", "/menu": "Le Menu" };
 
 export default async function RecipePage({
   params,

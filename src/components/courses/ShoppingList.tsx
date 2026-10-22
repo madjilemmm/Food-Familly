@@ -325,7 +325,7 @@ export function ShoppingList({
             detail={
               restants > 0
                 ? `${restants} article${restants > 1 ? "s" : ""} pas pris : Kaddie ${restants > 1 ? "les" : "le"} proposera aux prochaines courses.`
-                : "La liste sera effacée pour toute la famille."
+                : "Les plats achetés passent dans le Menu, à cuisiner, et une nouvelle liste démarre."
             }
             confirmLabel="Oui, c'est fini"
             apres="/courses"

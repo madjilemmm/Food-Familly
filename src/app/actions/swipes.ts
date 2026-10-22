@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
 import { enviesPour, getProfiles } from "@/lib/data";
 import { notifyMatch } from "@/lib/notifications";
+import { oublierDuMenu, platsDuMenu, synchroniserMenu } from "@/lib/menu";
 import { changed } from "./_shared";
 
 /** Un swipe tel qu'il était avant (pour « Annuler ») ; null s'il n'y en avait pas. */
@@ -14,8 +15,13 @@ export type SwipeAvant = { liked: boolean; swiped_at: string; liked_at: string |
  * À droite : « j'en ai envie » (une envie, et on retient qu'on aime ce plat) ;
  * à gauche : « pas envie là » (on n'oublie pas qu'on l'a aimé avant).
  * Match : au moins 2 personnes en ont envie. Seules ces personnes sont prévenues.
+ * Un plat qui plaît entre au Menu, et ses ingrédients vont sur la liste (lib/menu.ts) :
+ * auMenu le dit, pour l'écran « C'est un match » ; entre : c'est ce swipe qui l'y a mis.
  */
-export async function swipe(recipeId: string, liked: boolean): Promise<{ match: boolean; avec: string[]; avant: SwipeAvant }> {
+export async function swipe(
+  recipeId: string,
+  liked: boolean,
+): Promise<{ match: boolean; avec: string[]; avant: SwipeAvant; auMenu: boolean; entre: boolean }> {
   const user = await requireUser();
   // Vérification de la recette, swipe d'avant et « était-ce déjà un match ? » en même temps.
   const [{ data: recipe }, { data: avant }, avantMatch] = await Promise.all([
@@ -37,15 +43,28 @@ export async function swipe(recipeId: string, liked: boolean): Promise<{ match: 
   const autres = (likers ?? []).filter((id) => id !== user.profileId);
   // Un nouveau match seulement (rejoindre un match déjà là ne réveille personne).
   const nouveau = likers != null && avantMatch == null;
-  // Les autres téléphones ne sont prévenus (et rafraîchis) que pour un nouveau match.
+  // Un « Miam » peut faire entrer le plat au Menu (et ses ingrédients sur la liste).
+  const menu = liked ? await synchroniserMenu(user.familyId) : null;
+  const ajoutes = menu?.ajoutes ?? [];
+  // Les autres téléphones ne sont prévenus (et rafraîchis) que si quelque chose change pour eux.
   if (nouveau) changed(() => notifyMatch(user.familyId, recipeId, autres));
+  else if (ajoutes.length) changed();
   else revalidatePath("/", "layout");
   const noms = new Map((await getProfiles(user.familyId)).map((p) => [p.id, p.name]));
-  return { match: likers != null, avec: autres.flatMap((id) => noms.get(id) ?? []), avant: (avant as SwipeAvant) ?? null };
+  return {
+    match: likers != null,
+    avec: autres.flatMap((id) => noms.get(id) ?? []),
+    avant: (avant as SwipeAvant) ?? null,
+    auMenu: menu ? platsDuMenu(menu.trip).includes(recipeId) : false,
+    entre: ajoutes.includes(recipeId),
+  };
 }
 
-/** « Annuler » : le swipe redevient ce qu'il était (ou disparaît s'il n'y en avait pas). */
-export async function undoSwipe(recipeId: string, avant: SwipeAvant = null) {
+/**
+ * « Annuler » : le swipe redevient ce qu'il était (ou disparaît s'il n'y en avait pas).
+ * S'il venait de mettre le plat au Menu, le plat en ressort, avec ses ingrédients.
+ */
+export async function undoSwipe(recipeId: string, avant: SwipeAvant = null, sortirDuMenu = false) {
   const user = await requireUser();
   const date = (v: unknown) => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v : null);
   const ligne = db().from("swipes");
@@ -57,6 +76,7 @@ export async function undoSwipe(recipeId: string, avant: SwipeAvant = null) {
   } else {
     await ligne.delete().eq("profile_id", user.profileId).eq("recipe_id", recipeId);
   }
+  if (sortirDuMenu === true) await oublierDuMenu(user.familyId, recipeId);
   changed();
 }
 

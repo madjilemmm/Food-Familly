@@ -2,16 +2,16 @@ import { RealtimeRefresher } from "@/components/RealtimeRefresher";
 import { FileAttente } from "@/components/FileAttente";
 import { TabBar, type Tab } from "@/components/TabBar";
 import { AnnulerProvider } from "@/components/Annuler";
-import { IconeLivre, IconePanier, IconeSwipe } from "@/components/ui";
+import { IconeAssiette, IconePanier, IconeSwipe } from "@/components/ui";
 import { BandeauATable } from "@/components/ATable";
 import type { ATable, Profile } from "@/lib/data";
 
-// Trois onglets, les mêmes pour tout le monde : choisir (Envies), acheter (Courses), cuisiner (Recettes).
-// Les matchs s'ouvrent depuis la pastille de l'écran Envies.
+// Trois onglets, les mêmes pour tout le monde : dire (Envies), voir ce qu'on mange (Menu),
+// faire les courses (Courses). Les recettes s'ouvrent depuis le Menu et chaque plat.
 const TABS: Tab[] = [
   { href: "/envies", label: "Envies", icon: <IconeSwipe /> },
+  { href: "/menu", label: "Menu", icon: <IconeAssiette /> },
   { href: "/courses", label: "Courses", icon: <IconePanier /> },
-  { href: "/recettes", label: "Recettes", icon: <IconeLivre /> },
 ];
 
 /** Barre d'onglets et rafraîchissement en direct. */

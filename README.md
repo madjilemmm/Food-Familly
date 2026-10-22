@@ -5,7 +5,7 @@ Chaque famille crée son espace, ajoute ses membres et partage un code. Ensuite,
 
 - **Celui ou celle qui part** l'annonce en 2 taps. Les autres sont prévenus, il voit leurs réponses en direct, coche les plats, et la liste de courses se fait toute seule, triée par rayon.
 - **Tout le monde** swipe des recettes comme sur une appli de rencontre : à droite « j'en ai envie », à gauche « pas envie là ». Quand **au moins deux personnes** ont envie du même plat, c'est un **match**, pour ces personnes-là. Quand quelqu'un part, les autres répondent avec du texte libre et/ou des plats, et leurs envies arrivent de toute façon à la personne qui fait les courses.
-- Une seule appli pour tout le monde, trois onglets : **Envies** (swipe, matchs), **Courses**, **Recettes**. Ce n'est pas le profil qui décide de l'écran, c'est le moment : celle ou celui qui touche « Je pars » fait les courses (préparation « Qui mange quoi ? », puis le magasin avec rien que la liste) ; les autres disent ce qu'ils veulent, ou **prennent le relais**. Kaddie propose d'office les plats demandés et les envies partagées ; chaque plat dit pourquoi (« Demandé par Madji », « Envie de Madji et Yoalem ») et pour qui, corrigeable (« Qui en mange ? », invités), et les quantités suivent.
+- Une seule appli pour tout le monde, trois onglets : **Envies** (swipe), **Menu** (ce qu'on mange), **Courses** (la liste). « Tu swipes, Kaddie fait le reste » : un plat qui fait un match (seul dans la famille, une envie) entre au **Menu**, et ses ingrédients vont tout seuls sur la **liste**, toujours ouverte. Personne ne lance de course ni ne choisit les plats ; on retire un plat du Menu d'un appui (×) ou on en ajoute un (+). « Je pars faire les courses » est facultatif : il prévient la famille, pour une dernière envie. « J'ai fini les courses » passe les plats achetés « à cuisiner » et ouvre une nouvelle liste. Les recettes s'ouvrent depuis le Menu.
 
 Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres, Realtime, Storage), Web Push (VAPID), hébergement sur Vercel (gratuit).
 
@@ -257,7 +257,7 @@ src/
   middleware.ts          # famille rejointe, profil choisi, anciennes adresses
   app/
     bienvenue/ profil/   # saisie du code puis choix du profil
-    (appli)/             # Envies (swipe) · Courses (préparer, magasin) · Matchs
+    (appli)/             # Envies (swipe) · Menu · Courses (la liste) · Ce soir · Notre année
     famille/             # membres, code de la famille
     bienvenue/creer/     # création d'une famille
     recettes/            # liste + formulaire de recette

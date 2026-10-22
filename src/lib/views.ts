@@ -1,10 +1,8 @@
 import "server-only";
-import { cache } from "react";
 import {
   conflictsOf,
   getAppris,
   getCoursesPassees,
-  getCurrentTrip,
   getFamilyEnvies,
   getFamilySwipes,
   getHistorique,
@@ -15,12 +13,9 @@ import {
   getProfiles,
   getRecipes,
   signauxDe,
-  type Profile,
   type Recipe,
   type Trip,
-  type TripRequest,
 } from "@/lib/data";
-import { isPastDeadline } from "@/lib/domain/trip";
 import type { Convives } from "@/lib/domain/convives";
 import { cleMaison } from "@/lib/domain/maison";
 import { aAjouter, type Suggestion } from "@/lib/domain/habitudes";
@@ -154,68 +149,15 @@ export async function platsDeLaCourse(familyId: string, trip: Trip): Promise<Pla
   }));
 }
 
-export type CandidateRecipe = Recipe & PlatDeLaCourse;
-
-export type TripOverview = {
-  trip: Trip;
-  /** Celui ou celle qui fait les courses (null si son profil a été retiré). */
-  shopper: Profile | null;
-  /** Le profil connecté fait-il ces courses ? */
-  iAmShopper: boolean;
-  members: Profile[];
-  /** Les réponses des autres membres. */
-  responses: { member: Profile; request: TripRequest | null; recipes: Recipe[] }[];
-  candidates: CandidateRecipe[];
-  pastDeadline: boolean;
-  nobodyAnswered: boolean;
-  /** Ingrédients des plats gardés, sans doute déjà à la maison : à vérifier avant de partir. */
-  aVerifier: string[];
-  /** Pas pris la dernière fois, et achats habituels : à ajouter d'un geste (rien d'office). */
-  reportes: Suggestion[];
-  habituels: Suggestion[];
-};
-
 /**
- * Tout ce qu'il faut pour une session de courses : qui la fait, les réponses
- * des autres et les plats (voir platsDeLaCourse).
- * Le dépassement de l'heure limite est calculé ici, à l'affichage.
+ * Avant de partir, sur la liste : les ingrédients des plats du Menu que la famille a
+ * sans doute déjà (à vérifier), ce qui n'a pas été pris la dernière fois et les achats
+ * habituels (à ajouter d'un geste, rien d'office).
  */
-export const getTripOverview = cache(async function getTripOverview(
-  familyId: string,
-  myProfileId: string,
-): Promise<TripOverview | null> {
-  // Tout part en même temps : un seul aller-retour vers la base.
-  const [trip, members, recipes] = await Promise.all([getCurrentTrip(familyId), getProfiles(familyId), getRecipes(familyId)]);
-  if (!trip) return null;
-  const requests = trip.trip_requests;
-  const recipeById = new Map(recipes.map((r) => [r.id, r]));
-  const shopper = members.find((m) => m.id === trip.created_by) ?? null;
-
-  const responses = members
-    .filter((m) => m.id !== trip.created_by)
-    .map((member) => {
-      const request = requests.find((r) => r.profile_id === member.id) ?? null;
-      return {
-        member,
-        request,
-        recipes: (request?.recipe_ids ?? []).flatMap((id) => recipeById.get(id) ?? []),
-      };
-    });
-
-  const [plats, hist, passees, appris] = await Promise.all([
-    platsDeLaCourse(familyId, trip),
-    getHistorique(familyId),
-    getCoursesPassees(familyId),
-    getAppris(familyId),
-  ]);
-  const candidates = plats.flatMap((p) => {
-    const recipe = recipeById.get(p.id);
-    return recipe ? [{ ...recipe, ...p }] : [];
-  });
-
-  // Les ingrédients des plats gardés que la famille a sans doute déjà (et pas encore remis sur la liste).
-  const gardes = candidates.filter((c) => c.checked).map((c) => c.id);
-  const ingredients = hist.aLaMaison.size && gardes.length ? (await getRecipesWithIngredients(familyId, gardes)).flatMap((r) => r.recipe_ingredients) : [];
+export async function aPreparer(familyId: string, trip: Trip): Promise<{ aVerifier: string[]; reportes: Suggestion[]; habituels: Suggestion[] }> {
+  const menu = trip.trip_recipes.filter((r) => r.selected).map((r) => r.recipe_id);
+  const [hist, passees, appris] = await Promise.all([getHistorique(familyId), getCoursesPassees(familyId), getAppris(familyId)]);
+  const ingredients = hist.aLaMaison.size && menu.length ? (await getRecipesWithIngredients(familyId, menu)).flatMap((r) => r.recipe_ingredients) : [];
   const surLaListe = new Set(trip.shopping_list_items.filter((i) => i.source !== "maison").map((i) => cleMaison(i.name)));
   const vus = new Set<string>();
   const aVerifier = ingredients
@@ -226,16 +168,7 @@ export const getTripOverview = cache(async function getTripOverview(
       return true;
     })
     .map((i) => i.name);
-
   return {
-    trip,
-    shopper,
-    iAmShopper: trip.created_by === myProfileId,
-    members,
-    responses,
-    candidates,
-    pastDeadline: isPastDeadline(trip.deadline_at),
-    nobodyAnswered: requests.length === 0,
     aVerifier,
     ...aAjouter(passees.courses, passees.reponses, {
       surLaListe: new Set(trip.shopping_list_items.filter((i) => i.source === "manual" || i.source === "request").map((i) => cleProduit(i.name, appris))),
@@ -243,7 +176,7 @@ export const getTripOverview = cache(async function getTripOverview(
       now: Date.now(),
     }),
   };
-});
+}
 
 /** L'avertissement d'un plat choisi malgré les goûts de la famille. */
 function attentionPour(c: ReturnType<typeof conflictsOf> | undefined): string {
