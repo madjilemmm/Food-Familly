@@ -8,7 +8,7 @@ import { swipe, undoSwipe, type SwipeAvant } from "@/app/actions/swipes";
 import { lireAttente, mettreEnAttente, retirerDeLAttente } from "@/lib/attente";
 import { estErreurReseau } from "@/lib/reseau";
 import { useAnnuler } from "@/components/Annuler";
-import { Bouton, CarteRecette, IconeJenVeux, IconePasEnvie, Logo, Scene } from "@/design-system/components/Kaddie";
+import { Bouton, CarteRecette, Logo, Scene } from "@/design-system/components/Kaddie";
 import type { Recipe } from "@/lib/data";
 import { listeDeNoms } from "@/lib/domain/convives";
 import { CarteGeste, PILE } from "./CarteGeste";
@@ -124,12 +124,12 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
       </div>
 
       {deck.length > 0 && (
-        <div className="flex items-center justify-center gap-10">
-          <Bouton variante="nope" rond aria-label="Pas envie" onClick={() => press(false)}>
-            <IconePasEnvie />
+        <div className="mx-auto flex w-full max-w-sm items-center gap-3">
+          <Bouton variante="nope" large className="flex-1" onClick={() => press(false)}>
+            Bof
           </Bouton>
-          <Bouton variante="like" rond aria-label="J'en veux" onClick={() => press(true)}>
-            <IconeJenVeux />
+          <Bouton variante="like" large className="flex-1" onClick={() => press(true)}>
+            Miam
           </Bouton>
         </div>
       )}
@@ -253,7 +253,7 @@ function EcranMatch({
       transition={{ duration: 0.24 }}
       role="dialog"
       aria-modal="true"
-      aria-label="C'est un match"
+      aria-label={avec.length ? "C'est un match" : "Au Menu"}
     >
       <Scene
         duo="aubergine"
@@ -264,13 +264,16 @@ function EcranMatch({
           <div className="kd-pop text-accent">
             <Logo variante="monogramme" width={96} title="" />
           </div>
-          <h2 className="kd-display text-[56px]!">C&apos;est un match&nbsp;!</h2>
-          <p className="kd-titre-3">{avec.length ? `${listeDeNoms(avec)} et toi en avez envie.` : "Vous êtes plusieurs à en avoir envie."}</p>
+          <h2 className="kd-display text-[56px]!">{avec.length ? "C'est un match\u00a0!" : "Au Menu\u00a0!"}</h2>
+          <p className="kd-titre-3">{avec.length ? `${listeDeNoms(avec)} et toi en avez envie.` : "Tu en as envie : il est au Menu."}</p>
+          {!auMenu && (
+            <p className="font-semibold">Il n&apos;est pas entré au Menu : il est complet, ou tu l&apos;en avais retiré. Tu peux l&apos;y remettre depuis le Menu.</p>
+          )}
           {auMenu && (
             <p className="font-semibold">
               {ingredients > 0
-                ? `Au Menu : ${ingredients} ingrédient${ingredients > 1 ? "s" : ""} ajouté${ingredients > 1 ? "s" : ""} à la liste.`
-                : "Au Menu : les ingrédients sont sur la liste."}
+                ? `${ingredients} ingrédient${ingredients > 1 ? "s" : ""} ajouté${ingredients > 1 ? "s" : ""} à ta liste.`
+                : "Les ingrédients sont sur ta liste."}
             </p>
           )}
         </div>

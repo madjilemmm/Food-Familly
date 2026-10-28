@@ -176,7 +176,7 @@ export function ShoppingList({
       {list.length > 0 && (
         <div className="mb-6">
           <p className="kd-etiquette mb-2">
-            {done === list.length ? "Tout est dans le caddie" : `${done} sur ${list.length} dans le caddie`}
+            {done === list.length ? "Tout est acheté" : `${done} sur ${list.length} achetés`}
           </p>
           <div className="h-3 overflow-hidden rounded-full bg-trait">
             <div className="h-full rounded-full bg-accent transition-all duration-300" style={{ width: `${(done / list.length) * 100}%` }} />

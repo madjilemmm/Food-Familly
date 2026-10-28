@@ -307,7 +307,7 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
 
       {interditPour.length > 0 && (
         <p role="status" className="rounded-pastille bg-aubergine px-4 py-3 text-blanc">
-          Interdit pour {interditPour.join(", ")}&nbsp;: cette recette sera cachée du swipe, des matchs et des courses.
+          Interdit pour {interditPour.join(", ")}&nbsp;: cette recette sera cachée du swipe, du Menu et des courses.
         </p>
       )}
 
@@ -325,7 +325,7 @@ export function RecipeForm({ recipe, gouts = [] }: { recipe?: RecipeWithIngredie
         <ConfirmButton
           action={() => deleteRecipe(recipe.id)}
           question={`Supprimer « ${recipe.title} » ?`}
-          detail="Elle disparaît des swipes, des matchs et des courses de toute la famille."
+          detail="Elle disparaît des swipes, du Menu et des courses de toute la famille."
           confirmLabel="Oui, supprimer"
           disabled={saving}
           className="min-h-14 w-full text-encre-douce underline underline-offset-4"

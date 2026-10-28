@@ -56,7 +56,7 @@ export default async function Envies({ searchParams }: { searchParams: Promise<{
         >
           <IconePanier className="size-6 shrink-0 text-violet" />
           <span className="flex-1">
-            {iAmShopper ? "Tu fais les courses : ta liste est prête." : `${who} fait les courses : une envie ? Un match va tout seul sur la liste.`}
+            {iAmShopper ? "Tu fais les courses : ta liste est prête." : `${who} fait les courses : une envie ? Un plat choisi va tout seul sur la liste.`}
           </span>
         </Link>
       )}

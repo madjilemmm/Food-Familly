@@ -23,7 +23,7 @@ export function CarteInviter() {
       className="mb-4 flex min-h-14 items-center gap-3 rounded-bouton bg-blanc px-4 py-2 text-petit leading-snug font-semibold text-aubergine active:scale-[0.98]"
     >
       <IconeCoeur className="size-6 shrink-0 text-violet" />
-      <span className="flex-1">Invite ta famille : vos envies en commun deviennent des matchs</span>
+      <span className="flex-1">Invite ta famille : vos envies en commun deviennent le Menu</span>
       <IconeRetour className="size-6 rotate-180 text-violet" />
     </Link>
   );

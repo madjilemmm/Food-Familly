@@ -17,7 +17,7 @@ export function BilanCourses({ course, moi }: { course: DerniereCourse; moi: { i
         <>
           <p className="kd-titre-3">Courses finies&nbsp;!</p>
           <p className="text-encre">
-            {course.pris} article{course.pris > 1 ? "s" : ""} dans le caddie
+            {course.pris} article{course.pris > 1 ? "s" : ""} acheté{course.pris > 1 ? "s" : ""}
             {course.pourQui.length > 0 && <> · pour {listeDeNoms(course.pourQui)}</>}.
           </p>
           {course.mercis.length > 0 && (

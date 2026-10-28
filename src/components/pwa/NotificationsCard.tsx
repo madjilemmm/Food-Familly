@@ -77,7 +77,7 @@ export function NotificationsCard({ variant }: { variant: "banner" | "pill" | "i
 
       {state === "off" && (
         <>
-          <p>Une alerte quand quelqu&apos;un part en courses ou qu&apos;un plat matche.</p>
+          <p>Une alerte quand quelqu&apos;un part en courses ou qu&apos;un plat est choisi.</p>
           <button onClick={enable} className="kd-btn kd-btn--large">
             Activer les notifs
           </button>

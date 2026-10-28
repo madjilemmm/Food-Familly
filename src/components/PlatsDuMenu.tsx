@@ -75,7 +75,7 @@ export function PlatsDuMenu({ menu, autres, titreAutres = "Aussi envie" }: { men
             <ul className="kd-liste border-t-2 border-trait">{etat.menu.map((p) => ligne(p, true))}</ul>
           </>
         ) : (
-          <p className="kd-petit">Rien pour l&apos;instant : les prochains matchs arriveront ici.</p>
+          <p className="kd-petit">Rien pour l&apos;instant : un plat arrive ici quand deux personnes en ont envie (une seule si tu es seul·e).</p>
         )}
       </section>
       {etat.autres.length > 0 && (
