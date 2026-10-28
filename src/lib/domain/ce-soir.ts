@@ -38,6 +38,9 @@ export type CandidatSoir = {
   rang?: number;
 };
 
+/** Le plat de ce soir, gardé sur le téléphone tant que la table « ce_soir_choix » n'existe pas (« jour:recette:profil »). */
+export const CE_SOIR_COOKIE = "ce_soir";
+
 /** « Autre idée » : un plat écarté ne revient pas en premier pendant ce nombre de jours. */
 export const PAS_CE_SOIR_JOURS = 2;
 

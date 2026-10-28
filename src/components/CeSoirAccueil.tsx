@@ -298,8 +298,7 @@ export async function CeSoirAccueil({
         {noms2.length > 0 && (
           <p className="soir-ligne mt-3 flex min-h-14 items-center gap-3 border-t-2 border-trait text-petit font-medium">
             <IconePanier className="size-6 shrink-0 text-aubergine" />
-            {noms2.length} article{noms2.length > 1 ? "s" : ""} iron
-            {noms2.length > 1 ? "t" : "t"} dans le caddie
+            {noms2.length} article{noms2.length > 1 ? "s" : ""} {noms2.length > 1 ? "iront" : "ira"} dans le caddie
           </p>
         )}
       </div>
@@ -335,6 +334,7 @@ function Photo({ recipe, lien }: { recipe: Recipe; lien: string }) {
   return (
     <Link
       href={lien}
+      aria-label={`Voir la recette : ${recipe.title}`}
       className="relative min-h-[7.5rem] flex-1 overflow-hidden rounded-[0.875rem] bg-trait active:opacity-90"
     >
       <RecipeVisual recipe={recipe} className="absolute inset-0 size-full" />

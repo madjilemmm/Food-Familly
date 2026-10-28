@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
-import { PAS_CE_SOIR_JOURS } from "@/lib/domain/ce-soir";
+import { cookies } from "next/headers";
+import { CE_SOIR_COOKIE, PAS_CE_SOIR_JOURS } from "@/lib/domain/ce-soir";
 import { jourAParis } from "@/lib/domain/heure";
 import { choisirPlat } from "@/lib/menu";
 import { changed } from "./_shared";
@@ -37,9 +38,11 @@ export async function ceSeraCa(recipeId: string) {
   const { data: recette } = await db().from("recipes").select("id").eq("id", recipeId).eq("family_id", user.familyId).maybeSingle();
   if (!recette) redirect("/menu");
   await choisirPlat(user.familyId, recipeId, true);
-  await db()
+  const { error } = await db()
     .from("ce_soir_choix")
     .upsert({ family_id: user.familyId, jour: jourAParis(), recipe_id: recipeId, choisi_par: user.profileId, choisi_le: new Date().toISOString() }, { onConflict: "family_id,jour" });
+  // Base pas encore migrée : le choix reste au moins sur ce téléphone.
+  if (error) (await cookies()).set(CE_SOIR_COOKIE, `${jourAParis()}:${recipeId}:${user.profileId}`, { path: "/", maxAge: 86_400, httpOnly: true, sameSite: "lax" });
   changed();
   redirect("/menu");
 }
@@ -48,6 +51,7 @@ export async function ceSeraCa(recipeId: string) {
 export async function changerCeSoir() {
   const user = await requireUser();
   await db().from("ce_soir_choix").delete().eq("family_id", user.familyId).eq("jour", jourAParis());
+  (await cookies()).delete(CE_SOIR_COOKIE);
   changed();
   redirect("/menu");
 }

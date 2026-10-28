@@ -1,5 +1,7 @@
 import "server-only";
 import { cache } from "react";
+import { cookies } from "next/headers";
+import { CE_SOIR_COOKIE } from "@/lib/domain/ce-soir";
 import { db } from "@/lib/supabase/server";
 import { nAimePas, recipeConflicts, type Conflicts, type MemberTastes, type TasteLevel } from "@/lib/domain/foods";
 import { correspondAuxStyles, dureeMax, lireEnvies, styleDe, type Envies } from "@/lib/domain/envies";
@@ -824,7 +826,12 @@ export const getPasCeSoir = cache(async function getPasCeSoir(familyId: string):
 
 /** Le plat que la famille a retenu pour ce soir (« Ce sera ça »), s'il y en a un aujourd'hui. Base pas migrée : aucun. */
 export const getCeSoirChoisi = cache(async function getCeSoirChoisi(familyId: string): Promise<{ recipeId: string; choisiPar: string | null } | null> {
-  const { data } = await db().from("ce_soir_choix").select("recipe_id, choisi_par").eq("family_id", familyId).eq("jour", jourAParis()).maybeSingle();
+  const { data, error } = await db().from("ce_soir_choix").select("recipe_id, choisi_par").eq("family_id", familyId).eq("jour", jourAParis()).maybeSingle();
+  if (error) {
+    // Base pas encore migrée : le choix reste sur le téléphone de celui qui l'a fait (cookie du jour), faute de table.
+    const [jour, id, par] = ((await cookies()).get(CE_SOIR_COOKIE)?.value ?? "").split(":");
+    return jour === jourAParis() && id ? { recipeId: id, choisiPar: par || null } : null;
+  }
   return data ? { recipeId: data.recipe_id as string, choisiPar: (data.choisi_par as string | null) ?? null } : null;
 });
 
