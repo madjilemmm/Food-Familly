@@ -352,7 +352,7 @@ describe("Ta voix fait le match", () => {
   it("les plats dont une seule autre personne a envie passent devant, dans l'ordre du paquet", () => {
     const r = avancerLesVoixManquantes([p("pates"), p("quiche"), p("gratin"), p("tacos"), p("ramen")], envies, "moi");
     expect(r.paquet.map((c) => c.id)).toEqual(["quiche", "tacos", "pates", "gratin", "ramen"]);
-    expect(r.voix.get("tacos")).toBe("leo");
+    expect(r.voix.get("tacos")).toEqual(["leo"]);
   });
   it("pas un plat déjà en match, ni ma propre envie, ni un plat exclu", () => {
     const r = avancerLesVoixManquantes([p("gratin"), p("ramen"), p("tacos")], envies, "moi", (id) => id === "tacos");
@@ -362,5 +362,16 @@ describe("Ta voix fait le match", () => {
     const beaucoup = new Map(["a", "b", "c", "d", "e"].map((id) => [id, ["leo"]]));
     const r = avancerLesVoixManquantes(["a", "b", "c", "d", "e"].map(p), beaucoup, "moi");
     expect(r.voix.size).toBe(3);
+  });
+  it("un nouveau membre voit d'abord ce dont la famille a envie, les plus voulus en premier", () => {
+    const r = avancerLesVoixManquantes([p("pates"), p("tacos"), p("gratin"), p("ramen")], envies, "nouveau", () => false, { nouveau: true });
+    expect(r.paquet.map((c) => c.id)).toEqual(["gratin", "tacos", "ramen", "pates"]);
+    expect(r.voix.get("gratin")).toEqual(["leo", "anne"]);
+  });
+  it("nouveau : au plus cinq, et jamais un plat exclu", () => {
+    const beaucoup = new Map(["a", "b", "c", "d", "e", "f", "g"].map((id) => [id, ["leo"]]));
+    const r = avancerLesVoixManquantes(["a", "b", "c", "d", "e", "f", "g"].map(p), beaucoup, "nouveau", (id) => id === "a", { nouveau: true });
+    expect(r.voix.size).toBe(5);
+    expect(r.voix.has("a")).toBe(false);
   });
 });

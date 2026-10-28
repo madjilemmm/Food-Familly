@@ -23,7 +23,7 @@ import { RecipeVisual } from "./RecipeVisual";
  * « hier » : le plat mangé hier, redemandé en premier (« C'était bon ? »).
  * « voix » : une seule autre personne en a envie (son prénom) ; un « Miam » et c'est un match.
  */
-type CarteDuPaquet = Recipe & { hier?: boolean; voix?: string };
+type CarteDuPaquet = Recipe & { hier?: boolean; voix?: string; voixNb?: number };
 
 export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: CarteDuPaquet[]; toutCache?: boolean }) {
   // L'état local n'est pas réinitialisé par les rafraîchissements de la page :
@@ -37,7 +37,7 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
     nouvelles.forEach((r) => vues.current.add(r.id));
     setDeck((d) => [...d, ...nouvelles]);
   }, [initialDeck]);
-  const [match, setMatch] = useState<{ recipe: Recipe; avec: string[]; auMenu: boolean } | null>(null);
+  const [match, setMatch] = useState<{ recipe: Recipe; avec: string[]; auMenu: boolean; ingredients: number } | null>(null);
   // « attente » : pas de réseau, le choix est gardé sur le téléphone et partira tout seul.
   const [error, setError] = useState<null | "attente" | "erreur">(null);
   const pileRef = useRef<HTMLDivElement>(null);
@@ -56,7 +56,7 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
     const envoi: Promise<{ avant: SwipeAvant; auMenu: boolean } | "attente" | null> = swipe(carte.id, liked)
       .then((res) => {
         setError(null);
-        if (res.match) setMatch({ recipe: carte, avec: res.avec, auMenu: res.auMenu });
+        if (res.match) setMatch({ recipe: carte, avec: res.avec, auMenu: res.auMenu, ingredients: res.ingredients });
         // « Annuler » ne sort du Menu qu'un plat que ce swipe vient d'y faire entrer.
         return { avant: res.avant, auMenu: res.auMenu && res.entre };
       })
@@ -152,7 +152,7 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
       {/* Au-dessus de tout (la scène isole ses calques) : rendu directement dans <body>. */}
       {monte &&
         createPortal(
-          <AnimatePresence>{match && <EcranMatch recipe={match.recipe} avec={match.avec} auMenu={match.auMenu} onClose={() => setMatch(null)} />}</AnimatePresence>,
+          <AnimatePresence>{match && <EcranMatch recipe={match.recipe} avec={match.avec} auMenu={match.auMenu} ingredients={match.ingredients} onClose={() => setMatch(null)} />}</AnimatePresence>,
           document.body,
         )}
     </div>
@@ -187,7 +187,7 @@ function Carte({
         className="kd-carte--pleine"
         titre={recipe.title}
         photo={recipe.photo_url}
-        pastille={recipe.hier ? "Mangé hier" : recipe.voix ? "Ta voix fait le match" : recipe.pastille}
+        pastille={recipe.hier ? "Mangé hier" : recipe.voix ? (recipe.voixNb === 1 ? "Ta voix fait le match" : "La famille en a envie") : recipe.pastille}
         infos={
           recipe.hier
             ? "C'était bon ? Miam : on le refait"
@@ -226,7 +226,19 @@ function PileVide({ toutCache }: { toutCache: boolean }) {
 }
 
 /** « C'est un match » : monogramme qui éclot, puis la carte qui monte (120 ms après). */
-function EcranMatch({ recipe, avec, auMenu, onClose }: { recipe: Recipe; avec: string[]; auMenu: boolean; onClose: () => void }) {
+function EcranMatch({
+  recipe,
+  avec,
+  auMenu,
+  ingredients,
+  onClose,
+}: {
+  recipe: Recipe;
+  avec: string[];
+  auMenu: boolean;
+  ingredients: number;
+  onClose: () => void;
+}) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -254,7 +266,13 @@ function EcranMatch({ recipe, avec, auMenu, onClose }: { recipe: Recipe; avec: s
           </div>
           <h2 className="kd-display text-[56px]!">C&apos;est un match&nbsp;!</h2>
           <p className="kd-titre-3">{avec.length ? `${listeDeNoms(avec)} et toi en avez envie.` : "Vous êtes plusieurs à en avoir envie."}</p>
-          {auMenu && <p className="font-semibold">Au Menu : les ingrédients sont sur la liste.</p>}
+          {auMenu && (
+            <p className="font-semibold">
+              {ingredients > 0
+                ? `Au Menu : ${ingredients} ingrédient${ingredients > 1 ? "s" : ""} ajouté${ingredients > 1 ? "s" : ""} à la liste.`
+                : "Au Menu : les ingrédients sont sur la liste."}
+            </p>
+          )}
         </div>
         {/* La carte du plat, à hauteur fixe : le nom reste visible et tout tient sur l'écran. */}
         <div className="kd-carte kd-monte shrink-0 text-left [animation-delay:120ms]">

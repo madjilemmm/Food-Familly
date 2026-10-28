@@ -3,8 +3,10 @@ import { cache } from "react";
 import { db } from "@/lib/supabase/server";
 import { nAimePas, recipeConflicts, type Conflicts, type MemberTastes, type TasteLevel } from "@/lib/domain/foods";
 import { correspondAuxStyles, dureeMax, lireEnvies, styleDe, type Envies } from "@/lib/domain/envies";
-import { avancerLesVoixManquantes, calculerMatchs, estEnvie, ordonnerPaquet, type Avis, type Moment, type Signaux } from "@/lib/domain/reco";
+import { avancerLesVoixManquantes, calculerMatchs, estEnvie, ordonnerPaquet, REGLAGES, type Avis, type Moment, type Signaux } from "@/lib/domain/reco";
+import { listeDeNoms } from "@/lib/domain/convives";
 import { aRedemander } from "@/lib/domain/ce-soir";
+import { classiquesDe } from "@/lib/domain/classiques";
 import { bilanAnnee, type Annee } from "@/lib/domain/annee";
 import { passagesDesIngredients, sansDouteALaMaison } from "@/lib/domain/maison";
 import type { Style } from "@/lib/session";
@@ -457,7 +459,7 @@ export async function getDeck(
   familyId: string,
   profileId: string,
   moment: Moment = null,
-): Promise<(Recipe & { dejaVu?: boolean; hier?: boolean; voix?: string })[]> {
+): Promise<(Recipe & { dejaVu?: boolean; hier?: boolean; voix?: string; voixNb?: number })[]> {
   const [recipes, avis, envies, ctx, profiles, etiquettes, profils, hist, cuisines] = await Promise.all([
     getRecipes(familyId),
     getFamilySwipes(familyId),
@@ -516,8 +518,14 @@ export async function getDeck(
   // « Ta voix fait le match » : ce dont une seule autre personne a envie passe devant
   // (jamais un plat qu'un autre membre n'aime pas).
   const noms = new Map(profiles.map((p) => [p.id, p.name]));
-  const { paquet: avance, voix } = avancerLesVoixManquantes(ordonne, envies, profileId, (id) => conflicts.get(id)?.verdict === "fin");
-  const paquet = avance.map((r) => (voix.has(r.id) ? { ...r, voix: noms.get(voix.get(r.id)!) ?? "Quelqu'un" } : r));
+  // Un nouveau membre voit d'abord ce dont la famille a déjà envie : son premier « Miam » fait un match.
+  const mesSwipes = [...avis.values()].filter((parMembre) => parMembre.has(profileId)).length;
+  const nouveau = autres.length > 0 && mesSwipes < REGLAGES.NOUVEAU_SWIPES;
+  const { paquet: avance, voix } = avancerLesVoixManquantes(ordonne, envies, profileId, (id) => conflicts.get(id)?.verdict === "fin", { nouveau });
+  const paquet = avance.map((r) => {
+    const qui = voix.get(r.id);
+    return qui ? { ...r, voix: listeDeNoms(qui.map((id) => noms.get(id) ?? "Quelqu'un")), voixNb: qui.length } : r;
+  });
   // Le plat d'hier passe devant, même s'il ne serait pas revenu de sitôt.
   const idHier = aRedemander(cuisines, profileId, (id) => avis.get(id)?.get(profileId));
   const hier = idHier && conflicts.get(idHier)?.verdict !== "cache" ? recipes.find((r) => r.id === idHier) : undefined;
@@ -789,6 +797,21 @@ export async function getAnnee(familyId: string): Promise<
     titres: new Map(recipes.map((r) => [r.id, r.title])),
   };
 }
+
+// ─── Les classiques du foyer ───────────────────────────────────────────
+
+/** Les plats cuisinés au moins 3 fois par la famille (« C'est fait »), avec le nombre de fois. */
+export const getClassiques = cache(async function getClassiques(familyId: string): Promise<{ recipeId: string; fois: number }[]> {
+  const { data: trips } = await db().from("shopping_trips").select("id").eq("family_id", familyId).eq("status", "done");
+  if (!trips?.length) return [];
+  // Base pas encore migrée : aucun repas noté, donc aucun classique.
+  const { data: repas } = await db()
+    .from("repas")
+    .select("recipe_id, fait_le")
+    .in("trip_id", trips.map((t) => t.id))
+    .not("fait_le", "is", null);
+  return classiquesDe((repas ?? []).map((r) => ({ recipeId: r.recipe_id as string, faitLe: Date.parse(r.fait_le as string) })));
+});
 
 // ─── « Autre idée » ───────────────────────────────────────────────────
 

@@ -154,6 +154,7 @@ export function BandeauScene({
   fond,
   actions,
   titreSous = false,
+  compact = false,
   children,
 }: {
   illustration: Illustration;
@@ -166,6 +167,8 @@ export function BandeauScene({
   actions?: React.ReactNode;
   /** Étiquette et boutons sur une ligne, le titre dessous sur toute la largeur (plusieurs boutons). */
   titreSous?: boolean;
+  /** Écrans de liste (Menu, Courses) : un bandeau plus bas, pour voir plus de lignes sans défiler. */
+  compact?: boolean;
   children?: React.ReactNode;
 }) {
   const boutons = (actions || reglages) && (
@@ -181,7 +184,7 @@ export function BandeauScene({
       // Avec un fond à soi, on ne télécharge pas l'illustration pour rien.
       illustration={fond ? undefined : illustration}
       format="paysage"
-      className="bandeau pt-safe -mx-5 mb-5 px-5 pb-7"
+      className={`bandeau pt-safe -mx-5 px-5 ${compact ? "mb-4 pb-4" : "mb-5 pb-7"}`}
     >
       {fond === "courses" && <FondCourses format="paysage" />}
       {titreSous ? (
@@ -194,7 +197,7 @@ export function BandeauScene({
         </>
       ) : (
         <div className="flex items-start justify-between gap-4 pt-2">
-          <div className="min-w-0 pt-4">
+          <div className={`min-w-0 ${compact ? "pt-1" : "pt-4"}`}>
             {etiquette && <p className="kd-etiquette mb-2 text-blanc">{etiquette}</p>}
             <h1 className={`kd-titre-1 ${actions ? "bandeau-titre-serre" : ""}`}>{titre}</h1>
           </div>

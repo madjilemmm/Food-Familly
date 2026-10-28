@@ -13,7 +13,7 @@ import { changed } from "./_shared";
 export async function autreIdee(recipeId: string, i: number) {
   const user = await requireUser();
   const { data: recette } = await db().from("recipes").select("id").eq("id", recipeId).eq("family_id", user.familyId).maybeSingle();
-  if (!recette) redirect("/ce-soir");
+  if (!recette) redirect("/menu");
   const { error } = await db()
     .from("pas_ce_soir")
     .upsert(
@@ -21,5 +21,5 @@ export async function autreIdee(recipeId: string, i: number) {
       { onConflict: "family_id,recipe_id" },
     );
   changed();
-  redirect(error ? `/ce-soir?i=${(Number(i) || 0) + 1}` : "/ce-soir");
+  redirect(error ? `/menu?i=${(Number(i) || 0) + 1}` : "/menu");
 }

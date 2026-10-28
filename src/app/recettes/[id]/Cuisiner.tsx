@@ -7,7 +7,7 @@ import { marquerRepas } from "@/app/actions/trips";
 import { formatQuantity, scaleIngredients } from "@/lib/domain/shopping-list";
 import { IconeCroix, IconeRetour } from "@/components/ui";
 import { dureeDans } from "@/lib/domain/cuisine";
-import { AppelerATable } from "@/components/ATable";
+import { AppelerATable, PropositionATable } from "@/components/ATable";
 import { Ingredients } from "./Ingredients";
 
 type Ingredient = { id: string; name: string; quantity: number | null; unit: string };
@@ -114,6 +114,8 @@ function ModeCuisine({
 
   const etape = i >= 1 && i <= steps.length ? steps[i - 1] : null;
   const duree = etape ? dureeDans(etape) : null;
+  // Le dernier minuteur de la recette : quand il sonne, on propose d'appeler à table.
+  const dernierMinuteur = steps.reduce((dernier, s, k) => (dureeDans(s) ? k + 1 : dernier), 0);
 
   return createPortal(
     <Scene
@@ -161,7 +163,7 @@ function ModeCuisine({
         {etape && (
           <>
             <p className="font-display text-titre-2 leading-snug">{etape}</p>
-            {duree && <Minuteur key={i} minutes={duree} />}
+            {duree && <Minuteur key={i} minutes={duree} titre={i === dernierMinuteur ? titre : null} />}
           </>
         )}
         {i === total - 1 && (
@@ -209,7 +211,7 @@ function ModeCuisine({
 }
 
 /** Un minuteur d'un appui ; il vibre à la fin (si le téléphone le permet). */
-function Minuteur({ minutes }: { minutes: number }) {
+function Minuteur({ minutes, titre }: { minutes: number; titre: string | null }) {
   const [fin, setFin] = useState<number | null>(null);
   const [, tic] = useState(0);
   useEffect(() => {
@@ -232,8 +234,11 @@ function Minuteur({ minutes }: { minutes: number }) {
   }
   const reste = Math.max(0, Math.round((fin - Date.now()) / 1000));
   return (
-    <p role="timer" className="font-display text-titre-1">
-      {reste === 0 ? "C'est l'heure !" : `${Math.floor(reste / 60)}:${String(reste % 60).padStart(2, "0")}`}
-    </p>
+    <>
+      <p role="timer" className="font-display text-titre-1">
+        {reste === 0 ? "C'est l'heure !" : `${Math.floor(reste / 60)}:${String(reste % 60).padStart(2, "0")}`}
+      </p>
+      {reste === 0 && titre && <PropositionATable titre={titre} />}
+    </>
   );
 }

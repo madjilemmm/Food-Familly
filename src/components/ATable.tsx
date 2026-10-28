@@ -53,6 +53,30 @@ export function AppelerATable({ titre, large = false }: { titre?: string; large?
 }
 
 /** Minutes restantes (arrondies au-dessus), 0 quand c'est l'heure. */
+/**
+ * Au dernier minuteur de la recette : « À table dans 5 min », un appui, la famille est prévenue.
+ * Facultatif : rien ne part sans appui.
+ */
+export function PropositionATable({ titre }: { titre: string }) {
+  const [envoye, setEnvoye] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const { essayer, alerte } = useErreurReseau("Pas de réseau : l'appel n'est pas parti. Réessaie quand ça revient.");
+  if (envoye) return <p role="status" className="font-semibold">La famille est prévenue : à table dans 5 min.</p>;
+  return (
+    <>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => startTransition(async () => setEnvoye(await essayer(() => appelerATable(5, titre))))}
+        className="kd-btn kd-btn--secondaire self-start px-6"
+      >
+        À table dans 5 min
+      </button>
+      {alerte}
+    </>
+  );
+}
+
 function restant(a: number, now: number) {
   return Math.max(0, Math.ceil((a - now) / 60_000));
 }

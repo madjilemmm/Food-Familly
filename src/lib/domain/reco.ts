@@ -76,6 +76,9 @@ export const REGLAGES = {
   ENVIE_DES_AUTRES: 0.6,
   /** Paquet : au plus ce nombre de plats « Ta voix fait le match » passent en tête. */
   VOIX_MANQUANTE_MAX: 3,
+  /** Un membre qui a swipé moins de plats que ça est « nouveau » : il voit d'abord ce dont la famille a envie. */
+  NOUVEAU_SWIPES: 8,
+  NOUVEAU_MAX: 5,
   /** Paquet : personne de la famille ne l'a encore vu. */
   DECOUVERTE: 0.1,
   /** Paquet : un autre membre n'aime pas un ingrédient (hors mode strict). */
@@ -271,22 +274,31 @@ export function ordonnerPaquet<C extends CartePaquet>(cartes: C[], now: number, 
  * « Ta voix fait le match » : un plat dont une seule autre personne a envie devient un match
  * si j'en ai envie aussi. Ces plats passent en tête du paquet (au plus VOIX_MANQUANTE_MAX),
  * dans l'ordre du paquet ; seulement ceux qui y sont déjà (disponibles pour moi), et jamais
- * un plat qu'un autre membre n'aime pas (exclu). Renvoie aussi, pour chacun, qui en a envie.
+ * un plat qu'un autre membre n'aime pas (exclu).
+ *
+ * Un nouveau membre (moins de NOUVEAU_SWIPES swipes) voit d'abord ce dont la famille a déjà envie,
+ * même à plusieurs, les plus voulus en premier (NOUVEAU_MAX au plus) : son premier « Miam »
+ * fait un match tout de suite. Renvoie aussi, pour chaque plat avancé, qui en a envie.
  */
 export function avancerLesVoixManquantes<C extends { id: string }>(
   paquet: C[],
   envies: Map<string, string[]>,
   moi: string,
   exclu: (id: string) => boolean = () => false,
-): { paquet: C[]; voix: Map<string, string> } {
-  const voix = new Map<string, string>();
-  for (const c of paquet) {
-    if (voix.size >= REGLAGES.VOIX_MANQUANTE_MAX) break;
-    const qui = envies.get(c.id) ?? [];
-    if (qui.length === 1 && qui[0] !== moi && !exclu(c.id)) voix.set(c.id, qui[0]);
-  }
+  { nouveau = false }: { nouveau?: boolean } = {},
+): { paquet: C[]; voix: Map<string, string[]> } {
+  const voix = new Map<string, string[]>();
+  const autres = (id: string) => (envies.get(id) ?? []).filter((p) => p !== moi);
+  const max = nouveau ? REGLAGES.NOUVEAU_MAX : REGLAGES.VOIX_MANQUANTE_MAX;
+  const candidats = paquet.filter((c) => {
+    const qui = autres(c.id);
+    return !exclu(c.id) && (nouveau ? qui.length >= 1 : qui.length === 1 && (envies.get(c.id) ?? []).length === 1);
+  });
+  // Nouveau : les plus voulus d'abord (le tri est stable : à égalité, l'ordre du paquet reste).
+  const choisis = (nouveau ? [...candidats].sort((a, b) => autres(b.id).length - autres(a.id).length) : candidats).slice(0, max);
+  for (const c of choisis) voix.set(c.id, autres(c.id));
   if (voix.size === 0) return { paquet, voix };
-  return { paquet: [...paquet.filter((c) => voix.has(c.id)), ...paquet.filter((c) => !voix.has(c.id))], voix };
+  return { paquet: [...choisis, ...paquet.filter((c) => !voix.has(c.id))], voix };
 }
 
 /** Évite trois plats du même style d'affilée, en avançant le suivant d'un autre style (fenêtre de 3). */

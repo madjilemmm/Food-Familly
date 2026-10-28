@@ -37,6 +37,7 @@ export async function CoursesScreen({ me, notifications }: { me: Profile; notifi
   return (
     <>
       <BandeauScene
+        compact
         fond="courses"
         illustration="courses"
         etiquette={enCourse === me.id ? "Tu fais les courses" : qui ? `${qui} fait les courses` : `Salut ${me.name}`}

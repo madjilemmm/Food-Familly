@@ -5,7 +5,7 @@ import { db } from "@/lib/supabase/server";
 import { notifyATable, notifyReponseATable } from "@/lib/notifications";
 import { changed, cleanText } from "./_shared";
 
-const DELAIS = [0, 10, 20, 30];
+const DELAIS = [0, 5, 10, 20, 30];
 
 /** « À table ! » : maintenant ou dans quelques minutes ; les autres sont prévenus. */
 export async function appelerATable(minutes: number, titre?: string) {

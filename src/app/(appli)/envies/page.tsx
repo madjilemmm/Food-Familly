@@ -44,7 +44,6 @@ export default async function Envies({ searchParams }: { searchParams: Promise<{
     <div className="ecran-envies">
       <BandeauScene
         illustration="table"
-        etiquette="Ce soir"
         titre="Ça te dit ?"
         titreSous
         actions={<NotificationsCard variant="icone" />}

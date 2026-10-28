@@ -114,7 +114,7 @@ export async function notifyATable(familyId: string, cuisinierId: string, minute
     {
       title: minutes ? `À table dans ${minutes} min !` : "À table !",
       body: `${nom} a cuisiné${titre ? ` : ${titre}` : ""}. Tu arrives ?`,
-      url: "/ce-soir",
+      url: "/menu",
       tag: "a-table",
     },
   );
@@ -124,7 +124,7 @@ export async function notifyATable(familyId: string, cuisinierId: string, minute
 export async function notifyReponseATable(familyId: string, deQui: string, cuisinierId: string, reponse: "arrive" | "retard") {
   const all = await members(familyId);
   const nom = all.find((m) => m.id === deQui)?.name ?? "Quelqu'un";
-  await sendPush([cuisinierId], { title: reponse === "arrive" ? `${nom} arrive` : `${nom} : 5 min`, body: "", url: "/ce-soir", tag: `a-table-${deQui}` });
+  await sendPush([cuisinierId], { title: reponse === "arrive" ? `${nom} arrive` : `${nom} : 5 min`, body: "", url: "/menu", tag: `a-table-${deQui}` });
 }
 
 // ─── « Ta voix fait le match » ─────────────────────────────────────────

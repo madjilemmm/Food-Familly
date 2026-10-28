@@ -22,11 +22,11 @@ export type SwipeAvant = { liked: boolean; swiped_at: string; liked_at: string |
 export async function swipe(
   recipeId: string,
   liked: boolean,
-): Promise<{ match: boolean; avec: string[]; avant: SwipeAvant; auMenu: boolean; entre: boolean }> {
+): Promise<{ match: boolean; avec: string[]; avant: SwipeAvant; auMenu: boolean; entre: boolean; ingredients: number }> {
   const user = await requireUser();
   // Vérification de la recette, swipe d'avant et « était-ce déjà un match ? » en même temps.
   const [{ data: recipe }, { data: avant }, avantMatch] = await Promise.all([
-    db().from("recipes").select("id").eq("id", recipeId).eq("family_id", user.familyId).maybeSingle(),
+    db().from("recipes").select("id, title").eq("id", recipeId).eq("family_id", user.familyId).maybeSingle(),
     db().from("swipes").select("liked, swiped_at, liked_at").eq("profile_id", user.profileId).eq("recipe_id", recipeId).maybeSingle(),
     liked ? enviesPour(user.familyId, recipeId) : Promise.resolve(null),
   ]);
@@ -61,6 +61,10 @@ export async function swipe(
     avant: (avant as SwipeAvant) ?? null,
     auMenu,
     entre: ajoutes.includes(recipeId),
+    // Les articles de la liste qui viennent de ce plat (un article commun à deux plats compte pour les deux).
+    ingredients: auMenu
+      ? menu!.trip.shopping_list_items.filter((i) => i.source === "recipe" && (i.for_recipes ?? "").split(", ").includes(recipe.title as string)).length
+      : 0,
   };
 }
 

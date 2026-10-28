@@ -40,11 +40,20 @@ export async function jePars() {
   changed(() => notifyTripStarted(user.familyId, user.profileId));
 }
 
-/** Mettre un plat au Menu, ou l'en retirer : la liste suit (n'importe qui dans la famille). */
-export async function choisirPourLeMenu(recipeId: string, auMenu: boolean) {
+/**
+ * Mettre un plat au Menu, ou l'en retirer : la liste suit (n'importe qui dans la famille).
+ * « Pas ce soir » retire seulement le plat ; « Pas pour moi » (refus) le retire et note mon « Bof » :
+ * c'est un vrai signal pour mes goûts, comme au swipe (on n'oublie pas que j'ai pu l'aimer avant).
+ */
+export async function choisirPourLeMenu(recipeId: string, auMenu: boolean, refus = false) {
   const user = await requireUser();
   if ((await familyRecipeIds(user, [recipeId])).length === 0) throw new Error("Recette inconnue");
   await choisirPlat(user.familyId, recipeId, auMenu === true);
+  if (refus === true && auMenu !== true) {
+    await db()
+      .from("swipes")
+      .upsert({ profile_id: user.profileId, recipe_id: recipeId, liked: false, swiped_at: new Date().toISOString() }, { onConflict: "profile_id,recipe_id" });
+  }
   changed();
 }
 
