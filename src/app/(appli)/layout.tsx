@@ -4,18 +4,17 @@ import { redirect } from "next/navigation";
 import { FamilyLayout } from "@/components/FamilyLayout";
 import { doitVoirNouvellesCartes } from "@/lib/domain/foods";
 
-/** Envies, Menu, Courses : les mêmes écrans pour tout le monde. */
+/** Ce soir, Idées, Caddie : les mêmes écrans pour tout le monde. */
 export default async function AppliLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser(); // cookie seulement : les requêtes partent ensemble
   const [me, trip, appel] = await Promise.all([requireProfile(), getCurrentTrip(user.familyId), getATable(user.familyId)]);
-  // Jamais vu le questionnaire de goûts (profils déjà là avant lui compris) : une fois, maintenant.
-  if (!me.tastes_seen_at) redirect("/profil/gouts");
+  // La question d'allergie ne bloque plus l'entrée : elle se pose sur « Ce soir », en un appui.
   // Questionnaire rempli avant les nouvelles cartes : seulement celles-là, une fois.
   if (doitVoirNouvellesCartes(me.tastes_done_at)) redirect("/profil/gouts?nouvelles=1");
   // Questionnaire rempli avant l'écran « Tes envies » : seulement celui-là, une fois.
   if (me.tastes_done_at && !me.envies_done_at) redirect("/profil/gouts?envies=1");
   return (
-    <FamilyLayout me={me} aTable={appel} coursesBadge={Boolean(trip?.created_by && trip.created_by !== me.id && Date.now() - Date.parse(trip.departs_at) < 6 * 60 * 60 * 1000)}>
+    <FamilyLayout me={me} aTable={appel} caddie={trip?.shopping_list_items.filter((l) => !l.checked).length ?? 0}>
       {children}
     </FamilyLayout>
   );

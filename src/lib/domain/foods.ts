@@ -186,6 +186,28 @@ export function foodsIn(text: RecipeText, keys: Iterable<string>): Set<string> {
   return found;
 }
 
+/** Les allergènes courants qu'on dit sur la carte d'un plat : la clé, et comment on le lit (« contient du lait »). */
+export const ALLERGENES_DITS: { key: string; dit: string }[] = [
+  { key: "sans_gluten", dit: "du gluten" },
+  { key: "sans_lactose", dit: "du lait" },
+  { key: "oeufs", dit: "des œufs" },
+  { key: "arachide", dit: "des arachides" },
+  { key: "fruits_a_coque", dit: "des fruits à coque" },
+  { key: "poisson", dit: "du poisson" },
+  { key: "fruits_de_mer", dit: "des fruits de mer" },
+];
+
+/**
+ * « Contient du gluten et du lait » : ce que le plat contient parmi les allergènes courants,
+ * dit tel quel pour que chacun le voie sans rien répondre. Rien si aucun n'est repéré.
+ */
+export function contientPhrase(text: RecipeText): string | null {
+  const trouves = foodsIn(text, ALLERGENES_DITS.map((a) => a.key));
+  const dits = ALLERGENES_DITS.filter((a) => trouves.has(a.key)).map((a) => a.dit);
+  if (dits.length === 0) return null;
+  return `Contient ${dits.length === 1 ? dits[0] : `${dits.slice(0, -1).join(", ")} et ${dits[dits.length - 1]}`}`;
+}
+
 export type MemberTastes = { id: string; name: string; tastes: Record<string, TasteLevel> };
 
 export type Verdict = "cache" | "fin" | "tete" | "normal";

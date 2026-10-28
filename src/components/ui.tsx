@@ -70,6 +70,13 @@ export const IconeSwipe = (p: IconeProps) => (
   </Trait>
 );
 
+export const IconePersonne = (p: IconeProps) => (
+  <Trait {...p}>
+    <circle cx="12" cy="8.5" r="3.5" />
+    <path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" />
+  </Trait>
+);
+
 // Une roue dentée : l'ancien rond à rayons se lisait comme un soleil (« changer de thème »).
 export const IconeReglages = (p: IconeProps) => (
   <Trait {...p}>
@@ -81,6 +88,20 @@ export const IconeReglages = (p: IconeProps) => (
 export const IconeRetour = (p: IconeProps) => (
   <Trait {...p}>
     <path d="M15 5l-7 7 7 7" />
+  </Trait>
+);
+
+export const IconeCoche = (p: IconeProps) => (
+  <Trait {...p}>
+    <path d="M4.5 12.5l5 5 10-11" strokeWidth={3} />
+  </Trait>
+);
+
+/** « Autre idée » : la flèche qui tourne. */
+export const IconeAutre = (p: IconeProps) => (
+  <Trait {...p}>
+    <path d="M20 12a8 8 0 1 1-2.6-5.9" />
+    <path d="M20 4v4.5h-4.5" />
   </Trait>
 );
 
@@ -105,30 +126,33 @@ export const IconeCloche = (p: IconeProps) => (
 
 // ─── En-têtes ──────────────────────────────────────────────────────────
 
-/** Bouton rond vers les réglages ; blanc sur scène, violet sur fond lilas. */
-export function LienReglages({ surScene = false }: { surScene?: boolean }) {
+/**
+ * Le rond de la table : un seul accès à la famille, à l'invitation et aux réglages.
+ * Ta première lettre quand on la connaît ; blanc sur scène, violet sur fond lilas.
+ */
+export function LienReglages({ surScene = false, initiale }: { surScene?: boolean; initiale?: string }) {
   return (
     <Link
-      href="/reglages"
-      aria-label="Réglages"
+      href="/famille"
+      aria-label="Ma table et mes réglages"
       className={`flex size-14 shrink-0 items-center justify-center rounded-full active:scale-95 ${
-        surScene ? "bg-blanc text-aubergine" : "bg-surface text-violet"
+        surScene ? "bg-blanc text-aubergine" : "bg-aubergine text-blanc"
       }`}
     >
-      <IconeReglages />
+      {initiale ? <span className="font-display text-[24px] leading-none">{initiale.slice(0, 1).toUpperCase()}</span> : <IconePersonne />}
     </Link>
   );
 }
 
 /** En-tête d'un écran calme (fond lilas) : titre BoldenVan aubergine. */
-export function EnTete({ titre, sousTitre, reglages = true }: { titre: string; sousTitre?: string; reglages?: boolean }) {
+export function EnTete({ titre, sousTitre, reglages = true, initiale }: { titre: string; sousTitre?: string; reglages?: boolean; initiale?: string }) {
   return (
     <header className="pt-safe flex items-start justify-between gap-4 pb-5">
       <div className="min-w-0 pt-2">
         <h1 className="kd-titre-1 text-aubergine">{titre}</h1>
         {sousTitre && <p className="mt-2 text-encre-douce">{sousTitre}</p>}
       </div>
-      {reglages && <LienReglages />}
+      {reglages && <LienReglages initiale={initiale} />}
     </header>
   );
 }
@@ -151,10 +175,12 @@ export function BandeauScene({
   titre,
   etiquette,
   reglages = true,
+  initiale,
   fond,
   actions,
   titreSous = false,
   compact = false,
+  chevauche = false,
   children,
 }: {
   illustration: Illustration;
@@ -163,18 +189,22 @@ export function BandeauScene({
   titre: string;
   etiquette?: React.ReactNode;
   reglages?: boolean;
+  /** La première lettre du prénom, dans le rond de la table. */
+  initiale?: string;
   /** Boutons ronds à côté des réglages (la cloche des notifs, par exemple). */
   actions?: React.ReactNode;
   /** Étiquette et boutons sur une ligne, le titre dessous sur toute la largeur (plusieurs boutons). */
   titreSous?: boolean;
   /** Écrans de liste (Menu, Courses) : un bandeau plus bas, pour voir plus de lignes sans défiler. */
   compact?: boolean;
+  /** « Ce soir » : le bandeau laisse la place à une photo qui mord dessus (28 px). */
+  chevauche?: boolean;
   children?: React.ReactNode;
 }) {
   const boutons = (actions || reglages) && (
     <span className="ml-auto flex shrink-0 gap-2">
       {actions}
-      {reglages && <LienReglages surScene />}
+      {reglages && <LienReglages surScene initiale={initiale} />}
     </span>
   );
   return (
@@ -184,7 +214,7 @@ export function BandeauScene({
       // Avec un fond à soi, on ne télécharge pas l'illustration pour rien.
       illustration={fond ? undefined : illustration}
       format="paysage"
-      className={`bandeau pt-safe -mx-5 px-5 ${compact ? "mb-4 pb-4" : "mb-5 pb-7"}`}
+      className={`bandeau pt-safe -mx-5 px-5 ${chevauche ? "bandeau--fin mb-0 pb-11" : compact ? "mb-4 pb-4" : "mb-5 pb-7"}`}
     >
       {fond === "courses" && <FondCourses format="paysage" />}
       {titreSous ? (

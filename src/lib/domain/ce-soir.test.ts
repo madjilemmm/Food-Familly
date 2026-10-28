@@ -15,6 +15,14 @@ describe("Ce soir : une seule réponse", () => {
     const r = choisirCeSoir([c("a", { achete: true }), c("b")], { semaine: false, pasCeSoir: new Set(["a"]) });
     expect(r.map((x) => x.id)).toEqual(["b", "a"]);
   });
+  it("un plat déjà au Menu passe avant une envie à acheter, après un plat acheté", () => {
+    const r = choisirCeSoir([c("envie", { envies: 1 }), c("menu", { auMenu: true }), c("achete", { achete: true })], { semaine: false });
+    expect(r.map((x) => x.id)).toEqual(["achete", "menu", "envie"]);
+  });
+  it("sans rien d'acheté ni d'envie, Kaddie propose le haut du paquet, dans l'ordre", () => {
+    const r = choisirCeSoir([c("c", { rang: 2 }), c("a", { rang: 0 }), c("b", { rang: 1 })], { semaine: false });
+    expect(r.map((x) => x.id)).toEqual(["a", "b", "c"]);
+  });
   it("un soir de semaine, le plus rapide avance", () => {
     const r = choisirCeSoir([c("long", { achete: true, minutes: 90 }), c("rapide", { achete: true, minutes: 20 })], { semaine: true });
     expect(r[0].id).toBe("rapide");

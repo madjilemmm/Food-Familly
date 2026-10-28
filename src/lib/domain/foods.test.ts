@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AUTRE, INGREDIENTS, cartesPour, compatibility, foodsIn, nAimePas, recipeConflicts, type MemberTastes } from "./foods";
+import { AUTRE, INGREDIENTS, cartesPour, compatibility, contientPhrase, foodsIn, nAimePas, recipeConflicts, type MemberTastes } from "./foods";
 
 const has = (lines: string[], key: string) => foodsIn(lines, [key]).has(key);
 
@@ -123,5 +123,17 @@ describe("ordre des cartes", () => {
     expect(keys[0]).toBe("champignons");
     expect(keys.indexOf("poisson")).toBeLessThan(keys.indexOf("boeuf"));
     expect(keys).toHaveLength(INGREDIENTS.length);
+  });
+});
+
+describe("contientPhrase : ce que dit la carte d'un plat", () => {
+  it("un seul allergène", () => {
+    expect(contientPhrase(["Gratin dauphinois", "Pommes de terre", "Crème", "Lait", "Gruyère"])).toBe("Contient du lait");
+  });
+  it("plusieurs, dits en une phrase", () => {
+    expect(contientPhrase(["Quiche lorraine", "Pâte brisée", "Lardons", "Œufs", "Crème", "Lait"])).toBe("Contient du gluten, du lait et des œufs");
+  });
+  it("rien de repéré : pas de phrase", () => {
+    expect(contientPhrase(["Ratatouille et riz", "Aubergine", "Courgette", "Tomate", "Riz"])).toBeNull();
   });
 });

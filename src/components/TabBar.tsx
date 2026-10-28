@@ -33,7 +33,7 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
     };
   }, [router, pathname, hrefs]);
 
-  // Les recettes et « Ce soir » s'ouvrent depuis le Menu : l'onglet Menu reste allumé.
+  // Les recettes et « Ce soir » s'ouvrent depuis l'accueil : l'onglet Ce soir reste allumé.
   const matches = (href: string, path: string) =>
     path === href || path.startsWith(`${href}/`) || (href === "/menu" && (path === "/ce-soir" || path.startsWith("/recettes")));
   const isActive = (href: string) => (pressed ? pressed === href : matches(href, pathname));

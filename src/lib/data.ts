@@ -6,6 +6,7 @@ import { correspondAuxStyles, dureeMax, lireEnvies, styleDe, type Envies } from 
 import { avancerLesVoixManquantes, calculerMatchs, estEnvie, ordonnerPaquet, REGLAGES, type Avis, type Moment, type Signaux } from "@/lib/domain/reco";
 import { listeDeNoms } from "@/lib/domain/convives";
 import { aRedemander } from "@/lib/domain/ce-soir";
+import { jourAParis } from "@/lib/domain/heure";
 import { classiquesDe } from "@/lib/domain/classiques";
 import { bilanAnnee, type Annee } from "@/lib/domain/annee";
 import { passagesDesIngredients, sansDouteALaMaison } from "@/lib/domain/maison";
@@ -819,6 +820,12 @@ export const getClassiques = cache(async function getClassiques(familyId: string
 export const getPasCeSoir = cache(async function getPasCeSoir(familyId: string): Promise<Set<string>> {
   const { data } = await db().from("pas_ce_soir").select("recipe_id").eq("family_id", familyId).gt("jusqu_a", new Date().toISOString());
   return new Set((data ?? []).map((r) => r.recipe_id as string));
+});
+
+/** Le plat que la famille a retenu pour ce soir (« Ce sera ça »), s'il y en a un aujourd'hui. Base pas migrée : aucun. */
+export const getCeSoirChoisi = cache(async function getCeSoirChoisi(familyId: string): Promise<{ recipeId: string; choisiPar: string | null } | null> {
+  const { data } = await db().from("ce_soir_choix").select("recipe_id, choisi_par").eq("family_id", familyId).eq("jour", jourAParis()).maybeSingle();
+  return data ? { recipeId: data.recipe_id as string, choisiPar: (data.choisi_par as string | null) ?? null } : null;
 });
 
 // ─── « À table ! » ─────────────────────────────────────────────────────

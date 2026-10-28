@@ -10,6 +10,7 @@ import { SESSION_COOKIE, newSession, type Style } from "@/lib/session";
 import { STARTER_RECIPES } from "@/lib/starter-recipes";
 import { BUCKET_PHOTOS, cheminDansLeStockage } from "@/lib/photos";
 import { annulerInvitations, familleInvitee, jetonDe, noterEssaiRate, tropDEssais } from "@/lib/acces";
+import { normalizeName } from "@/lib/domain/shopping-list";
 import { cleanText, changed } from "./_shared";
 
 const CODE_WORDS = [
@@ -68,12 +69,37 @@ export async function joinFamily(_prev: { error?: string }, formData: FormData):
   redirect("/profil");
 }
 
-/** Depuis un lien d'invitation : on entre dans la famille, puis on choisit son prénom. */
-export async function joinByInvitation(jeton: string) {
-  const family = await familleInvitee(jeton);
-  if (!family) redirect(`/rejoindre/${encodeURIComponent(jeton)}`);
-  await setSession(newSession(family.id));
-  redirect("/profil");
+/**
+ * Depuis un lien d'invitation, en un écran : son prénom, et c'est tout. On entre dans la famille et on voit
+ * tout de suite ce qu'on mange ce soir. Un prénom déjà dans la famille est la même personne qui revient
+ * (sur un autre téléphone) : on la retrouve au lieu de la doubler.
+ */
+export async function rejoindreAvecPrenom(jeton: string, _prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
+  if (await tropDEssais()) return { error: "Trop d'essais. Attends un quart d'heure avant de réessayer." };
+  const famille = await familleInvitee(jeton);
+  if (!famille) {
+    await noterEssaiRate().catch(() => {});
+    return { error: "Ce lien a expiré. Demande un nouveau lien, ou tape le code famille." };
+  }
+  const prenom = cleanText(formData.get("prenom"), 40);
+  if (!prenom) return { error: "Indique ton prénom." };
+  const { data: membres } = await db().from("profiles").select("id, name, style").eq("family_id", famille.id);
+  const cle = (n: string) => normalizeName(n);
+  const deja = (membres ?? []).find((m) => cle(String(m.name)) === cle(prenom));
+  let profileId = deja?.id as string | undefined;
+  const style: Style = deja ? cleanStyle(deja.style) : "fun";
+  if (!profileId) {
+    const { data, error } = await db()
+      .from("profiles")
+      .insert({ name: prenom, emoji: "😎", style, family_id: famille.id, sort_order: 100 })
+      .select("id")
+      .single();
+    if (error || !data) return { error: "L'entrée a échoué. Réessaie." };
+    profileId = data.id as string;
+  }
+  await setSession(newSession(famille.id, profileId, style));
+  changed();
+  redirect("/menu");
 }
 
 /**
@@ -111,8 +137,8 @@ export async function createFamily(_prev: { error?: string }, formData: FormData
   await addStarterRecipes(familyId);
 
   await setSession(newSession(familyId, me.id as string, style));
-  // Une seule question (régime, allergies), puis directement les plats à swiper.
-  redirect(`/profil/gouts?regime=1&suite=${encodeURIComponent("/envies")}`);
+  // Directement la réponse du soir : la question d'allergie se pose là, en un appui.
+  redirect("/menu");
 }
 
 /** 10 recettes classiques pour qu'une nouvelle famille puisse swiper tout de suite. */
@@ -139,8 +165,7 @@ export async function chooseProfile(profileId: string) {
   const profile = await getProfile(session.familyId, profileId);
   if (!profile) throw new Error("Profil introuvable");
   await setSession(newSession(session.familyId, profile.id, profile.style));
-  // Première fois sur ce profil : le questionnaire de goûts d'abord.
-  redirect(profile.tastes_seen_at ? "/" : "/profil/gouts?regime=1");
+  redirect("/");
 }
 
 /** « Je ne suis pas dans la liste » : on s'ajoute soi-même à la famille. */
@@ -157,7 +182,7 @@ export async function addMyself(_prev: { error?: string }, formData: FormData): 
   if (error || !data) return { error: "L'ajout a échoué. Réessayez." };
   await setSession(newSession(session.familyId, data.id as string, style));
   changed();
-  redirect("/profil/gouts?regime=1");
+  redirect("/menu");
 }
 
 export async function forgetProfile() {

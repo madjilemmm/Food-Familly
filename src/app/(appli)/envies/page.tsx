@@ -7,7 +7,6 @@ import { momentDe } from "@/lib/domain/reco";
 import { SwipeDeck } from "@/components/SwipeDeck";
 import { BandeauScene, IconePanier } from "@/components/ui";
 import { CarteGouts, CarteInviter } from "@/components/Envies";
-import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 
 // Laisse le temps à l'import Marmiton (lancé après l'affichage) de finir.
 export const maxDuration = 60;
@@ -43,10 +42,12 @@ export default async function Envies({ searchParams }: { searchParams: Promise<{
     // Comme Recettes : le bandeau illustré, puis la pile de cartes sur le lilas, jusqu'aux onglets.
     <div className="ecran-envies">
       <BandeauScene
-        illustration="table"
+        compact
+        fond="courses"
+        illustration="courses"
+        etiquette="Idées"
         titre="Ça te dit ?"
-        titreSous
-        actions={<NotificationsCard variant="icone" />}
+        initiale={me.name}
       />
       {/* Un seul bandeau à la fois : la course en cours, sinon inviter la famille, sinon le questionnaire. */}
       {bandeauCourse && (

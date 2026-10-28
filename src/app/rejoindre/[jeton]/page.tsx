@@ -3,15 +3,15 @@ import { redirect } from "next/navigation";
 import { Logo, Scene } from "@/design-system/components/Kaddie";
 import { getSession } from "@/lib/auth";
 import { familleInvitee } from "@/lib/acces";
-import { joinByInvitation } from "@/app/actions/auth";
+import { rejoindreAvecPrenom } from "@/app/actions/auth";
 import { Rejoindre } from "./Rejoindre";
 
 export const metadata = { title: "Invitation — Kaddie" };
 export const dynamic = "force-dynamic";
 
 /**
- * Un lien d'invitation, reçu dans le groupe de la famille : un appui pour entrer,
- * puis on choisit son prénom. Expiré ou annulé : on le dit, et le code reste possible.
+ * Un lien d'invitation, reçu dans le groupe de la famille : son prénom, un appui, et on voit
+ * ce qu'on mange ce soir. Expiré ou annulé : on le dit, et le code reste possible.
  */
 export default async function InvitationPage({ params }: { params: Promise<{ jeton: string }> }) {
   const { jeton } = await params;
@@ -32,7 +32,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ jet
           <>
             <p className="kd-etiquette text-blanc">Tu es invité·e</p>
             <h1 className="kd-titre-1">{famille.name}</h1>
-            <p>Swipe ce qui te fait envie : la personne qui fait les courses le reçoit.</p>
+            <p>Dis-nous ton prénom : tu vois tout de suite ce qu&apos;on mange ce soir.</p>
           </>
         ) : (
           <>
@@ -43,7 +43,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ jet
       </div>
       <div className="mx-auto w-full max-w-md pb-4">
         {famille ? (
-          <Rejoindre action={joinByInvitation.bind(null, jeton)} nom={famille.name} autreFamille={Boolean(session)} />
+          <Rejoindre action={rejoindreAvecPrenom.bind(null, jeton)} nom={famille.name} autreFamille={Boolean(session)} />
         ) : (
           <Link href="/bienvenue" className="kd-btn kd-btn--secondaire kd-btn--large">
             J&apos;ai un code famille

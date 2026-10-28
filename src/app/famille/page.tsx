@@ -8,10 +8,10 @@ import { FamilyCode } from "@/components/family/FamilyCode";
 import { MembersEditor } from "@/components/family/MembersEditor";
 import { FamilyName } from "@/components/family/FamilyName";
 import { StrictToggle } from "@/components/family/StrictToggle";
-import { IconeRetour } from "@/components/ui";
+import { BandeauScene, IconeRetour } from "@/components/ui";
 import { cheminInvitation, invitationAPartager } from "@/lib/acces";
 
-export const metadata = { title: "Ma famille — Kaddie" };
+export const metadata = { title: "La table — Kaddie" };
 
 export default async function FamilyPage({ searchParams }: { searchParams: Promise<{ bienvenue?: string }> }) {
   const user = await requireUser();
@@ -26,7 +26,21 @@ export default async function FamilyPage({ searchParams }: { searchParams: Promi
   const invitation = await lienAPartager(user.familyId, me.id);
 
   return (
-    <main className="pt-safe pb-safe mx-auto flex max-w-xl flex-col gap-6 px-5 pb-16">
+    <main className="ecran-famille pb-safe mx-auto flex max-w-xl flex-col gap-6 px-5 pb-16">
+      {/* Le même bandeau que Ce soir, Idées et le caddie ; le rond y devient un retour. */}
+      <BandeauScene
+        compact
+        fond="courses"
+        illustration="courses"
+        etiquette="Ta famille"
+        titre="La table"
+        reglages={false}
+        actions={
+          <Link href="/menu" aria-label="Retour" className="flex size-14 shrink-0 items-center justify-center rounded-full bg-blanc text-aubergine active:scale-95">
+            <IconeRetour className="size-7" />
+          </Link>
+        }
+      />
       {welcome ? (
         <Scene duo="aubergine" seed={14} format="carre" className="kd-monte mt-4 flex flex-col gap-3 rounded-carte p-6">
           <p className="kd-titre-2">Ta famille est créée.</p>
@@ -36,11 +50,7 @@ export default async function FamilyPage({ searchParams }: { searchParams: Promi
               : "Envoie le code ci-dessous aux autres. Sur leur téléphone, ils ouvrent Kaddie, tapent le code et choisissent leur prénom."}
           </p>
         </Scene>
-      ) : (
-        <Link href={"/"} className="-ml-2 inline-flex min-h-14 items-center gap-1 self-start font-semibold text-violet">
-          <IconeRetour className="size-6" /> Retour
-        </Link>
-      )}
+      ) : null}
 
       <FamilyName name={family.name} />
       <FamilyCode code={family.join_code} familyName={family.name} invitation={invitation} />
@@ -52,6 +62,14 @@ export default async function FamilyPage({ searchParams }: { searchParams: Promi
 
       {/* Un réglage fin, utile seulement à plusieurs : après l'essentiel. */}
       {members.length > 1 && <StrictToggle strict={family.strict_dislikes} />}
+
+      <Link href="/reglages" className="kd-liste__article min-h-16 justify-between border-t-2 border-trait active:bg-trait/40">
+        <span className="min-w-0">
+          <span className="block font-semibold">Réglages</span>
+          <span className="kd-petit block">Notifications, goûts, portrait, données</span>
+        </span>
+        <IconeRetour className="size-6 shrink-0 rotate-180 text-violet" />
+      </Link>
 
       {welcome && (
         <Link href={"/"} className="kd-btn kd-btn--large">

@@ -201,6 +201,20 @@ a {
   flex-direction: column;
 }
 
+/* Le bandeau de « Ce soir » : un titre un peu plus petit, pour que la photo, le texte et le bouton tiennent sur l'écran. */
+.bandeau--fin .kd-titre-1 {
+  font-size: calc(var(--taille-titre-1) * 0.84);
+  line-height: 1.1;
+}
+
+/* Ce soir : le bandeau, puis la réponse du soir qui remplit l'écran jusqu'aux onglets (la photo prend ce que le texte lui laisse). */
+.ecran-soir {
+  min-height: calc(100dvh - 5.25rem - max(env(safe-area-inset-bottom), 0.75rem));
+  padding-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Le monogramme qui respire pendant les chargements */
 @keyframes kd-pulse {
   0%,

@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
-import { forFamily, getClassiques, getFamilyEnvies, getFamilySwipes, getProfiles, getRecipes, getRepasAchetes } from "@/lib/data";
+import { forFamily, getCeSoirChoisi, getClassiques, getFamilyEnvies, getFamilySwipes, getProfiles, getRecipes, getRepasAchetes } from "@/lib/data";
 import { platsDuMenu, synchroniserMenu } from "@/lib/menu";
 import { listeDeNoms } from "@/lib/domain/convives";
-import { CarteInviter } from "@/components/Envies";
-import { BandeauScene, EtatVide, IconeLivre } from "@/components/ui";
+import { BandeauScene, EtatVide } from "@/components/ui";
 import { CeSoir } from "@/components/courses/CeSoir";
 import { PlatsDuMenu } from "@/components/PlatsDuMenu";
-import { CeSoirCarte } from "@/components/CeSoirCarte";
+import { CeSoirAccueil } from "@/components/CeSoirAccueil";
+import { DerniereDemande } from "@/components/courses/DerniereDemande";
+import { aPreparer } from "@/lib/views";
 
-export const metadata = { title: "Le Menu — Kaddie" };
+export const metadata = { title: "Ce soir — Kaddie" };
 
 /** « Aussi envie » : au plus ce nombre de plats, à ajouter d'un appui. */
 const AUTRES_MAX = 6;
@@ -17,13 +18,14 @@ const AUTRES_MAX = 6;
 const PROPOSES_MIN = 3;
 
 /**
- * Le Menu : ce que la famille va manger. Un plat qui plaît (un match ; seul, une envie)
+ * Ce soir : la réponse à « on mange quoi ? » (components/CeSoirAccueil.tsx), puis « Cette semaine » :
+ * ce que la famille va manger. Un plat qui plaît (un match ; seul, une envie)
  * y entre de lui-même, et ses ingrédients sont sur la liste (lib/menu.ts).
  * Au-dessus, ce qui est déjà acheté et reste à cuisiner.
  */
 export default async function Menu({ searchParams }: { searchParams: Promise<{ i?: string }> }) {
   const me = await requireProfile();
-  const [{ trip }, profiles, recipes, envies, repas, classiques, avis, params] = await Promise.all([
+  const [{ trip }, profiles, recipes, envies, repas, classiques, avis, choisi, params] = await Promise.all([
     synchroniserMenu(me.family_id),
     getProfiles(me.family_id),
     getRecipes(me.family_id),
@@ -31,9 +33,9 @@ export default async function Menu({ searchParams }: { searchParams: Promise<{ i
     getRepasAchetes(me.family_id),
     getClassiques(me.family_id),
     getFamilySwipes(me.family_id),
+    getCeSoirChoisi(me.family_id),
     searchParams,
   ]);
-  const seul = profiles.length === 1;
   const noms = new Map(profiles.map((p) => [p.id, p.name]));
   const parId = new Map(recipes.map((r) => [r.id, r]));
   const auMenu = new Set(platsDuMenu(trip));
@@ -52,7 +54,8 @@ export default async function Menu({ searchParams }: { searchParams: Promise<{ i
       .filter(Boolean)
       .join(" · ");
   };
-  const plats = [...auMenu].flatMap((id) => (parId.has(id) ? [{ ...parId.get(id)!, infos: infos(id) }] : []));
+  // Le plat de ce soir a sa place en haut : il n'est pas répété dans « Cette semaine ».
+  const plats = [...auMenu].filter((id) => id !== choisi?.recipeId).flatMap((id) => (parId.has(id) ? [{ ...parId.get(id)!, infos: infos(id) }] : []));
   // D'autres envies (y compris un plat retiré du Menu), les plus partagées d'abord, puis les classiques du foyer.
   const dejaLa = new Set([...auMenu, ...achetes]);
   const candidats = [
@@ -76,38 +79,45 @@ export default async function Menu({ searchParams }: { searchParams: Promise<{ i
   }
   const i = Math.max(0, Number(params.i) || 0);
 
+  const proposition = await CeSoirAccueil({ me, trip, i });
+  // Quelqu'un d'autre est parti faire les courses : une dernière demande, d'un appui.
+  const parti = trip.created_by && trip.created_by !== me.id && Date.now() - Date.parse(trip.departs_at) < 6 * 60 * 60 * 1000 ? profiles.find((p) => p.id === trip.created_by) : undefined;
+  const demandes = parti ? (({ reportes, habituels }) => [...reportes, ...habituels].slice(0, 4).map((s) => s.nom))(await aPreparer(me.family_id, trip)) : [];
+
+  const decide = Boolean(choisi && parId.has(choisi.recipeId));
+  const jour = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Paris" }).format(new Date());
+
   return (
     <>
-      <BandeauScene
-        compact
-        illustration="table"
-        etiquette={plats.length ? `${plats.length} plat${plats.length > 1 ? "s" : ""} au Menu` : "Ce qu'on mange"}
-        titre="Le Menu"
-        actions={
-          <Link href="/recettes" aria-label="Toutes les recettes" className="flex size-14 shrink-0 items-center justify-center rounded-full bg-blanc text-aubergine active:scale-95">
-            <IconeLivre />
-          </Link>
-        }
-      />
-      {seul && <CarteInviter />}
-      <CeSoirCarte me={me} i={i} />
-      {repas && <CeSoir tripId={repas.tripId} plats={repas.plats} moi={me.name} />}
+      {/* Le bandeau et la réponse du soir forment un seul écran : la photo mord sur le bandeau et prend la hauteur qui reste. */}
+      <div className="ecran-soir">
+        <BandeauScene
+          chevauche
+          fond="courses"
+          illustration="courses"
+          etiquette={jour.replace(/^./, (c) => c.toUpperCase())}
+          titre={decide ? "Ce soir" : "Ce soir ?"}
+          initiale={me.name}
+        />
+        {proposition}
+      </div>
+      {parti && <DerniereDemande qui={parti.name} choix={demandes} />}
+      {repas && <CeSoir tripId={repas.tripId} plats={repas.plats.filter((p) => p.id !== choisi?.recipeId)} moi={me.name} />}
 
-      {plats.length === 0 && autres.length === 0 ? (
-        <EtatVide
-          phrase={
-            seul
-              ? "Swipe des plats : ce qui te fait envie arrive ici, et ses ingrédients vont tout seuls sur la liste."
-              : "Swipe des plats : quand vous êtes au moins deux à dire « Miam », le plat arrive ici et ses ingrédients vont tout seuls sur la liste."
-          }
-        >
+      {!proposition && plats.length === 0 && autres.length === 0 ? (
+        <EtatVide phrase="Rien à proposer pour l'instant : swipe quelques plats, Kaddie s'en sert pour répondre à « on mange quoi ? ».">
           <Link href="/envies" className="kd-btn kd-btn--secondaire min-h-12 px-5">
-            Swiper des plats
+            Explorer des plats
           </Link>
         </EtatVide>
       ) : (
         <PlatsDuMenu menu={plats} autres={autres} titreAutres={titreAutres} />
       )}
+      <p className="mb-6">
+        <Link href="/recettes" className="min-h-11 py-2.5 font-semibold text-violet underline underline-offset-4">
+          Toutes les recettes
+        </Link>
+      </p>
     </>
   );
 }

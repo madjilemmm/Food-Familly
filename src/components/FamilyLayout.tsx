@@ -6,28 +6,30 @@ import { IconeAssiette, IconePanier, IconeSwipe } from "@/components/ui";
 import { BandeauATable } from "@/components/ATable";
 import type { ATable, Profile } from "@/lib/data";
 
-// Trois onglets, les mêmes pour tout le monde : dire (Envies), voir ce qu'on mange (Menu),
-// faire les courses (Courses). Les recettes s'ouvrent depuis le Menu et chaque plat.
+// Trois entrées, les mêmes pour tout le monde : « Ce soir » (la réponse du soir et la semaine), « Idées »
+// (les cartes à swiper, à la demande) et le « Caddie » (la liste, avec ce qu'il reste à prendre).
+// Les recettes s'ouvrent depuis chaque plat ; la famille et les réglages, depuis le rond de la table.
 const TABS: Tab[] = [
-  { href: "/envies", label: "Envies", icon: <IconeSwipe /> },
-  { href: "/menu", label: "Menu", icon: <IconeAssiette /> },
-  { href: "/courses", label: "Courses", icon: <IconePanier /> },
+  { href: "/envies", label: "Idées", icon: <IconeSwipe /> },
+  { href: "/menu", label: "Ce soir", icon: <IconeAssiette /> },
+  { href: "/courses", label: "Caddie", icon: <IconePanier /> },
 ];
 
 /** Barre d'onglets et rafraîchissement en direct. */
 export function FamilyLayout({
   me,
-  coursesBadge,
+  caddie = 0,
   aTable,
   children,
 }: {
   me: Profile;
-  coursesBadge?: boolean;
+  /** Ce qu'il reste à prendre dans le caddie. */
+  caddie?: number;
   /** Un appel « À table ! » en cours : le bandeau s'affiche par-dessus l'écran. */
   aTable?: ATable | null;
   children: React.ReactNode;
 }) {
-  const tabs = TABS.map((t) => (t.label === "Courses" && coursesBadge ? { ...t, badge: 1 } : t));
+  const tabs = TABS.map((t) => (t.label === "Caddie" && caddie > 0 ? { ...t, badge: Math.min(caddie, 99) } : t));
   return (
     <AnnulerProvider>
       <RealtimeRefresher familyId={me.family_id} />

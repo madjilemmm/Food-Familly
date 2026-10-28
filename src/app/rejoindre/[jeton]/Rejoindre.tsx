@@ -1,17 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { isIOS, isStandalone } from "@/components/pwa/device";
 import { InstallHelp } from "@/components/pwa/InstallHelp";
 import { SubmitButton } from "@/components/SubmitButton";
+import { MessageErreur } from "@/components/ui";
+import { sansPlantage } from "@/lib/reseau";
+
+type Etat = { error?: string };
 
 /**
- * Entrer dans la famille d'un appui. Sur iPhone, l'appli installée ne partage pas
+ * Entrer à la table en un écran : son prénom, un appui. Sur iPhone, l'appli installée ne partage pas
  * sa mémoire avec Safari : on l'installe d'abord, puis on y colle le lien.
  */
-export function Rejoindre({ action, nom, autreFamille }: { action: () => Promise<void>; nom: string; autreFamille: boolean }) {
+export function Rejoindre({ action, nom, autreFamille }: { action: (prev: Etat, formData: FormData) => Promise<Etat>; nom: string; autreFamille: boolean }) {
   const [installer, setInstaller] = useState<boolean | null>(null);
   const [copie, setCopie] = useState(false);
+  const [etat, formAction] = useActionState(sansPlantage(action), {});
 
   useEffect(() => {
     // Détection côté navigateur uniquement (inconnue au rendu serveur).
@@ -44,10 +49,12 @@ export function Rejoindre({ action, nom, autreFamille }: { action: () => Promise
   }
 
   return (
-    <form action={action} className="flex flex-col gap-3">
+    <form action={formAction} className="flex flex-col gap-3">
       {autreFamille && <p className="kd-petit text-center text-blanc">Ce téléphone quittera sa famille actuelle pour rejoindre {nom}.</p>}
+      <input name="prenom" aria-label="Ton prénom" required maxLength={40} autoComplete="given-name" placeholder="Ton prénom" className="kd-champ" />
+      {etat.error && <MessageErreur>{etat.error}</MessageErreur>}
       <SubmitButton className="kd-btn kd-btn--secondaire kd-btn--large" pendingLabel="J'arrive…">
-        Rejoindre {nom}
+        Voir le repas du soir
       </SubmitButton>
     </form>
   );

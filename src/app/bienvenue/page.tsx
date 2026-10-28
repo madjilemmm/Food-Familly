@@ -15,7 +15,7 @@ export default function WelcomePage() {
     >
       <div className="kd-monte mx-auto flex max-w-md flex-col items-center gap-5 pt-16 text-center">
         <Logo width={280} />
-        <p className="kd-titre-3">Les courses de la famille, en un swipe.</p>
+        <p className="max-w-xs text-[1.1875rem] leading-[1.6rem] font-medium text-balance">On mange quoi ce soir ? Décidez à plusieurs, Kaddie remplit le caddie.</p>
       </div>
       <div className="mx-auto w-full max-w-md pb-4">
         <InstallFirst>

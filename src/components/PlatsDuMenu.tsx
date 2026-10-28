@@ -68,10 +68,10 @@ export function PlatsDuMenu({ menu, autres, titreAutres = "Aussi envie" }: { men
   return (
     <>
       <section className="mb-10">
-        <h2 className="kd-etiquette">Prochains repas</h2>
+        <h2 className="kd-etiquette">Cette semaine</h2>
         {etat.menu.length > 0 ? (
           <>
-            <p className="kd-petit mb-2">Leurs ingrédients sont sur la liste de courses.</p>
+            <p className="kd-petit mb-2">Leurs ingrédients sont dans le caddie.</p>
             <ul className="kd-liste border-t-2 border-trait">{etat.menu.map((p) => ligne(p, true))}</ul>
           </>
         ) : (
@@ -81,7 +81,7 @@ export function PlatsDuMenu({ menu, autres, titreAutres = "Aussi envie" }: { men
       {etat.autres.length > 0 && (
         <section className="mb-10">
           <h2 className="kd-etiquette">{titreAutres}</h2>
-          <p className="kd-petit mb-2">Touche + pour le mettre au Menu : ses ingrédients arrivent sur la liste.</p>
+          <p className="kd-petit mb-2">Touche + pour le mettre au Menu : ses ingrédients arrivent dans le caddie.</p>
           <ul className="kd-liste border-t-2 border-trait">{etat.autres.map((p) => ligne(p, false))}</ul>
         </section>
       )}
