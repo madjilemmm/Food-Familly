@@ -23,6 +23,12 @@ describe("Ce soir : une seule réponse", () => {
     const r = choisirCeSoir([c("c", { rang: 2 }), c("a", { rang: 0 }), c("b", { rang: 1 })], { semaine: false });
     expect(r.map((x) => x.id)).toEqual(["a", "b", "c"]);
   });
+  it("« Autre idée » fait défiler les plats, même quand tous ont déjà été écartés", () => {
+    const tous = [c("a"), c("b"), c("c")];
+    // a écarté il y a longtemps, c tout à l'heure : a revient en premier, c en dernier
+    const r = choisirCeSoir(tous, { semaine: false, pasCeSoir: new Map([["a", 100], ["b", 200], ["c", 300]]) });
+    expect(r.map((x) => x.id)).toEqual(["a", "b", "c"]);
+  });
   it("un soir de semaine, le plus rapide avance", () => {
     const r = choisirCeSoir([c("long", { achete: true, minutes: 90 }), c("rapide", { achete: true, minutes: 20 })], { semaine: true });
     expect(r[0].id).toBe("rapide");

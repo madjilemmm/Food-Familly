@@ -818,10 +818,11 @@ export const getClassiques = cache(async function getClassiques(familyId: string
 
 // ─── « Autre idée » ───────────────────────────────────────────────────
 
-/** Les plats écartés de « Ce soir » par la famille, pas encore revenus (base pas migrée : aucun). */
-export const getPasCeSoir = cache(async function getPasCeSoir(familyId: string): Promise<Set<string>> {
-  const { data } = await db().from("pas_ce_soir").select("recipe_id").eq("family_id", familyId).gt("jusqu_a", new Date().toISOString());
-  return new Set((data ?? []).map((r) => r.recipe_id as string));
+/** Les plats écartés de « Ce soir » par la famille, pas encore revenus, avec la fin de leur écart (base pas migrée : aucun). */
+export const getPasCeSoir = cache(async function getPasCeSoir(familyId: string): Promise<Map<string, number>> {
+  const { data } = await db().from("pas_ce_soir").select("recipe_id, jusqu_a").eq("family_id", familyId).gt("jusqu_a", new Date().toISOString());
+  // recette → fin de l'écart : plus elle est lointaine, plus l'écart est récent.
+  return new Map((data ?? []).map((r) => [r.recipe_id as string, Date.parse(r.jusqu_a as string)]));
 });
 
 /** Le plat que la famille a retenu pour ce soir (« Ce sera ça »), s'il y en a un aujourd'hui. Base pas migrée : aucun. */

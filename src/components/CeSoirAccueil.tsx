@@ -9,6 +9,7 @@ import {
   getFamilySwipes,
   getPasCeSoir,
   getProfiles,
+  getRecipe,
   getRecipes,
   getRecipesWithIngredients,
   getRepasAchetes,
@@ -17,9 +18,9 @@ import {
 import { platsDuMenu } from "@/lib/menu";
 import { choisirCeSoir } from "@/lib/domain/ce-soir";
 import { contientPhrase } from "@/lib/domain/foods";
-import { listeDeNoms } from "@/lib/domain/convives";
+import { phraseEnvie } from "@/lib/domain/convives";
 import { RecipeVisual } from "@/components/RecipeVisual";
-import { SubmitButton } from "@/components/SubmitButton";
+import { BoutonCommande } from "@/components/BoutonCommande";
 import { Logo } from "@/design-system/components/Kaddie";
 import {
   IconeAutre,
@@ -27,13 +28,6 @@ import {
   IconePanier,
   IconeRetour,
 } from "@/components/ui";
-import {
-  aucuneAllergie,
-  autreIdee,
-  ceSeraCa,
-  changerCeSoir,
-} from "@/app/actions/ce-soir";
-
 const JOUR = 86_400_000;
 /** Au moins ce nombre de plats à proposer : le paquet de Kaddie complète ce qui est acheté, au Menu ou envié. */
 const PROPOSITIONS_MIN = 6;
@@ -68,7 +62,7 @@ export async function CeSoirAccueil({
   me: Profile;
   trip: Trip;
   i?: number;
-}) {
+}): Promise<{ node: React.ReactNode; platId: string | null }> {
   const [
     choisi,
     repas,
@@ -111,7 +105,10 @@ export async function CeSoirAccueil({
     const achete = (repas?.plats ?? []).some(
       (p) => p.id === retenu.id && !p.fait,
     );
-    return (
+    // Sans étapes (recette à peine saisie), « Je cuisine » n'a rien à ouvrir : la fiche de la recette suffit.
+    const detail = await getRecipe(me.family_id, retenu.id);
+    const cuisinable = (detail?.steps?.length ?? 0) > 0;
+    const node = (
       <section
         className="kd-monte flex min-h-0 flex-1 flex-col"
         aria-label="Le repas de ce soir"
@@ -159,22 +156,21 @@ export async function CeSoirAccueil({
         </div>
         <div className="soir-bas">
           <Link
-            href={`/recettes/${retenu.id}?depuis=/menu&cuisine=1`}
+            href={`/recettes/${retenu.id}?depuis=/menu${cuisinable ? "&cuisine=1" : ""}`}
             className="kd-btn kd-btn--large w-full"
           >
-            Je cuisine
+            {cuisinable ? "Je cuisine" : "Voir la recette"}
           </Link>
-          <form action={changerCeSoir} className="self-center">
-            <button
-              type="submit"
-              className="min-h-11 px-4 font-semibold text-violet"
-            >
-              Changer de plat
-            </button>
-          </form>
+          <BoutonCommande
+            commande="changer"
+            className="flex min-h-11 items-center gap-2 self-center px-4 font-semibold text-violet"
+          >
+            Changer de plat
+          </BoutonCommande>
         </div>
       </section>
     );
+    return { node, platId: retenu.id };
   }
 
   // ─── Une proposition ───
@@ -223,32 +219,23 @@ export async function CeSoirAccueil({
   }
   const possibles = await forFamily(me.family_id, candidats);
   const choix = choisirCeSoir(possibles, { semaine: enSemaine(), pasCeSoir });
-  if (choix.length === 0) return null;
+  if (choix.length === 0) return { node: null, platId: null };
   const idx = Math.max(0, i || 0);
   const plat = choix[idx % choix.length];
   const qui = (envies.get(plat.id) ?? []).flatMap((id) => noms.get(id) ?? []);
   const fois = classiques.find((c) => c.recipeId === plat.id)?.fois;
   const aime = avis.get(plat.id)?.get(me.id)?.liked === true;
-  const raison = [
+  // Une phrase qui dit pourquoi ce plat, sans mot interne (« à acheter », « au Menu »).
+  const raison =
     plat.origine === "achete"
-      ? "Déjà acheté"
-      : plat.origine === "menu"
-        ? "Déjà au Menu"
-        : plat.origine === "envie"
-          ? "À acheter"
-          : null,
-    qui.length
-      ? `Envie de ${listeDeNoms(qui, me.name).replace(/^Toi\b/, "toi")}`
-      : fois
-        ? `Classique · ${fois} fois`
-        : aime
-          ? "Tu l'avais aimé"
-          : plat.origine === "idee"
-            ? "Une idée de Kaddie"
-            : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+      ? "Déjà acheté aux dernières courses"
+      : qui.length
+        ? phraseEnvie(qui, me.name)
+        : fois
+          ? `Un classique : ${fois} fois`
+          : aime
+            ? "Tu l'avais aimé"
+            : "Une idée de Kaddie";
   const contient = contientPhrase(ctx.texts.get(plat.id) ?? [plat.title]);
   const [avecIngredients] = await getRecipesWithIngredients(me.family_id, [
     plat.id,
@@ -258,7 +245,7 @@ export async function CeSoirAccueil({
   );
   const lien = `/recettes/${plat.id}?depuis=/menu`;
 
-  return (
+  const node = (
     <section
       className="kd-monte flex min-h-0 flex-1 flex-col"
       key={plat.id}
@@ -298,35 +285,33 @@ export async function CeSoirAccueil({
         {noms2.length > 0 && (
           <p className="soir-ligne mt-3 flex min-h-14 items-center gap-3 border-t-2 border-trait text-petit font-medium">
             <IconePanier className="size-6 shrink-0 text-aubergine" />
-            {noms2.length} article{noms2.length > 1 ? "s" : ""} {noms2.length > 1 ? "iront" : "ira"} dans le caddie
+            {noms2.length} article{noms2.length > 1 ? "s" : ""}{" "}
+            {plat.origine === "menu" ? "déjà dans le caddie" : noms2.length > 1 ? "iront dans le caddie" : "ira dans le caddie"}
           </p>
         )}
       </div>
       <div className="soir-bas">
-        <form action={ceSeraCa.bind(null, plat.id)}>
-          <SubmitButton
-            className="kd-btn kd-btn--large w-full"
-            pendingLabel="C'est noté…"
-          >
-            Ce sera ça
-          </SubmitButton>
-        </form>
+        <BoutonCommande
+          commande="ceSeraCa"
+          recipeId={plat.id}
+          className="kd-btn kd-btn--large w-full"
+          pendingLabel="C'est noté…"
+        >
+          Ce sera ça
+        </BoutonCommande>
         {choix.length > 1 && (
-          <form
-            action={autreIdee.bind(null, plat.id, idx)}
-            className="self-center"
+          <BoutonCommande
+            commande="autreIdee"
+            recipeId={plat.id}
+            className="flex min-h-11 items-center gap-2 self-center px-4 font-semibold text-violet"
           >
-            <SubmitButton
-              className="flex min-h-11 items-center gap-2 px-4 font-semibold text-violet"
-              pendingLabel="…"
-            >
-              <IconeAutre className="size-5" /> Autre idée
-            </SubmitButton>
-          </form>
+            <IconeAutre className="size-5" /> Autre idée
+          </BoutonCommande>
         )}
       </div>
     </section>
   );
+  return { node, platId: plat.id };
 }
 
 /** La photo du plat : elle prend la hauteur que le texte et le bouton lui laissent, et mord de 28 px sur le bandeau. */
@@ -352,14 +337,12 @@ function QuestionAllergie() {
       <p className="basis-full text-petit font-medium">
         <span className="soir-q-long">Une allergie ou un régime à signaler ?</span><span className="soir-q-court" aria-hidden="true">Allergie ou régime ?</span>
       </p>
-      <form action={aucuneAllergie}>
-        <SubmitButton
-          className="min-h-11 min-w-22 rounded-[0.875rem] border-[3px] border-aubergine px-4 font-semibold text-aubergine"
-          pendingLabel="…"
-        >
-          Non
-        </SubmitButton>
-      </form>
+      <BoutonCommande
+        commande="allergie"
+        className="min-h-11 min-w-22 rounded-[0.875rem] border-[3px] border-aubergine px-4 font-semibold text-aubergine"
+      >
+        Non
+      </BoutonCommande>
       <Link
         href={LIEN_ALLERGIES}
         className="flex min-h-11 min-w-22 items-center justify-center rounded-[0.875rem] border-[3px] border-aubergine px-4 font-semibold text-aubergine"

@@ -58,7 +58,7 @@ export async function CoursesScreen({ me, notifications }: { me: Profile; notifi
         ) : (
           <>Rien à cuisiner pour l&apos;instant : {seul ? "swipe des plats" : "quand vous êtes au moins deux à dire « Miam »"}, leurs ingrédients arrivent ici. </>
         )}
-        <Link href={ROUTES.menu} className="font-semibold text-violet underline underline-offset-4">
+        <Link href={ROUTES.menu} className="font-semibold whitespace-nowrap text-violet underline underline-offset-4">
           Voir Ce soir
         </Link>
       </p>

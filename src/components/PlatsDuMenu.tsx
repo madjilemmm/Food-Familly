@@ -13,7 +13,7 @@ type Plat = { id: string; title: string; photo_url: string | null; infos: string
  * Les plats du Menu (leurs ingrédients sont sur la liste) et d'autres envies.
  * × retire un plat du Menu, + en ajoute un : la liste suit.
  */
-export function PlatsDuMenu({ menu, autres, titreAutres = "Aussi envie" }: { menu: Plat[]; autres: Plat[]; titreAutres?: string }) {
+export function PlatsDuMenu({ menu, autres, titreAutres = "D'autres envies" }: { menu: Plat[]; autres: Plat[]; titreAutres?: string }) {
   const [, startTransition] = useTransition();
   // Le plat dont on a touché « × » : « Pas ce soir » ou « Pas pour moi ».
   const [retire, setRetire] = useState<string | null>(null);
@@ -81,7 +81,7 @@ export function PlatsDuMenu({ menu, autres, titreAutres = "Aussi envie" }: { men
       {etat.autres.length > 0 && (
         <section className="mb-10">
           <h2 className="kd-etiquette">{titreAutres}</h2>
-          <p className="kd-petit mb-2">Touche + pour le mettre au Menu : ses ingrédients arrivent dans le caddie.</p>
+          <p className="kd-petit mb-2">Touche + : ses ingrédients arrivent dans le caddie.</p>
           <ul className="kd-liste border-t-2 border-trait">{etat.autres.map((p) => ligne(p, false))}</ul>
         </section>
       )}

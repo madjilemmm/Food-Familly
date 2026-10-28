@@ -75,8 +75,6 @@ export function FamilyCode({
               dangerouslySetInnerHTML={{ __html: invitation.qr }}
             />
           </details>
-          <p className="kd-etiquette mt-3">Ou le code famille</p>
-          {codeAffiche}
         </>
       ) : (
         <>
@@ -87,15 +85,35 @@ export function FamilyCode({
           </button>
         </>
       )}
-      <ConfirmButton
-        action={regenerateJoinCode}
-        question="Changer le code ?"
-        detail={`L'ancien ne marchera plus pour rejoindre la famille${invitation ? ", ni les liens déjà envoyés" : ""}. Les téléphones déjà connectés le restent.`}
-        confirmLabel="Oui, changer le code"
-        className="min-h-14 w-full text-encre-douce underline underline-offset-4"
-      >
-        Changer le code
-      </ConfirmButton>
+      {!invitation && <ChangerLeCode avecLiens={false} />}
+    </section>
+  );
+}
+
+function ChangerLeCode({ avecLiens }: { avecLiens: boolean }) {
+  return (
+    <ConfirmButton
+      action={regenerateJoinCode}
+      question="Changer le code ?"
+      detail={`L'ancien ne marchera plus pour rejoindre la famille${avecLiens ? ", ni les liens déjà envoyés" : ""}. Les téléphones déjà connectés le restent.`}
+      confirmLabel="Oui, changer le code"
+      className="min-h-14 w-full text-encre-douce underline underline-offset-4"
+    >
+      Changer le code
+    </ConfirmButton>
+  );
+}
+
+/** Le code famille (il marche toujours, même sans lien) et son changement : un réglage, pas l'écran de La table. */
+export function CodeFamille({ code, avecLiens }: { code: string; avecLiens: boolean }) {
+  return (
+    <section className="flex flex-col gap-1">
+      <p className="kd-etiquette">Code de la famille</p>
+      <p className="kd-petit">Pour rejoindre sans lien : à taper une seule fois sur le nouveau téléphone.</p>
+      <p data-code className="font-display text-titre-2 tracking-[0.04em] break-words text-aubergine select-all">
+        {code}
+      </p>
+      <ChangerLeCode avecLiens={avecLiens} />
     </section>
   );
 }

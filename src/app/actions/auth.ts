@@ -8,6 +8,7 @@ import { getProfile } from "@/lib/data";
 import { requireFamily, requireUser, setSession } from "@/lib/auth";
 import { SESSION_COOKIE, newSession, type Style } from "@/lib/session";
 import { STARTER_RECIPES } from "@/lib/starter-recipes";
+import { DETAILS_DE_DEPART } from "@/lib/starter-etapes";
 import { BUCKET_PHOTOS, cheminDansLeStockage } from "@/lib/photos";
 import { annulerInvitations, familleInvitee, jetonDe, noterEssaiRate, tropDEssais } from "@/lib/acces";
 import { normalizeName } from "@/lib/domain/shopping-list";
@@ -145,7 +146,16 @@ export async function createFamily(_prev: { error?: string }, formData: FormData
 async function addStarterRecipes(familyId: string) {
   const { data: recipes } = await db()
     .from("recipes")
-    .insert(STARTER_RECIPES.map(({ title, emoji }) => ({ family_id: familyId, title, emoji })))
+    .insert(
+      STARTER_RECIPES.map(({ title, emoji }) => ({
+        family_id: familyId,
+        title,
+        emoji,
+        servings: 4,
+        total_minutes: DETAILS_DE_DEPART[title]?.minutes ?? null,
+        steps: DETAILS_DE_DEPART[title]?.steps ?? [],
+      })),
+    )
     .select("id, title");
   if (!recipes) return;
   const idByTitle = new Map(recipes.map((r) => [r.title as string, r.id as string]));

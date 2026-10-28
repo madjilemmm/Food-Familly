@@ -13,11 +13,11 @@ export function CreateFamilyForm() {
     <form action={action} className="flex flex-col gap-6">
       <label className="block">
         <span className="kd-etiquette mb-2 block">Ton prénom</span>
-        <input name="prenom" required maxLength={40} autoComplete="given-name" placeholder="Karin" className="kd-champ" />
+        <input name="prenom" required maxLength={40} autoComplete="given-name" placeholder="ex. Karin" className="kd-champ" />
       </label>
       <label className="block">
         <span className="kd-etiquette mb-2 block">Nom de la famille (facultatif)</span>
-        <input name="family_name" maxLength={60} placeholder="Famille Martin" className="kd-champ" />
+        <input name="family_name" maxLength={60} placeholder="ex. Famille Martin" className="kd-champ" />
       </label>
 
       {state.error && <MessageErreur>{state.error}</MessageErreur>}

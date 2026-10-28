@@ -46,15 +46,19 @@ export const PAS_CE_SOIR_JOURS = 2;
 
 export function choisirCeSoir<C extends CandidatSoir>(
   candidats: C[],
-  { semaine, pasCeSoir = new Set() }: { semaine: boolean; pasCeSoir?: Set<string> },
+  { semaine, pasCeSoir = new Map() }: { semaine: boolean; pasCeSoir?: Map<string, number> | Set<string> },
 ): C[] {
   const note = (c: C) =>
     (c.achete ? CE_SOIR.ACHETE + Math.min(CE_SOIR.ANCIENNETE_MAX, CE_SOIR.PAR_JOUR * c.joursDepuisAchat) : c.auMenu ? CE_SOIR.AU_MENU : 0) +
     CE_SOIR.PAR_ENVIE * c.envies -
     CE_SOIR.PAR_RANG * (c.rang ?? 0) +
     (semaine && c.minutes ? (c.minutes <= 30 ? CE_SOIR.RAPIDE : c.minutes > 60 ? CE_SOIR.LONG : 0) : 0);
-  // Un plat écarté (« Autre idée ») passe après les autres, sans disparaître.
-  return [...candidats].sort((a, b) => Number(pasCeSoir.has(a.id)) - Number(pasCeSoir.has(b.id)) || note(b) - note(a) || a.id.localeCompare(b.id));
+  // Un plat écarté (« Autre idée ») passe après les autres, sans disparaître ; entre deux plats écartés, le moins récemment écarté
+  // d'abord : « Autre idée » fait ainsi toujours défiler les plats, même quand tous ont été écartés.
+  const fin = (id: string) => (pasCeSoir instanceof Map ? (pasCeSoir.get(id) ?? 0) : 0);
+  return [...candidats].sort(
+    (a, b) => Number(pasCeSoir.has(a.id)) - Number(pasCeSoir.has(b.id)) || fin(a.id) - fin(b.id) || note(b) - note(a) || a.id.localeCompare(b.id),
+  );
 }
 
 /**

@@ -2,8 +2,9 @@ import Link from "next/link";
 import { after } from "next/server";
 import { requireProfile, requireUser } from "@/lib/auth";
 import { remplirSiBesoin } from "@/lib/marmiton";
-import { getCurrentTrip, getDeck, getProfiles, getRecipes } from "@/lib/data";
+import { getCurrentTrip, getDeck, getProfiles, getRecipes, getTasteContext } from "@/lib/data";
 import { momentDe } from "@/lib/domain/reco";
+import { contientPhrase } from "@/lib/domain/foods";
 import { SwipeDeck } from "@/components/SwipeDeck";
 import { BandeauScene, IconePanier } from "@/components/ui";
 import { CarteGouts, CarteInviter } from "@/components/Envies";
@@ -37,6 +38,8 @@ export default async function Envies({ searchParams }: { searchParams: Promise<{
   after(() => remplirSiBesoin(user.familyId, deck.filter((r) => !r.dejaVu).length));
   // Paquet vide alors que la famille a des recettes : ce sont les goûts qui cachent tout.
   const toutCache = deck.length === 0 && (await getRecipes(user.familyId)).length > 0;
+  // Les allergènes courants, dits comme sur « Ce soir » : une carte dit la même chose partout.
+  const gouts = await getTasteContext(user.familyId);
 
   return (
     // Comme Recettes : le bandeau illustré, puis la pile de cartes sur le lilas, jusqu'aux onglets.
@@ -71,7 +74,7 @@ export default async function Envies({ searchParams }: { searchParams: Promise<{
           </Link>
         </p>
       )}
-      <SwipeDeck initialDeck={deck} toutCache={toutCache} />
+      <SwipeDeck initialDeck={deck.map((r) => ({ ...r, contient: contientPhrase(gouts.texts.get(r.id) ?? [r.title]) }))} toutCache={toutCache} />
     </div>
   );
 }

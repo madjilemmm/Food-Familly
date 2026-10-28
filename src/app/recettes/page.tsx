@@ -9,16 +9,19 @@ export const metadata = { title: "Recettes — Kaddie" };
 
 export default async function RecipesPage() {
   const user = await requireUser();
-  const [, all, tastes] = await Promise.all([requireProfile(), getRecipes(user.familyId), getTasteContext(user.familyId)]);
+  const [me, all, tastes] = await Promise.all([requireProfile(), getRecipes(user.familyId), getTasteContext(user.familyId)]);
   // Les recettes de la famille d'abord, puis celles importées de Marmiton.
   const recipes = [...all.filter((r) => !r.source_url), ...all.filter((r) => r.source_url)];
   const auto = all.length - recipes.filter((r) => !r.source_url).length;
   return (
     <>
       <BandeauScene
-        illustration="marche"
+        compact
+        fond="courses"
+        illustration="courses"
         etiquette={`${recipes.length} recette${recipes.length > 1 ? "s" : ""}`}
         titre="Les recettes"
+        initiale={me.name}
       />
       <Link href="/recettes/nouvelle" className="kd-btn kd-btn--large mb-6">
         Ajouter une recette

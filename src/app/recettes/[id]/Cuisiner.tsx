@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { Scene } from "@/design-system/components/Kaddie";
 import { marquerRepas } from "@/app/actions/trips";
 import { formatQuantity, scaleIngredients } from "@/lib/domain/shopping-list";
@@ -86,6 +87,7 @@ function ModeCuisine({
   // Écran 0 : ce qu'il faut ; puis une étape par écran ; puis « Bon appétit ».
   const total = steps.length + 2;
   const [i, setI] = useState(0);
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const depart = useRef<number | null>(null);
   const aller = (k: number) => setI(Math.max(0, Math.min(total - 1, k)));
@@ -180,15 +182,16 @@ function ModeCuisine({
                   startTransition(async () => {
                     await marquerRepas(repasTripId, recipeId, true).catch(() => {});
                     onFermer();
+                    router.push("/menu");
                   })
                 }
-                className="kd-btn kd-btn--secondaire kd-btn--large w-full"
+                className="min-h-12 w-full text-center font-semibold underline underline-offset-4"
               >
-                C&apos;est fait
+                C&apos;est fait, retour à Ce soir
               </button>
             ) : (
-              <button type="button" onClick={onFermer} className="kd-btn kd-btn--secondaire kd-btn--large w-full">
-                Fermer
+              <button type="button" onClick={() => { onFermer(); router.push("/menu"); }} className="min-h-12 w-full text-center font-semibold underline underline-offset-4">
+                Retour à Ce soir
               </button>
             )}
           </div>

@@ -7,7 +7,6 @@ import { Scene } from "@/design-system/components/Kaddie";
 import { FamilyCode } from "@/components/family/FamilyCode";
 import { MembersEditor } from "@/components/family/MembersEditor";
 import { FamilyName } from "@/components/family/FamilyName";
-import { StrictToggle } from "@/components/family/StrictToggle";
 import { BandeauScene, IconeRetour } from "@/components/ui";
 import { cheminInvitation, invitationAPartager } from "@/lib/acces";
 
@@ -60,13 +59,10 @@ export default async function FamilyPage({ searchParams }: { searchParams: Promi
         <MembersEditor members={members} myId={me.id} />
       </section>
 
-      {/* Un réglage fin, utile seulement à plusieurs : après l'essentiel. */}
-      {members.length > 1 && <StrictToggle strict={family.strict_dislikes} />}
-
       <Link href="/reglages" className="kd-liste__article min-h-16 justify-between border-t-2 border-trait active:bg-trait/40">
         <span className="min-w-0">
           <span className="block font-semibold">Réglages</span>
-          <span className="kd-petit block">Notifications, goûts, portrait, données</span>
+          <span className="kd-petit block">Notifications, goûts, code de la famille, données</span>
         </span>
         <IconeRetour className="size-6 shrink-0 rotate-180 text-violet" />
       </Link>

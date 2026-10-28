@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
 import { forFamily, getCeSoirChoisi, getClassiques, getFamilyEnvies, getFamilySwipes, getProfiles, getRecipes, getRepasAchetes } from "@/lib/data";
 import { platsDuMenu, synchroniserMenu } from "@/lib/menu";
-import { listeDeNoms } from "@/lib/domain/convives";
+import { listeDeNoms, phraseEnvie } from "@/lib/domain/convives";
 import { BandeauScene, EtatVide } from "@/components/ui";
 import { CeSoir } from "@/components/courses/CeSoir";
 import { PlatsDuMenu } from "@/components/PlatsDuMenu";
@@ -12,7 +12,7 @@ import { aPreparer } from "@/lib/views";
 
 export const metadata = { title: "Ce soir — Kaddie" };
 
-/** « Aussi envie » : au plus ce nombre de plats, à ajouter d'un appui. */
+/** « D'autres envies » : au plus ce nombre de plats, à ajouter d'un appui. */
 const AUTRES_MAX = 6;
 /** Menu vide : au moins ce nombre de plats que la famille aime sont proposés, à ajouter d'un appui. */
 const PROPOSES_MIN = 3;
@@ -48,7 +48,7 @@ export default async function Menu({ searchParams }: { searchParams: Promise<{ i
     const aimePar = aime ? [...(avis.get(id) ?? [])].filter(([, a]) => a.likedAt != null).flatMap(([p]) => noms.get(p) ?? []) : [];
     return [
       foisClassique.has(id) ? `Classique · ${foisClassique.get(id)} fois` : null,
-      envie.length ? `Envie de ${listeDeNoms(envie, me.name).replace(/^Toi\b/, "toi")}` : aimePar.length ? `Aimé par ${listeDeNoms(aimePar, me.name).replace(/^Toi\b/, "toi")}` : null,
+      envie.length ? phraseEnvie(envie, me.name) : aimePar.length ? `Aimé par ${listeDeNoms(aimePar, me.name).replace(/^Toi\b/, "toi")}` : null,
       r?.total_minutes ? `${r.total_minutes} min` : null,
     ]
       .filter(Boolean)
@@ -66,7 +66,7 @@ export default async function Menu({ searchParams }: { searchParams: Promise<{ i
     .slice(0, AUTRES_MAX)
     .map((r) => ({ ...r, infos: infos(r.id) }));
   // Le Menu est vide et il y a peu à proposer : des plats que la famille aime déjà, à ajouter d'un appui.
-  let titreAutres = "Aussi envie";
+  let titreAutres = "D'autres envies";
   if (plats.length === 0 && autres.length < PROPOSES_MIN) {
     const dejaProposes = new Set([...dejaLa, ...autres.map((r) => r.id)]);
     const aimes = [...avis]
@@ -75,11 +75,13 @@ export default async function Menu({ searchParams }: { searchParams: Promise<{ i
       .flatMap(([id]) => parId.get(id) ?? []);
     const complement = (await forFamily(me.family_id, aimes)).slice(0, PROPOSES_MIN - autres.length).map((r) => ({ ...r, infos: infos(r.id, true) }));
     autres = [...autres, ...complement];
-    if (autres.length > 0 && autres.every((r) => !qui(r.id).length && !foisClassique.has(r.id))) titreAutres = "Pour remplir le Menu";
+    if (autres.length > 0 && autres.every((r) => !qui(r.id).length && !foisClassique.has(r.id))) titreAutres = "Quelques idées";
   }
   const i = Math.max(0, Number(params.i) || 0);
 
-  const proposition = await CeSoirAccueil({ me, trip, i });
+  const { node: proposition, platId } = await CeSoirAccueil({ me, trip, i });
+  // Le plat proposé n'est pas répété dans « D'autres envies » ; au Menu, il reste dans « Cette semaine » (c'est là qu'on le retire).
+  const autresEnvies = autres.filter((p) => p.id !== platId);
   // Quelqu'un d'autre est parti faire les courses : une dernière demande, d'un appui.
   const parti = trip.created_by && trip.created_by !== me.id && Date.now() - Date.parse(trip.departs_at) < 6 * 60 * 60 * 1000 ? profiles.find((p) => p.id === trip.created_by) : undefined;
   const demandes = parti ? (({ reportes, habituels }) => [...reportes, ...habituels].slice(0, 4).map((s) => s.nom))(await aPreparer(me.family_id, trip)) : [];
@@ -104,14 +106,14 @@ export default async function Menu({ searchParams }: { searchParams: Promise<{ i
       {parti && <DerniereDemande qui={parti.name} choix={demandes} />}
       {repas && <CeSoir tripId={repas.tripId} plats={repas.plats.filter((p) => p.id !== choisi?.recipeId)} moi={me.name} />}
 
-      {!proposition && plats.length === 0 && autres.length === 0 ? (
+      {!proposition && plats.length === 0 && autresEnvies.length === 0 ? (
         <EtatVide phrase="Rien à proposer pour l'instant : swipe quelques plats, Kaddie s'en sert pour répondre à « on mange quoi ? ».">
           <Link href="/envies" className="kd-btn kd-btn--secondaire min-h-12 px-5">
             Explorer des plats
           </Link>
         </EtatVide>
       ) : (
-        <PlatsDuMenu menu={plats} autres={autres} titreAutres={titreAutres} />
+        <PlatsDuMenu menu={plats} autres={autresEnvies} titreAutres={titreAutres} />
       )}
       <p className="mb-6">
         <Link href="/recettes" className="min-h-11 py-2.5 font-semibold text-violet underline underline-offset-4">

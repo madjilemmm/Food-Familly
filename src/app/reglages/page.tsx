@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { requireProfile, requireUser } from "@/lib/auth";
-import { getFamily } from "@/lib/data";
+import { getFamily, getProfiles } from "@/lib/data";
 import { deleteFamily, forgetProfile, leaveFamily } from "@/app/actions/auth";
 import { NotificationsCard } from "@/components/pwa/NotificationsCard";
-import { IconeRetour } from "@/components/ui";
+import { BandeauScene, IconeRetour } from "@/components/ui";
+import { CodeFamille } from "@/components/family/FamilyCode";
+import { StrictToggle } from "@/components/family/StrictToggle";
 import { ConfirmButton } from "@/components/courses/ConfirmButton";
 
 export const metadata = { title: "Réglages — Kaddie" };
@@ -11,21 +13,28 @@ export const metadata = { title: "Réglages — Kaddie" };
 /** Des sections séparées par l'espace, pas des cartes empilées. */
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [me, family] = await Promise.all([requireProfile(), getFamily(user.familyId)]);
+  const [me, family, members] = await Promise.all([requireProfile(), getFamily(user.familyId), getProfiles(user.familyId)]);
   const liens = [
     { href: "/profil/portrait", label: "Ton portrait gourmand", detail: "Ce que Kaddie a compris de toi" },
     { href: "/annee", label: "Notre année à table", detail: "Le bilan de la famille, à partager" },
     { href: `/profil/gouts?suite=${encodeURIComponent("/reglages")}`, label: "Mes goûts", detail: "Allergies, envies, j'aime / j'aime pas" },
-    { href: "/famille", label: "La table", detail: family ? `${family.name} · invitation, membres, mode strict` : "Invitation, membres, mode strict" },
   ];
   return (
-    <main className="pt-safe pb-safe mx-auto flex max-w-xl flex-col gap-10 px-5 pb-16">
-      <div>
-        <Link href={"/"} className="-ml-2 inline-flex min-h-14 items-center gap-1 font-semibold text-violet">
-          <IconeRetour className="size-6" /> Retour
-        </Link>
-        <h1 className="kd-titre-1 mt-2 text-aubergine">Réglages</h1>
-      </div>
+    <main className="ecran-famille pb-safe mx-auto flex max-w-xl flex-col gap-10 px-5 pb-16">
+      {/* Le même bandeau que La table, dont on vient : le rond y ramène. */}
+      <BandeauScene
+        compact
+        fond="courses"
+        illustration="courses"
+        etiquette={family?.name ?? "Ta famille"}
+        titre="Réglages"
+        reglages={false}
+        actions={
+          <Link href="/famille" aria-label="Retour à La table" className="flex size-14 shrink-0 items-center justify-center rounded-full bg-blanc text-aubergine active:scale-95">
+            <IconeRetour className="size-7" />
+          </Link>
+        }
+      />
 
       <section className="flex flex-col gap-3">
         <div>
@@ -38,6 +47,10 @@ export default async function SettingsPage() {
       </section>
 
       <NotificationsCard variant="full" />
+
+      {family && <CodeFamille code={family.join_code} avecLiens />}
+      {/* Un réglage fin, utile seulement à plusieurs. */}
+      {family && members.length > 1 && <StrictToggle strict={family.strict_dislikes} />}
 
       <ul className="kd-liste border-t-2 border-trait">
         {liens.map((l) => (

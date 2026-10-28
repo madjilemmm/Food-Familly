@@ -23,7 +23,8 @@ import { RecipeVisual } from "./RecipeVisual";
  * « hier » : le plat mangé hier, redemandé en premier (« C'était bon ? »).
  * « voix » : une seule autre personne en a envie (son prénom) ; un « Miam » et c'est un match.
  */
-type CarteDuPaquet = Recipe & { hier?: boolean; voix?: string; voixNb?: number };
+/** « contient » : les allergènes courants, dits comme sur « Ce soir » (« Contient du lait »). */
+type CarteDuPaquet = Recipe & { hier?: boolean; voix?: string; voixNb?: number; contient?: string | null };
 
 export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: CarteDuPaquet[]; toutCache?: boolean }) {
   // L'état local n'est pas réinitialisé par les rafraîchissements de la page :
@@ -191,7 +192,7 @@ function Carte({
         infos={
           recipe.hier
             ? "C'était bon ? Miam : on le refait"
-            : [recipe.voix && `Envie de ${recipe.voix}`, recipe.total_minutes && `${recipe.total_minutes} min`, !recipe.voix && recipe.source_url && "Recette Marmiton"]
+            : [recipe.voix && `${recipe.voix} en a envie`, recipe.total_minutes && `${recipe.total_minutes} min`, recipe.contient, !recipe.voix && !recipe.contient && recipe.source_url && "Recette Marmiton"]
                 .filter(Boolean)
                 .join(" · ") || undefined
         }

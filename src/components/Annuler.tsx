@@ -40,7 +40,7 @@ export function AnnulerProvider({ children }: { children: React.ReactNode }) {
               transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
               className="pointer-events-auto mx-auto flex max-w-xl items-center gap-3 rounded-bouton bg-aubergine py-2 pr-2 pl-4 text-blanc"
             >
-              <span className="min-w-0 flex-1 truncate font-semibold">{p.message}</span>
+              <span className="line-clamp-2 min-w-0 flex-1 font-semibold leading-snug">{p.message}</span>
               <button
                 type="button"
                 onClick={() => {
