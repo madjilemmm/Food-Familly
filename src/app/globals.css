@@ -83,6 +83,11 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* Hauteur réelle de la barre d'onglets (68 px de lien + trait + zone de sécurité) : tout ce qui se cale dessus la reprend. */
+:root {
+  --onglets: calc(4.25rem + 2px + max(env(safe-area-inset-bottom), 0.25rem));
+}
+
 /* Safe areas iPhone (encoche, barre d'accueil) */
 .pt-safe {
   padding-top: max(env(safe-area-inset-top), 1rem);
@@ -93,7 +98,7 @@ body {
 
 /* Espace réservé sous le contenu pour la barre d'onglets */
 .pb-tabbar {
-  padding-bottom: calc(5.25rem + max(env(safe-area-inset-bottom), 0.75rem));
+  padding-bottom: calc(var(--onglets) + 1.25rem);
 }
 /* Remplit l'écran au-dessus des onglets ; s'allonge (et la page défile) si le contenu ne tient pas. */
 .h-screen-tabbar {
@@ -195,7 +200,7 @@ a {
 
 /* Envies : le bandeau, puis la pile de cartes qui remplit l'écran jusqu'aux onglets. */
 .ecran-envies {
-  min-height: calc(100dvh - 5.25rem - max(env(safe-area-inset-bottom), 0.75rem));
+  min-height: calc(100dvh - var(--onglets));
   padding-bottom: 1.25rem;
   display: flex;
   flex-direction: column;
@@ -209,10 +214,79 @@ a {
 
 /* Ce soir : le bandeau, puis la réponse du soir qui remplit l'écran jusqu'aux onglets (la photo prend ce que le texte lui laisse). */
 .ecran-soir {
-  min-height: calc(100dvh - 5.25rem - max(env(safe-area-inset-bottom), 0.75rem));
-  padding-bottom: 1rem;
+  height: calc(100dvh - var(--onglets));
+  padding-bottom: 0.5rem;
   display: flex;
   flex-direction: column;
+}
+/* La partie haute (photo, texte) se serre quand l'écran est bas ; les boutons restent toujours visibles dessous. */
+.soir-haut {
+  position: relative;
+  z-index: 2;
+  margin-top: -1.75rem;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.soir-haut::-webkit-scrollbar {
+  display: none;
+}
+.soir-q-court {
+  display: none;
+}
+/* Hauteur d'iPhone ordinaire : la question tient sur une ligne, la photo garde sa place. */
+@media (max-height: 899px) {
+  .soir-q-long {
+    display: none;
+  }
+  .soir-q-court {
+    display: inline;
+  }
+  .soir-question {
+    flex-wrap: nowrap;
+  }
+  .soir-question p {
+    flex: 1;
+    flex-basis: auto;
+  }
+}
+.soir-bas {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.75rem;
+}
+/* Écran bas (iPhone SE, Android, Safari avec sa barre) : le bandeau et les lignes se resserrent. */
+@media (max-height: 760px) {
+  .bandeau--fin {
+    padding-bottom: 2.25rem;
+  }
+  .bandeau--fin .kd-etiquette {
+    display: none;
+  }
+  .bandeau--fin .kd-titre-1 {
+    font-size: calc(var(--taille-titre-1) * 0.68);
+  }
+  .ecran-soir .kd-titre-2 {
+    font-size: calc(var(--taille-titre-2) * 0.86);
+  }
+  .soir-ligne {
+    min-height: 3rem;
+    margin-top: 0.5rem;
+  }
+  .soir-question {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    flex-wrap: nowrap;
+  }
+  .soir-question p {
+    flex-basis: auto;
+    flex: 1;
+  }
 }
 
 /* Le monogramme qui respire pendant les chargements */

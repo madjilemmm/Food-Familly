@@ -90,7 +90,7 @@ export function FileAttente() {
   }, [refus]);
 
   return refus ? (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(4.75rem+max(env(safe-area-inset-bottom),0.75rem))] z-40 px-4">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--onglets)+0.75rem)] z-40 px-4">
       <p role="alert" className="kd-monte mx-auto max-w-xl rounded-pastille bg-aubergine px-4 py-3 text-blanc">
         Un changement fait hors connexion n&apos;a pas pu être enregistré : la liste a changé entre-temps.
       </p>

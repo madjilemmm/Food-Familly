@@ -39,7 +39,7 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
   const isActive = (href: string) => (pressed ? pressed === href : matches(href, pathname));
 
   return (
-    <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t-2 border-trait bg-surface">
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-trait bg-surface pb-[max(env(safe-area-inset-bottom),0.25rem)]">
       <ul className="mx-auto flex max-w-xl">
         {tabs.map((tab) => {
           const active = isActive(tab.href);
@@ -58,7 +58,7 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
                   }
                   setPressed(tab.href);
                 }}
-                className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 pt-1.5 pb-1 text-petit font-semibold transition-colors active:scale-95 ${
+                className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 pt-1.5 pb-1 text-petit font-semibold transition-colors active:scale-95 ${
                   active ? "text-violet" : "text-encre-douce"
                 }`}
               >

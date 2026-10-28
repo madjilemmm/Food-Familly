@@ -29,7 +29,7 @@ export function AnnulerProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={proposer}>
       {children}
-      <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-[calc(4.75rem+max(env(safe-area-inset-bottom),0.75rem))] z-40 px-4">
+      <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--onglets)+0.75rem)] z-40 px-4">
         <AnimatePresence>
           {p && (
             <motion.div
