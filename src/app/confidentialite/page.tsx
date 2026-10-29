@@ -12,7 +12,7 @@ export default function Confidentialite() {
           <IconeRetour className="size-6" /> Retour
         </Link>
         <h1 className="kd-titre-1 mt-2 text-aubergine">Confidentialité</h1>
-        <p className="kd-petit mt-2">Mise à jour le 19 octobre 2026</p>
+        <p className="kd-petit mt-2">Mise à jour le 29 octobre 2026</p>
         <p className="mt-4">
           Kaddie est un projet personnel, sans publicité. Ce que vous y mettez sert uniquement à faire marcher l&apos;appli pour votre
           famille.
@@ -38,6 +38,11 @@ export default function Confidentialite() {
           <strong>Sur le téléphone</strong> : deux cookies nécessaires au fonctionnement (la famille et le prénom choisis ; un
           identifiant pour la mise à jour en direct) et, sans réseau, les changements en attente. Aucun cookie publicitaire ni de
           mesure d&apos;audience.
+        </li>
+        <li>
+          <strong>Des compteurs anonymes</strong> : combien de fois par jour chaque étape du début est atteinte (accueil affiché, famille
+          créée, premier plat choisi, liste ouverte, lien partagé). Un simple total, sans identifiant, sans famille ni prénom : on ne
+          peut pas savoir qui.
         </li>
         <li>
           <strong>La sécurité</strong> : après un code famille erroné, une empreinte de l&apos;adresse internet (jamais l&apos;adresse

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/data";
-import { getAppris, getCeSoirChoisi, getDerniereCourse, getProfiles, getRecipes } from "@/lib/data";
+import { getAppris, getCeSoirChoisi, getDerniereCourse, getFamily, getProfiles, getRecipes } from "@/lib/data";
 import { aPreparer } from "@/lib/views";
 import { platsDuMenu, synchroniserMenu } from "@/lib/menu";
 import { listeDeNoms } from "@/lib/domain/convives";
 import { ROUTES } from "@/lib/routes";
 import { BandeauScene } from "@/components/ui";
+import { InstallerKaddie } from "@/components/pwa/InstallerKaddie";
+import { NoterEtape } from "@/components/NoterEtape";
 import { BilanCourses } from "./BilanCourses";
 import { AVerifier } from "./AVerifier";
 import { DerniereDemande } from "./DerniereDemande";
@@ -21,13 +23,14 @@ const DEPART_VISIBLE_MS = 6 * 60 * 60 * 1000;
  * de course : « Je pars faire les courses » prévient seulement la famille.
  */
 export async function CoursesScreen({ me, notifications }: { me: Profile; notifications?: React.ReactNode }) {
-  const [{ trip }, profiles, appris, derniere, recipes, choisi] = await Promise.all([
+  const [{ trip }, profiles, appris, derniere, recipes, choisi, famille] = await Promise.all([
     synchroniserMenu(me.family_id),
     getProfiles(me.family_id),
     getAppris(me.family_id),
     getDerniereCourse(me.family_id),
     getRecipes(me.family_id),
     getCeSoirChoisi(me.family_id),
+    getFamily(me.family_id),
   ]);
   const prep = await aPreparer(me.family_id, trip);
   const titres = new Map(recipes.map((r) => [r.id, r.title]));
@@ -81,6 +84,9 @@ export async function CoursesScreen({ me, notifications }: { me: Profile; notifi
       />
 
       <ShoppingList tripId={trip.id} items={trip.shopping_list_items} requests={[]} appris={appris} />
+
+      {famille && <InstallerKaddie code={famille.join_code} />}
+      <NoterEtape etape="liste_ouverte" />
     </>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { listeDeNoms, phraseEnvie } from "./convives";
+import { listeDeNoms, nomDeFamille, phraseEnvie } from "./convives";
 
 describe("listeDeNoms", () => {
   it("liste les prénoms, « Toi » en premier", () => {
@@ -17,5 +17,15 @@ describe("phraseEnvie", () => {
     expect(phraseEnvie(["Karin"], "Madji")).toBe("Karin en a envie");
     expect(phraseEnvie(["Karin", "Léo"], "Madji")).toBe("Karin et Léo en ont envie");
     expect(phraseEnvie([], "Madji")).toBe("");
+  });
+});
+
+describe("nomDeFamille", () => {
+  it("élide devant une voyelle ou un h", () => {
+    expect(nomDeFamille("Madji")).toBe("Famille de Madji");
+    expect(nomDeFamille("Anne")).toBe("Famille d'Anne");
+    expect(nomDeFamille("Élodie")).toBe("Famille d'Élodie");
+    expect(nomDeFamille("Hugo")).toBe("Famille d'Hugo");
+    expect(nomDeFamille("yasmine")).toBe("Famille d'yasmine");
   });
 });

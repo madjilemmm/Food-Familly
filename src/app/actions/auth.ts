@@ -8,10 +8,13 @@ import { getProfile } from "@/lib/data";
 import { requireFamily, requireUser, setSession } from "@/lib/auth";
 import { SESSION_COOKIE, newSession, type Style } from "@/lib/session";
 import { STARTER_RECIPES } from "@/lib/starter-recipes";
+import { noterEtape } from "@/lib/etapes";
 import { DETAILS_DE_DEPART } from "@/lib/starter-etapes";
 import { BUCKET_PHOTOS, cheminDansLeStockage } from "@/lib/photos";
 import { annulerInvitations, familleInvitee, jetonDe, noterEssaiRate, tropDEssais } from "@/lib/acces";
 import { normalizeName } from "@/lib/domain/shopping-list";
+import { foyerValide } from "@/lib/domain/foyer";
+import { nomDeFamille } from "@/lib/domain/convives";
 import { cleanText, changed } from "./_shared";
 
 const CODE_WORDS = [
@@ -99,6 +102,7 @@ export async function rejoindreAvecPrenom(jeton: string, _prev: { error?: string
     profileId = data.id as string;
   }
   await setSession(newSession(famille.id, profileId, style));
+  await noterEtape("invite_arrive");
   changed();
   redirect("/menu");
 }
@@ -110,7 +114,9 @@ export async function rejoindreAvecPrenom(jeton: string, _prev: { error?: string
 export async function createFamily(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
   const prenom = cleanText(formData.get("prenom"), 40);
   if (!prenom) return { error: "Indique ton prénom." };
-  const familyName = cleanText(formData.get("family_name"), 60) || `Famille de ${prenom}`;
+  const familyName = cleanText(formData.get("family_name"), 60) || nomDeFamille(prenom);
+  // Combien à table (1 à 5+) : de quoi calibrer la première liste.
+  const foyer = foyerValide(formData.get("foyer"), 6);
 
   // Code unique (on réessaie en cas de collision, très improbable).
   let familyId: string | null = null;
@@ -136,6 +142,9 @@ export async function createFamily(_prev: { error?: string }, formData: FormData
     return { error: "La création a échoué. Réessayez." };
   }
   await addStarterRecipes(familyId);
+  // Base pas encore migrée : la colonne n'existe pas, le foyer se corrige alors depuis « Ce soir ».
+  if (foyer) await db().from("families").update({ foyer }).eq("id", familyId);
+  await noterEtape("famille_creee");
 
   await setSession(newSession(familyId, me.id as string, style));
   // Directement la réponse du soir : la question d'allergie se pose là, en un appui.

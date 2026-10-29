@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/",
     name: "Kaddie — Courses et repas en famille",
     short_name: "Kaddie",
-    description: "Les courses et les repas de la famille, sans prise de tête.",
+    description: "On mange quoi ce soir ? Décidez à plusieurs, Kaddie remplit le caddie.",
     lang: "fr",
     start_url: "/",
     scope: "/",

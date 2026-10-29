@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useErreurReseau } from "@/components/ErreurReseau";
 import { Spinner } from "@/components/Spinner";
 
-export type Commande = "ceSeraCa" | "autreIdee" | "changer" | "allergie";
+export type Commande = "ceSeraCa" | "autreIdee" | "changer" | "allergie" | "foyer";
 
 /**
  * Un bouton de « Ce soir » : il envoie sa commande (/api/ce-soir), attend la réponse, puis recharge l'écran.
@@ -14,12 +14,16 @@ export type Commande = "ceSeraCa" | "autreIdee" | "changer" | "allergie";
 export function BoutonCommande({
   commande,
   recipeId,
+  n,
   className,
   pendingLabel = "…",
   children,
+  ...aria
 }: {
   commande: Commande;
   recipeId?: string;
+  n?: number;
+  "aria-label"?: string;
   className?: string;
   pendingLabel?: string;
   children: React.ReactNode;
@@ -29,16 +33,18 @@ export function BoutonCommande({
   const [rechargement, recharger] = useTransition();
   const { essayer, alerte } = useErreurReseau();
   const occupe = envoi || rechargement;
+
   return (
     <>
       <button
         type="button"
         disabled={occupe}
         className={className}
+        {...aria}
         onClick={async () => {
           setEnvoi(true);
           const ok = await essayer(async () => {
-            const r = await fetch("/api/ce-soir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commande, recipeId }) });
+            const r = await fetch("/api/ce-soir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commande, recipeId, n }) });
             if (!r.ok) throw new Error(String(r.status));
           });
           setEnvoi(false);

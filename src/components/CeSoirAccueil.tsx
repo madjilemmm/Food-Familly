@@ -7,6 +7,7 @@ import {
   getDeck,
   getFamilyEnvies,
   getFamilySwipes,
+  getFoyer,
   getPasCeSoir,
   getProfiles,
   getRecipe,
@@ -21,6 +22,7 @@ import { contientPhrase } from "@/lib/domain/foods";
 import { phraseEnvie } from "@/lib/domain/convives";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import { BoutonCommande } from "@/components/BoutonCommande";
+import { PartagerRepas } from "@/components/PartagerRepas";
 import { Logo } from "@/design-system/components/Kaddie";
 import {
   IconeAutre,
@@ -108,6 +110,12 @@ export async function CeSoirAccueil({
     // Sans étapes (recette à peine saisie), « Je cuisine » n'a rien à ouvrir : la fiche de la recette suffit.
     const detail = await getRecipe(me.family_id, retenu.id);
     const cuisinable = (detail?.steps?.length ?? 0) > 0;
+    // Le prochain pas utile : acheter tant que la liste n'est pas faite, puis cuisiner.
+    const resteAAcheter = ingredients.some((l) => !l.checked);
+    const listeDabord = !achete && resteAAcheter;
+    const jeChoisis = !choisi?.choisiPar || choisi.choisiPar === me.id;
+    const lienRecette = `/recettes/${retenu.id}?depuis=/menu${cuisinable ? "&cuisine=1" : ""}`;
+    const libelleRecette = cuisinable ? "Je cuisine" : "Voir la recette";
     const node = (
       <section
         className="kd-monte flex min-h-0 flex-1 flex-col"
@@ -123,6 +131,13 @@ export async function CeSoirAccueil({
               <span>
                 choisi par <strong className="text-encre">{parQui}</strong>
               </span>
+            )}
+            {jeChoisis && (
+              <PartagerRepas
+                titre={retenu.title}
+                articles={ingredients.length}
+                photo={retenu.photo_url}
+              />
             )}
           </p>
           <h2 className="kd-titre-2 mt-1.5 text-aubergine">{retenu.title}</h2>
@@ -156,17 +171,30 @@ export async function CeSoirAccueil({
         </div>
         <div className="soir-bas">
           <Link
-            href={`/recettes/${retenu.id}?depuis=/menu${cuisinable ? "&cuisine=1" : ""}`}
+            href={listeDabord ? "/courses" : lienRecette}
             className="kd-btn kd-btn--large w-full"
           >
-            {cuisinable ? "Je cuisine" : "Voir la recette"}
+            {listeDabord ? "Voir la liste de courses" : libelleRecette}
           </Link>
-          <BoutonCommande
-            commande="changer"
-            className="flex min-h-11 items-center gap-2 self-center px-4 font-semibold text-violet"
-          >
-            Changer de plat
-          </BoutonCommande>
+          <div className="flex items-center justify-center">
+            {listeDabord && jeChoisis && (
+              <>
+                <Link
+                  href={lienRecette}
+                  className="flex min-h-11 items-center px-3 font-semibold text-violet"
+                >
+                  {libelleRecette}
+                </Link>
+                <span aria-hidden className="size-1 rounded-full bg-trait" />
+              </>
+            )}
+            <BoutonCommande
+              commande="changer"
+              className="flex min-h-11 items-center gap-2 px-3 font-semibold text-violet"
+            >
+              Changer de plat
+            </BoutonCommande>
+          </div>
         </div>
       </section>
     );
@@ -237,6 +265,10 @@ export async function CeSoirAccueil({
             ? "Tu l'avais aimé"
             : "Une idée de Kaddie";
   const contient = contientPhrase(ctx.texts.get(plat.id) ?? [plat.title]);
+  // Le nombre de personnes à table : celui de la course, sinon le foyer dit à la création, sinon la famille.
+  const pour =
+    trip.people ??
+    Math.max((await getFoyer(me.family_id)) ?? 1, profiles.length);
   const [avecIngredients] = await getRecipesWithIngredients(me.family_id, [
     plat.id,
   ]);
@@ -283,11 +315,25 @@ export async function CeSoirAccueil({
             .join(" · ")}
         </p>
         {noms2.length > 0 && (
-          <p className="soir-ligne mt-3 flex min-h-14 items-center gap-3 border-t-2 border-trait text-petit font-medium">
+          <div className="soir-ligne mt-3 flex min-h-14 items-center gap-3 border-t-2 border-trait text-petit font-medium">
             <IconePanier className="size-6 shrink-0 text-aubergine" />
-            {noms2.length} article{noms2.length > 1 ? "s" : ""}{" "}
-            {plat.origine === "menu" ? "déjà dans le caddie" : noms2.length > 1 ? "iront dans le caddie" : "ira dans le caddie"}
-          </p>
+            <span className="flex-1">
+              {noms2.length} article{noms2.length > 1 ? "s" : ""}{" "}
+              {plat.origine === "menu"
+                ? "déjà dans le caddie"
+                : noms2.length > 1
+                  ? "iront dans le caddie"
+                  : "ira dans le caddie"}
+            </span>
+            <BoutonCommande
+              commande="foyer"
+              n={pour >= 6 ? 1 : pour + 1}
+              aria-label={`pour ${pour}, changer le nombre de personnes à table`}
+              className="flex min-h-11 shrink-0 items-center px-1 font-semibold text-violet underline decoration-dotted underline-offset-4"
+            >
+              pour {pour}
+            </BoutonCommande>
+          </div>
         )}
       </div>
       <div className="soir-bas">
@@ -335,7 +381,12 @@ function QuestionAllergie() {
       className="soir-question mt-3 flex flex-wrap items-center gap-3 border-t-2 border-trait pt-3.5"
     >
       <p className="basis-full text-petit font-medium">
-        <span className="soir-q-long">Une allergie ou un régime à signaler ?</span><span className="soir-q-court" aria-hidden="true">Allergie ou régime ?</span>
+        <span className="soir-q-long">
+          Une allergie ou un régime à signaler ?
+        </span>
+        <span className="soir-q-court" aria-hidden="true">
+          Allergie ou régime ?
+        </span>
       </p>
       <BoutonCommande
         commande="allergie"

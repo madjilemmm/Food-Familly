@@ -11,7 +11,7 @@ const rubik = Rubik({ subsets: ["latin"], weight: ["400", "500", "600"], variabl
 
 export const metadata: Metadata = {
   title: "Kaddie",
-  description: "Les courses de la famille, en un swipe.",
+  description: "On mange quoi ce soir ? Décidez à plusieurs, Kaddie remplit le caddie.",
   applicationName: "Kaddie",
   appleWebApp: {
     capable: true,

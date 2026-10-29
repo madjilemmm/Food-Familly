@@ -10,9 +10,9 @@ export default function CreateFamilyPage() {
       <Link href="/bienvenue" className="-ml-2 inline-flex min-h-14 items-center gap-1 font-semibold text-violet">
         <IconeRetour className="size-6" /> Retour
       </Link>
-      <h1 className="kd-titre-1 mt-2 text-aubergine">Créer ma famille</h1>
+      <h1 className="kd-titre-1 mt-2 text-aubergine">Presque prêt</h1>
       <p className="mt-3 mb-6 text-encre-douce">
-        Tu commences seul·e : swipe des plats, fais ta liste. Ta famille te rejoint quand elle veut.
+        Un prénom, le nombre de personnes : Kaddie adapte les quantités. Ta famille te rejoint quand tu veux.
       </p>
       <CreateFamilyForm />
     </main>

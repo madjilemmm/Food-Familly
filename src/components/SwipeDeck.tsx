@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { swipe, undoSwipe, type SwipeAvant } from "@/app/actions/swipes";
 import { lireAttente, mettreEnAttente, retirerDeLAttente } from "@/lib/attente";
 import { estErreurReseau } from "@/lib/reseau";
-import { useAnnuler } from "@/components/Annuler";
+import { BandeauAnnuler, useProposition } from "@/components/Annuler";
 import { Bouton, CarteRecette, Logo, Scene } from "@/design-system/components/Kaddie";
 import type { Recipe } from "@/lib/data";
 import { listeDeNoms } from "@/lib/domain/convives";
@@ -26,7 +26,22 @@ import { RecipeVisual } from "./RecipeVisual";
 /** « contient » : les allergènes courants, dits comme sur « Ce soir » (« Contient du lait »). */
 type CarteDuPaquet = Recipe & { hier?: boolean; voix?: string; voixNb?: number; contient?: string | null };
 
-export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: CarteDuPaquet[]; toutCache?: boolean }) {
+/** Les trois premiers choix expliquent « Miam » : l'utilisateur sait à quoi ses envies servent. */
+const PREMIERS_CHOIX = 3;
+
+export function SwipeDeck({
+  initialDeck,
+  toutCache = false,
+  dejaSwipes = PREMIERS_CHOIX,
+  ensuite,
+}: {
+  initialDeck: CarteDuPaquet[];
+  toutCache?: boolean;
+  /** Combien de plats cette personne a déjà swipés (avant d'ouvrir l'écran). */
+  dejaSwipes?: number;
+  /** Ce qui remplace la légende des premiers choix, une fois ceux-ci faits. */
+  ensuite?: React.ReactNode;
+}) {
   // L'état local n'est pas réinitialisé par les rafraîchissements de la page :
   // le paquet reste stable pendant qu'on swipe.
   const [deck, setDeck] = useState(initialDeck);
@@ -46,20 +61,23 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
   useEffect(() => setMonte(true), []);
   const top = deck[0];
 
-  const proposer = useAnnuler();
+  // « Annuler » est posé en haut de la pile : il ne recouvre ni Bof ni Miam, ni le nom du plat suivant.
+  const { p: proposition, proposer, effacer } = useProposition();
+  const [faits, setFaits] = useState(0);
   // Lecteur d'écran : la carte suivante est annoncée, comme on la verrait arriver.
   const [annonce, setAnnonce] = useState("");
   function decide(liked: boolean) {
     if (!top) return;
     const carte = top;
     setDeck((d) => d.slice(1));
+    setFaits((n) => n + 1);
     setAnnonce(deck[1] ? `Plat suivant : ${deck[1].title}` : "Plus de plats pour l'instant");
-    const envoi: Promise<{ avant: SwipeAvant; auMenu: boolean } | "attente" | null> = swipe(carte.id, liked)
+    const envoi: Promise<{ avant: SwipeAvant; auMenu: boolean; articles: number } | "attente" | null> = swipe(carte.id, liked)
       .then((res) => {
         setError(null);
         if (res.match) setMatch({ recipe: carte, avec: res.avec, auMenu: res.auMenu, ingredients: res.ingredients });
         // « Annuler » ne sort du Menu qu'un plat que ce swipe vient d'y faire entrer.
-        return { avant: res.avant, auMenu: res.auMenu && res.entre };
+        return { avant: res.avant, auMenu: res.auMenu && res.entre, articles: res.auMenu ? res.ingredients : 0 };
       })
       .catch((e) => {
         if (!estErreurReseau(e)) {
@@ -71,9 +89,10 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
         return "attente" as const;
       });
     // Un doigt qui glisse trop vite : la carte revient, et le swipe redevient ce qu'il était.
-    proposer(`${liked ? "Miam" : "Bof"} : ${carte.title}`, () => {
+    const annuler = () => {
       setMatch((m) => (m?.recipe.id === carte.id ? null : m));
       setDeck((d) => [carte, ...d.filter((r) => r.id !== carte.id)]);
+      setFaits((n) => Math.max(0, n - 1));
       envoi.then((res) => {
         if (res !== "attente") return undoSwipe(carte.id, res?.avant ?? null, res?.auMenu ?? false).catch(() => {});
         // Gardé hors connexion : s'il n'est pas encore parti, il suffit de l'oublier.
@@ -81,6 +100,13 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
         if (enFile && !enFile.envoyee) retirerDeLAttente([enFile.cle]);
         else return undoSwipe(carte.id, null).catch(() => {});
       });
+    };
+    if (!liked) return proposer(`Bof : ${carte.title}`, annuler);
+    // Un « Miam » dit ce qu'il a fait : attendre la réponse, pour annoncer les articles arrivés dans le caddie.
+    void envoi.then((res) => {
+      if (res === null) return;
+      const articles = res === "attente" ? 0 : res.articles;
+      proposer(`Miam : ${carte.title}`, annuler, articles > 0 ? `${articles} article${articles > 1 ? "s" : ""} dans le caddie` : undefined);
     });
   }
 
@@ -99,8 +125,19 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  // Les trois premiers choix : une phrase dit à quoi sert « Miam ». Ensuite, ce que la page y met d'habitude.
+  const premiers = dejaSwipes + faits < PREMIERS_CHOIX && deck.length > 0;
+  const entete = premiers ? (
+    <p className="kd-petit">
+      <strong className="font-semibold text-encre">Miam</strong>&nbsp;: je le mangerais. Kaddie apprend et vous propose pour ce soir.
+    </p>
+  ) : (
+    ensuite
+  );
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col gap-5">
+      {entete && <div className="-mb-2">{entete}</div>}
       {/* Jamais moins de 12rem, même sur iPhone SE : la page défile alors un peu. */}
       <div ref={pileRef} className="relative mx-auto min-h-[12rem] w-full flex-1 sm:max-h-[36rem] sm:max-w-sm">
         {deck.length === 0 ? (
@@ -122,6 +159,9 @@ export function SwipeDeck({ initialDeck, toutCache = false }: { initialDeck: Car
               .reverse()}
           </AnimatePresence>
         )}
+        <div aria-live="polite" className="pointer-events-none absolute inset-x-3 top-3 z-50">
+          <AnimatePresence>{proposition && <BandeauAnnuler key={proposition.id} p={proposition} effacer={effacer} />}</AnimatePresence>
+        </div>
       </div>
 
       {deck.length > 0 && (
@@ -192,7 +232,7 @@ function Carte({
         infos={
           recipe.hier
             ? "C'était bon ? Miam : on le refait"
-            : [recipe.voix && `${recipe.voix} en a envie`, recipe.total_minutes && `${recipe.total_minutes} min`, recipe.contient, !recipe.voix && !recipe.contient && recipe.source_url && "Recette Marmiton"]
+            : [recipe.voix && `${recipe.voix} ${recipe.voixNb && recipe.voixNb > 1 ? "en ont" : "en a"} envie`, recipe.total_minutes && `${recipe.total_minutes} min`, recipe.contient, !recipe.voix && !recipe.contient && recipe.source_url && "Recette Marmiton"]
                 .filter(Boolean)
                 .join(" · ") || undefined
         }

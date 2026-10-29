@@ -1,12 +1,29 @@
+import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Logo, Scene } from "@/design-system/components/Kaddie";
 import { getSession } from "@/lib/auth";
 import { familleInvitee } from "@/lib/acces";
+import { apercuInvitation } from "@/lib/apercu";
+import { texteApercu, titreApercu } from "@/lib/domain/apercu";
+import { origineDuSite } from "@/lib/origine";
 import { rejoindreAvecPrenom } from "@/app/actions/auth";
 import { Rejoindre } from "./Rejoindre";
 
-export const metadata = { title: "Invitation — Kaddie" };
+/** Ce que montre le lien dans le groupe de la famille, avant même de l'ouvrir : le plat de ce soir, ou qui invite. */
+export async function generateMetadata({ params }: { params: Promise<{ jeton: string }> }): Promise<Metadata> {
+  const [{ jeton }, h] = await Promise.all([params, headers()]);
+  const apercu = await apercuInvitation(jeton);
+  const titre = titreApercu(apercu);
+  const texte = texteApercu(apercu);
+  // L'image d'aperçu est donnée en chemin relatif : elle se résout sur le site qui sert le lien.
+  let metadataBase: URL | undefined;
+  try {
+    metadataBase = new URL(origineDuSite(h));
+  } catch {}
+  return { metadataBase, title: apercu ? `${titre} — Kaddie` : "Invitation — Kaddie", description: texte, openGraph: { title: titre, description: texte, siteName: "Kaddie", locale: "fr_FR" } };
+}
 export const dynamic = "force-dynamic";
 
 /**
@@ -30,7 +47,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ jet
         <Logo width={240} />
         {famille ? (
           <>
-            <p className="kd-etiquette text-blanc">Tu es invité·e</p>
+            <p className="kd-etiquette text-blanc">{famille.par ? `${famille.par} t'invite` : "Tu es invité·e"}</p>
             <h1 className="kd-titre-1">{famille.name}</h1>
             <p>Dis-nous ton prénom : tu vois tout de suite ce qu&apos;on mange ce soir.</p>
           </>

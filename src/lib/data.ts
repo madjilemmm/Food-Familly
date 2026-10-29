@@ -134,6 +134,21 @@ export const getFamily = cache(async function getFamily(familyId: string): Promi
   return check(await db().from("families").select("id, name, join_code, strict_dislikes").eq("id", familyId).maybeSingle());
 });
 
+/** Combien de plats cette personne a swipés : « Miam » s'explique pendant les premiers choix. */
+export const getMesSwipes = cache(async function getMesSwipes(familyId: string, profileId: string): Promise<number> {
+  return compterSwipes(await getFamilySwipes(familyId), profileId);
+});
+
+/** Le nombre de plats swipés par un membre, dans les avis de la famille. */
+const compterSwipes = (avis: Map<string, Map<string, Avis>>, profileId: string) => [...avis.values()].filter((parMembre) => parMembre.has(profileId)).length;
+
+/** Le nombre de personnes à table d'habitude ; null s'il n'a pas été dit (ou base pas encore migrée). */
+export const getFoyer = cache(async function getFoyer(familyId: string): Promise<number | null> {
+  const { data, error } = await db().from("families").select("foyer").eq("id", familyId).maybeSingle();
+  const n = error ? null : (data?.foyer as number | null | undefined);
+  return typeof n === "number" && n > 0 ? n : null;
+});
+
 export const getProfiles = cache(async function getProfiles(familyId: string): Promise<Profile[]> {
   return check(
     await db().from("profiles").select(PROFILE_FIELDS).eq("family_id", familyId).order("sort_order").order("created_at"),
@@ -522,7 +537,7 @@ export async function getDeck(
   // (jamais un plat qu'un autre membre n'aime pas).
   const noms = new Map(profiles.map((p) => [p.id, p.name]));
   // Un nouveau membre voit d'abord ce dont la famille a déjà envie : son premier « Miam » fait un match.
-  const mesSwipes = [...avis.values()].filter((parMembre) => parMembre.has(profileId)).length;
+  const mesSwipes = compterSwipes(avis, profileId);
   const nouveau = autres.length > 0 && mesSwipes < REGLAGES.NOUVEAU_SWIPES;
   const { paquet: avance, voix } = avancerLesVoixManquantes(ordonne, envies, profileId, (id) => conflicts.get(id)?.verdict === "fin", { nouveau });
   const paquet = avance.map((r) => {

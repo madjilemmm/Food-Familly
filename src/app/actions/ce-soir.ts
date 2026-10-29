@@ -5,7 +5,8 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
 import { CE_SOIR_COOKIE, PAS_CE_SOIR_JOURS } from "@/lib/domain/ce-soir";
 import { jourAParis } from "@/lib/domain/heure";
-import { choisirPlat } from "@/lib/menu";
+import { changerFoyer, choisirPlat } from "@/lib/menu";
+import { noterEtape } from "@/lib/etapes";
 import { changed } from "./_shared";
 import { skipTastes } from "./tastes";
 
@@ -41,10 +42,13 @@ export async function ceSeraCa(recipeId: string) {
   const { data: recette } = await db().from("recipes").select("id").eq("id", recipeId).eq("family_id", user.familyId).maybeSingle();
   if (!recette) return;
   await choisirPlat(user.familyId, recipeId, true);
+  const { count: dejaChoisi } = await db().from("ce_soir_choix").select("jour", { count: "exact", head: true }).eq("family_id", user.familyId);
   const { error } = await db()
     .from("ce_soir_choix")
     .upsert({ family_id: user.familyId, jour: jourAParis(), recipe_id: recipeId, choisi_par: user.profileId, choisi_le: new Date().toISOString() }, { onConflict: "family_id,jour" });
   if (error) (await cookies()).set(CE_SOIR_COOKIE, `${jourAParis()}:${recipeId}:${user.profileId}`, { path: "/", maxAge: 86_400, httpOnly: true, sameSite: "lax" });
+  // Le tout premier choix de la famille : une étape du début à compter.
+  if (!error && dejaChoisi === 0) await noterEtape("premier_choix");
   changed();
 }
 
@@ -59,4 +63,11 @@ export async function changerCeSoir() {
 /** « Non » : pas d'allergie ni de régime à signaler. On ne redemande pas. */
 export async function aucuneAllergie() {
   await skipTastes();
+}
+
+/** « pour 4 » : le nombre de personnes à table, pour la famille. */
+export async function pourCombien(n: number) {
+  const user = await requireUser();
+  await changerFoyer(user.familyId, Number(n));
+  changed();
 }

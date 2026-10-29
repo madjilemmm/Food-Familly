@@ -2,7 +2,7 @@ import Link from "next/link";
 import { after } from "next/server";
 import { requireProfile, requireUser } from "@/lib/auth";
 import { remplirSiBesoin } from "@/lib/marmiton";
-import { getCurrentTrip, getDeck, getProfiles, getRecipes, getTasteContext } from "@/lib/data";
+import { getCurrentTrip, getDeck, getMesSwipes, getProfiles, getRecipes, getTasteContext } from "@/lib/data";
 import { momentDe } from "@/lib/domain/reco";
 import { contientPhrase } from "@/lib/domain/foods";
 import { SwipeDeck } from "@/components/SwipeDeck";
@@ -21,11 +21,12 @@ export default async function Envies({ searchParams }: { searchParams: Promise<{
   const maintenant = new Date();
   const moment = (await searchParams).tout === "1" ? null : momentDe(maintenant);
   // Profil, paquet, course en cours et membres : tout part en même temps.
-  const [me, deck, trip, members] = await Promise.all([
+  const [me, deck, trip, members, mesSwipes] = await Promise.all([
     requireProfile(),
     getDeck(user.familyId, user.profileId, moment),
     getCurrentTrip(user.familyId),
     getProfiles(user.familyId),
+    getMesSwipes(user.familyId, user.profileId),
   ]);
   // « Je pars faire les courses » : une dernière envie peut encore partir sur la liste.
   const enCourse = trip?.created_by && Date.now() - Date.parse(trip.departs_at) < EN_COURSE_MS ? trip.created_by : null;
@@ -66,15 +67,21 @@ export default async function Envies({ searchParams }: { searchParams: Promise<{
       )}
       {!bandeauCourse && members.length === 1 && <CarteInviter />}
       {!bandeauCourse && members.length > 1 && !me.tastes_done_at && <CarteGouts retour="/envies" />}
-      {moment === "rapide" && (
-        <p className="kd-petit mb-3">
-          {jourDe(maintenant).replace(/^./, (c) => c.toUpperCase())} soir : les plats rapides d&apos;abord.{" "}
-          <Link href="/envies?tout=1" className="font-semibold text-violet underline underline-offset-4">
-            Tout voir
-          </Link>
-        </p>
-      )}
-      <SwipeDeck initialDeck={deck.map((r) => ({ ...r, contient: contientPhrase(gouts.texts.get(r.id) ?? [r.title]) }))} toutCache={toutCache} />
+      <SwipeDeck
+        initialDeck={deck.map((r) => ({ ...r, contient: contientPhrase(gouts.texts.get(r.id) ?? [r.title]) }))}
+        toutCache={toutCache}
+        dejaSwipes={mesSwipes}
+        ensuite={
+          moment === "rapide" && (
+            <p className="kd-petit">
+              {jourDe(maintenant).replace(/^./, (c) => c.toUpperCase())} soir : les plats rapides d&apos;abord.{" "}
+              <Link href="/envies?tout=1" className="font-semibold text-violet underline underline-offset-4">
+                Tout voir
+              </Link>
+            </p>
+          )
+        }
+      />
     </div>
   );
 }

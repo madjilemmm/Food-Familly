@@ -20,6 +20,8 @@ export async function middleware(req: NextRequest) {
   if (pathname === "/api/version") return NextResponse.next();
   // Relances « plus que 10 min », appelées par Supabase sans session.
   if (pathname === "/api/cron/relance") return NextResponse.next();
+  // Compteur d'étapes anonyme : l'accueil le sollicite avant toute connexion.
+  if (pathname === "/api/etape") return NextResponse.next();
   if (OUVERTES(pathname)) return NextResponse.next();
   const isApi = pathname.startsWith("/api/");
   const session = await decodeAnySession(req.cookies.get(SESSION_COOKIE)?.value);

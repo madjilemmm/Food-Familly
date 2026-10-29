@@ -77,17 +77,23 @@ export async function invitationAPartager(familyId: string, profileId: string): 
   return refus ? null : invitation;
 }
 
-/** La famille d'un lien encore valable ; null s'il a expiré, été annulé ou n'existe pas. */
-export async function familleInvitee(jeton: string): Promise<{ id: string; name: string } | null> {
+/** La famille d'un lien encore valable, et le prénom de qui invite ; null s'il a expiré, été annulé ou n'existe pas. */
+export async function familleInvitee(jeton: string): Promise<{ id: string; name: string; par: string | null } | null> {
   if (!JETON.test(jeton)) return null;
   const { data } = await db()
     .from("invitations")
-    .select("families(id, name)")
+    .select("created_by, families(id, name)")
     .eq("jeton", jeton)
     .gt("expires_at", new Date().toISOString())
     .maybeSingle();
-  const famille = (data as { families: { id: string; name: string } | null } | null)?.families;
-  return famille ?? null;
+  const ligne = data as { created_by: string | null; families: { id: string; name: string } | null } | null;
+  if (!ligne?.families) return null;
+  let par: string | null = null;
+  if (ligne.created_by) {
+    const { data: membre } = await db().from("profiles").select("name").eq("id", ligne.created_by).maybeSingle();
+    par = (membre?.name as string | undefined) ?? null;
+  }
+  return { ...ligne.families, par };
 }
 
 /** Changer le code annule aussi les liens déjà envoyés. */

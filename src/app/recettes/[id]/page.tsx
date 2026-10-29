@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfile, requireUser } from "@/lib/auth";
-import { getCurrentTrip, getFamilyEnvies, getFamilySwipes, getProfiles, getRecipe, getRepasAchetes, type RecipeWithIngredients } from "@/lib/data";
+import { getCurrentTrip, getFamilyEnvies, getFamilySwipes, getFoyer, getProfiles, getRecipe, getRepasAchetes, type RecipeWithIngredients } from "@/lib/data";
 import { db } from "@/lib/supabase/server";
 import { extractRecipe } from "@/lib/domain/recipe-import";
 import { safeFetch } from "@/lib/safe-fetch";
@@ -57,7 +57,7 @@ export default async function RecipePage({
   // Acheté aux dernières courses : on le cuisine pour celles et ceux qui le mangent.
   const achete = repas?.plats.find((p) => p.id === id && !p.fait);
   const recipe = await completer(found);
-  const people = achete?.mangeurs.length || trip?.people || Math.max(1, members.length);
+  const people = achete?.mangeurs.length || trip?.people || Math.max((await getFoyer(user.familyId)) ?? 1, members.length);
   const monAvis = swipes.get(id)?.get(user.profileId);
   const etat: EtatAvis = envies.get(id)?.includes(user.profileId) ? "envie" : monAvis?.likedAt != null ? "aime" : monAvis ? "refuse" : null;
   const infos = [recipe.total_minutes && duree(recipe.total_minutes), recipe.servings && `prévue pour ${recipe.servings}`].filter(Boolean);

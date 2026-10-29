@@ -29,7 +29,7 @@ Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres,
 
 | Règle | Détail |
 |---|---|
-| Familles | Au premier lancement : **« Créer ma famille »** (nom et prénoms des membres) ou **« J'ai un code famille »**. Chaque famille a ses propres membres, recettes, matchs et listes, invisibles des autres. Une nouvelle famille reçoit 10 recettes de départ. |
+| Familles | Au premier lancement : **« Commencer »** (un prénom et combien vous êtes à table : Kaddie propose tout de suite un repas) ou **« J'ai déjà un code »**. Chaque famille a ses propres membres, recettes, matchs et listes, invisibles des autres. Une nouvelle famille reçoit 10 recettes de départ. |
 | Connexion | Le code famille est saisi une seule fois, puis on choisit son prénom (ou « Je ne suis pas dans la liste »). C'est retenu sur le téléphone pendant plus d'un an. |
 | Qui fait les courses | N'importe quel membre. Une seule course à la fois par famille : les autres voient « X part dans… » et lui envoient leurs demandes. Tout le monde peut consulter et compléter la liste. |
 | Départ en courses | Choix : 30 min, 1 h, 2 h ou « ce soir, 18 h ». Ce dernier choix disparaît après 17 h. |
@@ -80,7 +80,13 @@ Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres,
    [`supabase/migrations/20261019000004_a_table.sql`](supabase/migrations/20261019000004_a_table.sql)
    (« À table ! » : l'appel et les réponses), puis
    [`supabase/migrations/20261022000001_voix_et_ce_soir.sql`](supabase/migrations/20261022000001_voix_et_ce_soir.sql)
-   (« Ta voix fait le match » et « Autre idée » dans Ce soir).
+   (« Ta voix fait le match » et « Autre idée » dans Ce soir), puis
+   [`supabase/migrations/20261028000001_ce_soir_choisi.sql`](supabase/migrations/20261028000001_ce_soir_choisi.sql)
+   (« Ce sera ça » : le plat retenu pour ce soir), puis
+   [`supabase/migrations/20261028000002_recettes_de_depart.sql`](supabase/migrations/20261028000002_recettes_de_depart.sql)
+   (durée et étapes des 10 recettes de départ, pour les familles créées avant), puis
+   [`supabase/migrations/20261029000001_premiere_experience.sql`](supabase/migrations/20261029000001_premiere_experience.sql)
+   (le nombre de personnes à table, et des compteurs d'étapes anonymes pour voir où l'on s'arrête : voir plus bas).
    Chaque fichier se lance dans cet ordre ; on peut les relancer sans risque.
 
    Pas besoin de données de départ : on crée sa famille directement dans l'appli. (Le fichier facultatif
@@ -185,13 +191,13 @@ Il faut **iOS 16.4 ou plus récent** (Réglages → Général → Informations �
 À faire sur **chaque** iPhone de la famille :
 
 1. Ouvrez l'adresse Vercel dans **Safari** (pas Chrome : seul Safari permet l'installation sur iPhone).
-2. Touchez le bouton **Partager** (le carré avec une flèche vers le haut ⬆︎).
-3. Faites défiler et touchez **« Sur l'écran d'accueil »**, puis **Ajouter**.
-4. **Fermez Safari** et ouvrez l'appli **depuis sa nouvelle icône** 🍽️ sur l'écran d'accueil.
-5. La première personne touche **« Créer ma famille »** et ajoute tous les membres. Elle obtient un **code famille** (exemple : `paella-6024-lasagne`) à partager avec le bouton 📤.
-   Les autres touchent **« J'ai un code famille »**, saisissent ce code puis leur prénom.
-6. Touchez le bouton **« Activer les notifications »**, puis **Autoriser**.
-7. Pour vérifier : ⚙️ (en haut à droite) → **Tester**. Une notification doit arriver.
+2. Touchez **« Commencer »**, donnez votre prénom et combien vous êtes à table : Kaddie propose un repas pour ce soir, et son caddie se remplit.
+   Sur l'écran **Ce soir**, le bouton de partage envoie à la famille un message prêt (le plat, la liste déjà faite) avec un lien d'invitation : chacun donne son prénom, sans code.
+3. Sur l'écran **Caddie**, la carte « Garde Kaddie sur ton écran d'accueil » donne les trois gestes et **le code de la famille** (exemple : `paella-6024-lasagne`).
+   Touchez le bouton **Partager** (le carré avec une flèche vers le haut ⬆︎), puis **« Sur l'écran d'accueil »**, puis **Ajouter**.
+4. **Fermez Safari** et ouvrez l'appli **depuis sa nouvelle icône** 🍽️. Touchez **« J'ai déjà un code »**, tapez le code (une seule fois), puis choisissez votre prénom.
+5. Touchez la cloche 🔔 de l'écran Caddie (**« Activer les notifs »**), puis **Autoriser**.
+6. Pour vérifier : ⚙️ (en haut à droite) → **Tester**. Une notification doit arriver.
 
 Points importants sur iPhone :
 
@@ -285,6 +291,9 @@ supabase/
 
 - `families` : chaque famille et son code pour la rejoindre
 - `families.strict_dislikes` : le mode strict des goûts (vrai par défaut)
+- `families.foyer` : le nombre de personnes à table d'habitude (de 1 à 12), demandé à la création ; les quantités de la liste en partent
+- `ce_soir_choix` : le plat retenu pour ce soir, un par famille et par jour
+- `parcours_etapes` : des compteurs anonymes de l'entrée dans l'appli (voir « Mesurer le début »), sans identifiant ni famille
 - `profiles` : les membres d'une famille, avec les dates du questionnaire de goûts (`tastes_seen_at`, `tastes_done_at`)
 - `profile_tastes` : les goûts de chacun (`food` = clé de `src/lib/domain/foods.ts` ou `autre:…`, `level` = `interdit` / `pas_fan` / `adore`)
 - `recipes`, `recipe_ingredients` : nom, quantité, unité, rayon ; `recipes.source_url` pour les recettes importées de Marmiton
@@ -295,6 +304,17 @@ supabase/
 - `trip_recipes` : les plats cochés par la personne qui fait les courses
 - `shopping_list_items` : la liste (origine `recipe` / `manual` / `request`, coché ou non)
 - `push_subscriptions` : un abonnement par appareil
+
+### Mesurer le début
+
+Pour voir où l'on s'arrête, Kaddie compte, **par jour**, combien de fois chaque étape est atteinte : `accueil` (page d'accueil affichée),
+`famille_creee`, `premier_choix` (le premier « Ce sera ça » d'une famille), `liste_ouverte` (le Caddie ouvert pour la première fois sur un téléphone),
+`invitation_envoyee` (le lien préparé pour la famille) et `invite_arrive` (quelqu'un rejoint par le lien). Un simple total : aucun identifiant, aucune famille, aucun prénom
+(la page Confidentialité l'annonce). Pour les lire, dans le **SQL Editor** de Supabase :
+
+```sql
+select etape, sum(n) as fois from parcours_etapes where jour >= current_date - 7 group by etape order by fois desc;
+```
 
 ### Temps réel
 

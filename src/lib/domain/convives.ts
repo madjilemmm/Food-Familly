@@ -19,3 +19,8 @@ export function phraseEnvie(noms: string[], moi: string): string {
   if (noms.includes(moi)) return autres.length === 0 ? "Tu en as envie" : `${autres.join(", ")} et toi en avez envie`;
   return autres.length === 1 ? `${autres[0]} en a envie` : `${listeDeNoms(autres)} en ont envie`;
 }
+
+/** Le nom d'une famille qui n'en a pas choisi : « Famille de Madji », « Famille d'Anne » (voyelle ou h devant le prénom). */
+export function nomDeFamille(prenom: string): string {
+  return /^[aeiouyhàâäéèêëîïôöùûüœæ]/i.test(prenom) ? `Famille d'${prenom}` : `Famille de ${prenom}`;
+}

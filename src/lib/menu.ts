@@ -1,8 +1,9 @@
 import "server-only";
 import { db } from "@/lib/supabase/server";
-import { getAppris, getHistorique, getProfiles, getRecipesWithIngredients, loadCurrentTrip, TRIP_MAX_AGE_MS, type Trip } from "@/lib/data";
+import { getAppris, getFoyer, getHistorique, getProfiles, getRecipesWithIngredients, loadCurrentTrip, TRIP_MAX_AGE_MS, type Trip } from "@/lib/data";
 import { platsDeLaCourse } from "@/lib/views";
 import { cleMaison } from "@/lib/domain/maison";
+import { foyerValide } from "@/lib/domain/foyer";
 import { articlesDe } from "@/lib/domain/articles";
 import { itemKey, mergeIngredients, normalizeName, scaleIngredients } from "@/lib/domain/shopping-list";
 import { cleProduit } from "@/lib/domain/reconnaissance";
@@ -71,7 +72,7 @@ export async function synchroniserMenu(familyId: string): Promise<{ trip: Trip; 
     .map((p) => p.id);
   if (ajoutes.length === 0) return { trip, ajoutes };
   // Un repas de famille : pour tout le monde (qui en a envie est gardé pour l'affichage).
-  const pour = trip.people ?? Math.max(1, membres.length);
+  const pour = trip.people ?? Math.max((await getFoyer(familyId)) ?? 1, membres.length);
   const { error } = await db()
     .from("trip_recipes")
     .upsert(
@@ -160,7 +161,7 @@ export async function choisirPlat(familyId: string, recipeId: string, auMenu: bo
     .from("trip_recipes")
     .upsert(
       auMenu
-        ? { trip_id: trip.id, recipe_id: recipeId, selected: true, eaters: membres.map((m) => m.id), people: trip.people ?? Math.max(1, membres.length) }
+        ? { trip_id: trip.id, recipe_id: recipeId, selected: true, eaters: membres.map((m) => m.id), people: trip.people ?? Math.max((await getFoyer(familyId)) ?? 1, membres.length) }
         : { trip_id: trip.id, recipe_id: recipeId, selected: false },
       { onConflict: "trip_id,recipe_id" },
     );
@@ -174,5 +175,20 @@ export async function oublierDuMenu(familyId: string, recipeId: string) {
   const trip = await loadCurrentTrip(familyId);
   if (!trip) return;
   await db().from("trip_recipes").delete().eq("trip_id", trip.id).eq("recipe_id", recipeId);
+  await reconstruireListe(familyId);
+}
+
+/**
+ * « Pour 4 » : le nombre de personnes à table, retenu pour la famille et appliqué à la course en cours
+ * (quantités de la liste recalculées). Base pas encore migrée : seule la course en cours s'en souvient.
+ */
+export async function changerFoyer(familyId: string, n: number) {
+  const pour = foyerValide(n);
+  if (!pour) return;
+  await db().from("families").update({ foyer: pour }).eq("id", familyId);
+  const trip = await loadCurrentTrip(familyId);
+  if (!trip) return;
+  await db().from("shopping_trips").update({ people: pour }).eq("id", trip.id);
+  await db().from("trip_recipes").update({ people: pour }).eq("trip_id", trip.id).eq("selected", true);
   await reconstruireListe(familyId);
 }
