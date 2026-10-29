@@ -1,11 +1,19 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useErreurReseau } from "@/components/ErreurReseau";
 import { Spinner } from "@/components/Spinner";
 
 export type Commande = "ceSeraCa" | "autreIdee" | "changer" | "allergie" | "foyer";
+
+/**
+ * Si l'écran ne revient pas : on le redemande, puis une dernière fois, puis on recharge la page.
+ * React laisse parfois en attente une mise à jour dont les données sont arrivées très vite (le serveur a répondu, l'écran
+ * reste sur l'ancien état) ; un nouveau rechargement la débloque aussitôt.
+ */
+const RELANCES_MS = [1000, 2500];
+const RECHARGE_MS = 6000;
 
 /**
  * Un bouton de « Ce soir » : il envoie sa commande (/api/ce-soir), attend la réponse, puis recharge l'écran.
@@ -33,6 +41,12 @@ export function BoutonCommande({
   const [rechargement, recharger] = useTransition();
   const { essayer, alerte } = useErreurReseau();
   const occupe = envoi || rechargement;
+
+  useEffect(() => {
+    if (!rechargement) return;
+    const timers = [...RELANCES_MS.map((ms) => setTimeout(() => router.refresh(), ms)), setTimeout(() => window.location.reload(), RECHARGE_MS)];
+    return () => timers.forEach(clearTimeout);
+  }, [rechargement, router]);
 
   return (
     <>
