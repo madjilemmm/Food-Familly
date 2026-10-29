@@ -7,6 +7,7 @@ import { BandeauScene, EtatVide } from "@/components/ui";
 import { CeSoir } from "@/components/courses/CeSoir";
 import { PlatsDuMenu } from "@/components/PlatsDuMenu";
 import { CeSoirAccueil } from "@/components/CeSoirAccueil";
+import { NoterEtape } from "@/components/NoterEtape";
 import { DerniereDemande } from "@/components/courses/DerniereDemande";
 import { aPreparer } from "@/lib/views";
 
@@ -103,6 +104,7 @@ export default async function Menu({ searchParams }: { searchParams: Promise<{ i
         />
         {proposition}
       </div>
+      <NoterEtape etape="ce_soir_affiche" frequence="visite" />
       {parti && <DerniereDemande qui={parti.name} choix={demandes} />}
       {repas && <CeSoir tripId={repas.tripId} plats={repas.plats.filter((p) => p.id !== choisi?.recipeId)} moi={me.name} />}
 

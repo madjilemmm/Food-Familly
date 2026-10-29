@@ -82,7 +82,7 @@ export async function ajouterSuggestions(suggestions: Suggestion[]) {
   const trip = await assurerCourse(user.familyId);
   const propres = suggestions.slice(0, 30).flatMap((s) => {
     const nom = typeof s?.nom === "string" ? s.nom.trim().slice(0, 100) : "";
-    if (!nom || (s.origine !== "habituel" && s.origine !== "reporte")) return [];
+    if (!nom || (s.origine !== "habituel" && s.origine !== "reporte" && s.origine !== "derniere")) return [];
     const quantite = typeof s.quantite === "number" && s.quantite > 0 ? s.quantite : null;
     return [
       {
@@ -93,7 +93,8 @@ export async function ajouterSuggestions(suggestions: Suggestion[]) {
         aisle: isAisle(s.rayon) ? s.rayon : "autre",
         source: "manual" as const,
         cle: String(s.cle).slice(0, 120),
-        origine: s.origine,
+        // « La dernière fois » n'a pas d'étiquette sur la liste : la base n'en connaît que deux (habituel, pas pris la dernière fois).
+        origine: s.origine === "derniere" ? null : s.origine,
       },
     ];
   });

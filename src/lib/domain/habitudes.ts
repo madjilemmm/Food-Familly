@@ -13,6 +13,8 @@
  *   besoin » ou 3 propositions sans réponse de suite, jusqu'au prochain achat.
  * - Au plus 6 propositions, les plus en retard d'abord ; jamais ce qui est déjà sur la
  *   liste ; une seule fois par course.
+ * - « La dernière fois » : tant que la maison a fait moins de 3 courses (les habitudes ne peuvent pas encore parler),
+ *   ce qui a été acheté à la main à la dernière course faite, au plus 8 articles, proposé de la même façon.
  */
 
 export const HABITUDES = {
@@ -23,6 +25,8 @@ export const HABITUDES = {
   PAS_BESOIN_VEILLE: 2,
   SANS_REPONSE_VEILLE: 3,
   MAX: 6,
+  /** « La dernière fois » : au plus ce nombre d'articles. */
+  DERNIERE_MAX: 8,
   HISTOIRE_JOURS: 365,
 } as const;
 
@@ -58,7 +62,7 @@ export type Suggestion = {
   rayon: string;
   quantite: number | null;
   unite: string;
-  origine: "habituel" | "reporte";
+  origine: "habituel" | "reporte" | "derniere";
 };
 
 const achatCompte = (i: ArticlePasse) => i.checked && (i.source === "manual" || i.source === "request");
@@ -133,14 +137,29 @@ export function pasPrisLaDerniereFois(courses: CoursePassee[]): Suggestion[] {
 }
 
 /**
+ * Ce qui a été acheté à la main à la dernière course faite : de quoi répondre à « qu'est-ce qu'il nous faut ? » dès la deuxième
+ * course, avant que les habitudes se dessinent (il leur faut 3 achats). À partir de 3 courses faites, c'est « Tes habituels » qui parle.
+ */
+export function achetesLaDerniereFois(courses: CoursePassee[]): Suggestion[] {
+  const faites = courses.filter(vraimentFaite);
+  if (faites.length === 0 || faites.length >= HABITUDES.ACHATS_MIN) return [];
+  const vus = new Set<string>();
+  return faites[0].items
+    .filter(achatCompte)
+    .filter((i) => !vus.has(i.cle) && Boolean(vus.add(i.cle)))
+    .map((i) => ({ cle: i.cle, nom: i.name, rayon: i.aisle, quantite: i.quantity ?? null, unite: i.unit ?? "", origine: "derniere" as const }));
+}
+
+/**
  * « À ajouter ? » pour la course en cours : d'abord ce qui n'a pas été pris, puis les
- * habituels. Jamais ce qui est déjà sur la liste, ni ce qui a déjà eu une réponse ici.
+ * habituels, puis (aux premières courses) ce qui a été acheté la dernière fois.
+ * Jamais ce qui est déjà sur la liste, ni ce qui a déjà eu une réponse ici.
  */
 export function aAjouter(
   courses: CoursePassee[],
   reponses: Reponse[],
   { surLaListe, repondusIci, now }: { surLaListe: Set<string>; repondusIci: Set<string>; now: number },
-): { reportes: Suggestion[]; habituels: Suggestion[] } {
+): { reportes: Suggestion[]; habituels: Suggestion[]; derniere: Suggestion[] } {
   const libre = (s: Suggestion) => !surLaListe.has(s.cle) && !repondusIci.has(s.cle);
   const reportes = pasPrisLaDerniereFois(courses).filter(libre);
   const dejaProposes = new Set(reportes.map((r) => r.cle));
@@ -148,5 +167,9 @@ export function aAjouter(
     .filter((s) => libre(s) && !dejaProposes.has(s.cle))
     .slice(0, HABITUDES.MAX)
     .map(({ retard: _r, ...s }) => s);
-  return { reportes, habituels };
+  for (const h of habituels) dejaProposes.add(h.cle);
+  const derniere = achetesLaDerniereFois(courses)
+    .filter((s) => libre(s) && !dejaProposes.has(s.cle))
+    .slice(0, HABITUDES.DERNIERE_MAX);
+  return { reportes, habituels, derniere };
 }

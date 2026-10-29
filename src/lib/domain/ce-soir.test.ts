@@ -47,3 +47,26 @@ describe("C'était bon ? : le plat d'hier en premier", () => {
     expect(aRedemander([{ recipeId: "r", faitLe: hier, mangeurs: ["moi"] }], "moi", () => ({ liked: false, swipedAt: hier + 1000, likedAt: null }))).toBeNull();
   });
 });
+
+describe("Ce soir : les plats à refaire", () => {
+  it("un plat aimé et déjà mangé passe devant une idée neuve", () => {
+    const r = choisirCeSoir([c("neuf", { rang: 0 }), c("refait", { rang: 5, refait: 20 })], { semaine: false });
+    expect(r.map((x) => x.id)).toEqual(["refait", "neuf"]);
+  });
+  it("mais jamais devant une envie, même s'il n'a pas été fait depuis des mois", () => {
+    const r = choisirCeSoir([c("refait", { refait: 200 }), c("envie", { envies: 1 })], { semaine: false });
+    expect(r[0].id).toBe("envie");
+  });
+  it("ni devant un plat déjà acheté", () => {
+    const r = choisirCeSoir([c("refait", { refait: 60 }), c("achete", { achete: true })], { semaine: false });
+    expect(r[0].id).toBe("achete");
+  });
+  it("entre deux plats à refaire : celui qu'on n'a pas fait depuis le plus longtemps", () => {
+    const r = choisirCeSoir([c("recent", { refait: 10 }), c("ancien", { refait: 30 })], { semaine: false });
+    expect(r[0].id).toBe("ancien");
+  });
+  it("« Autre idée » l'écarte comme les autres", () => {
+    const r = choisirCeSoir([c("refait", { refait: 20 }), c("neuf")], { semaine: false, pasCeSoir: new Set(["refait"]) });
+    expect(r[0].id).toBe("neuf");
+  });
+});

@@ -6,6 +6,7 @@ import type { Avis } from "./reco";
  * puis ce dont quelqu'un a envie ; un soir de semaine, le plus rapide avance.
  * Un plat déjà au Menu (ses ingrédients sont sur la liste) vient ensuite.
  * Un plat à acheter n'arrive qu'à défaut de plat déjà acheté.
+ * Un plat aimé et déjà mangé (à refaire) passe devant une idée neuve, jamais devant une envie.
  * Sans rien de tout cela, Kaddie propose quand même : le haut de son paquet (goûts, envies,
  * ce qu'on a mangé récemment), dans l'ordre du paquet.
  */
@@ -22,6 +23,10 @@ export const CE_SOIR = {
   ANCIENNETE_MAX: 0.5,
   /** Un plat du paquet : le moins bien classé recule un peu (0,05 par rang). */
   PAR_RANG: 0.05,
+  /** Un plat à refaire : 0,3, plus 0,005 par jour sans l'avoir mangé (au plus 0,15) : toujours sous une envie (0,5). */
+  REFAIT: 0.3,
+  REFAIT_PAR_JOUR: 0.005,
+  REFAIT_ANCIENNETE_MAX: 0.15,
 } as const;
 
 export type CandidatSoir = {
@@ -36,10 +41,15 @@ export type CandidatSoir = {
   auMenu?: boolean;
   /** Sa place dans le paquet de la personne (0 = en tête), pour les plats proposés à défaut. */
   rang?: number;
+  /** Un plat à refaire (aimé, déjà mangé) : depuis combien de jours il n'a pas été mangé (voir domain/memoire.ts). */
+  refait?: number | null;
 };
 
 /** Le plat de ce soir, gardé sur le téléphone tant que la table « ce_soir_choix » n'existe pas (« jour:recette:profil »). */
 export const CE_SOIR_COOKIE = "ce_soir";
+
+/** « Prévenir la famille ? » a eu sa réponse ce jour-là (« 2026-10-29 », sur ce téléphone) : la question ne revient pas pour ce dîner. */
+export const PREVENU_COOKIE = "prevenu";
 
 /** « Autre idée » : un plat écarté ne revient pas en premier pendant ce nombre de jours. */
 export const PAS_CE_SOIR_JOURS = 2;
@@ -50,7 +60,8 @@ export function choisirCeSoir<C extends CandidatSoir>(
 ): C[] {
   const note = (c: C) =>
     (c.achete ? CE_SOIR.ACHETE + Math.min(CE_SOIR.ANCIENNETE_MAX, CE_SOIR.PAR_JOUR * c.joursDepuisAchat) : c.auMenu ? CE_SOIR.AU_MENU : 0) +
-    CE_SOIR.PAR_ENVIE * c.envies -
+    CE_SOIR.PAR_ENVIE * c.envies +
+    (c.refait != null ? CE_SOIR.REFAIT + Math.min(CE_SOIR.REFAIT_ANCIENNETE_MAX, CE_SOIR.REFAIT_PAR_JOUR * c.refait) : 0) -
     CE_SOIR.PAR_RANG * (c.rang ?? 0) +
     (semaine && c.minutes ? (c.minutes <= 30 ? CE_SOIR.RAPIDE : c.minutes > 60 ? CE_SOIR.LONG : 0) : 0);
   // Un plat écarté (« Autre idée ») passe après les autres, sans disparaître ; entre deux plats écartés, le moins récemment écarté

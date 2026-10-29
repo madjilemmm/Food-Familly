@@ -6,11 +6,15 @@ import { IconeCroix } from "@/components/ui";
 import { Spinner } from "@/components/Spinner";
 import { invitationAuPlat } from "@/lib/domain/apercu";
 
+/** Le signal qui ouvre l'aperçu du message : « Prévenir » de la question qui suit « Ce sera ça » le lance. */
+export const EVENEMENT_PREVENIR = "kaddie:prevenir";
+
 /**
- * « Prévenir la famille » : un bouton à côté de « Décidé » ouvre l'aperçu du message (le plat, la liste déjà prête),
- * « Envoyer » ouvre le partage du téléphone avec le lien d'invitation. Rien à rédiger, rien à expliquer.
+ * « Prévenir la famille » : un bouton à côté de « Décidé » (ou « Prévenir » de la question qui suit « Ce sera ça ») ouvre l'aperçu du
+ * message (le plat, la liste déjà prête, et qui en avait envie), « Envoyer » ouvre le partage du téléphone avec le lien d'invitation.
+ * Rien à rédiger, rien à expliquer.
  */
-export function PartagerRepas({ titre, articles, photo }: { titre: string; articles: number; photo: string | null }) {
+export function PartagerRepas({ titre, articles, photo, commeVoulu = null }: { titre: string; articles: number; photo: string | null; commeVoulu?: string | null }) {
   const [ouvert, setOuvert] = useState(false);
   const [monte, setMonte] = useState(false);
   const [envoi, setEnvoi] = useState(false);
@@ -18,6 +22,14 @@ export function PartagerRepas({ titre, articles, photo }: { titre: string; artic
   const fermer = useRef<HTMLButtonElement>(null);
   const bouton = useRef<HTMLButtonElement>(null);
   useEffect(() => setMonte(true), []);
+  useEffect(() => {
+    const ouvrir = () => {
+      setInfo(null);
+      setOuvert(true);
+    };
+    window.addEventListener(EVENEMENT_PREVENIR, ouvrir);
+    return () => window.removeEventListener(EVENEMENT_PREVENIR, ouvrir);
+  }, []);
   useEffect(() => {
     if (!ouvert) return;
     fermer.current?.focus();
@@ -32,7 +44,8 @@ export function PartagerRepas({ titre, articles, photo }: { titre: string; artic
   }, [ouvert]);
 
   // Le message tel que la famille le lira, puis le lien (ou l'adresse et le code, si les liens ne sont pas prêts).
-  const phrase = `Ce soir : ${titre}. ${invitationAuPlat(articles)}`;
+  const entete = `Ce soir : ${titre}${commeVoulu ? `, ${commeVoulu}` : ""}`;
+  const phrase = `${entete}. ${invitationAuPlat(articles)}`;
 
   async function envoyer() {
     setEnvoi(true);
@@ -96,7 +109,7 @@ export function PartagerRepas({ titre, articles, photo }: { titre: string; artic
                 {/* eslint-disable-next-line @next/next/no-img-element -- photo Supabase, aperçu seulement */}
                 {photo ? <img src={photo} alt="" className="h-32 w-full object-cover" /> : <div aria-hidden className="photo-absente h-32 w-full" />}
                 <div className="px-4 py-3">
-                  <p className="font-semibold">Ce soir : {titre}</p>
+                  <p className="font-semibold">{entete}</p>
                   <p className="kd-petit">{invitationAuPlat(articles)}</p>
                 </div>
               </div>

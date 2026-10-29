@@ -86,7 +86,9 @@ Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres,
    [`supabase/migrations/20261028000002_recettes_de_depart.sql`](supabase/migrations/20261028000002_recettes_de_depart.sql)
    (durée et étapes des 10 recettes de départ, pour les familles créées avant), puis
    [`supabase/migrations/20261029000001_premiere_experience.sql`](supabase/migrations/20261029000001_premiere_experience.sql)
-   (le nombre de personnes à table, et des compteurs d'étapes anonymes pour voir où l'on s'arrête : voir plus bas).
+   (le nombre de personnes à table, et des compteurs d'étapes anonymes pour voir où l'on s'arrête : voir plus bas), puis
+   [`supabase/migrations/20261030000001_mesure.sql`](supabase/migrations/20261030000001_mesure.sql)
+   (deux colonnes sur la décision du soir pour la mesure : `rang` et `raison`, voir « Mesurer le retour »).
    Chaque fichier se lance dans cet ordre ; on peut les relancer sans risque.
 
    Pas besoin de données de départ : on crée sa famille directement dans l'appli. (Le fichier facultatif
@@ -292,7 +294,7 @@ supabase/
 - `families` : chaque famille et son code pour la rejoindre
 - `families.strict_dislikes` : le mode strict des goûts (vrai par défaut)
 - `families.foyer` : le nombre de personnes à table d'habitude (de 1 à 12), demandé à la création ; les quantités de la liste en partent
-- `ce_soir_choix` : le plat retenu pour ce soir, un par famille et par jour
+- `ce_soir_choix` : le plat retenu pour ce soir, un par famille et par jour ; `rang` (combien d'idées écartées avec « Autre idée » ce jour-là avant « Ce sera ça ») et `raison` (la ligne affichée sous le plat : `achete`, `envie`, `classique_jour`, `adore`, `classique`, `aime`, `pas_fait` ou `idee`), gardés pour la mesure
 - `parcours_etapes` : des compteurs anonymes de l'entrée dans l'appli (voir « Mesurer le début »), sans identifiant ni famille
 - `profiles` : les membres d'une famille, avec les dates du questionnaire de goûts (`tastes_seen_at`, `tastes_done_at`)
 - `profile_tastes` : les goûts de chacun (`food` = clé de `src/lib/domain/foods.ts` ou `autre:…`, `level` = `interdit` / `pas_fan` / `adore`)
@@ -315,6 +317,37 @@ Pour voir où l'on s'arrête, Kaddie compte, **par jour**, combien de fois chaqu
 ```sql
 select etape, sum(n) as fois from parcours_etapes where jour >= current_date - 7 group by etape order by fois desc;
 ```
+
+Pour voir si l'on **revient**, d'autres totaux par jour, de la même façon : `ouverture_icone` (Kaddie ouverte depuis l'icône de l'écran d'accueil, une fois par visite),
+`ouverture_notification` (ouverte par une notification : son adresse porte `?via=notification`, retiré aussitôt), `ouverture_lien` (un membre rouvre un lien partagé dans
+le groupe), `ce_soir_affiche` (l'écran Ce soir, une fois par visite), `autre_idee` (une idée écartée), `prevenir_propose` (la question « Prévenir la famille ? » posée, une fois par jour et par
+téléphone), `prevenir_oui` et `prevenir_plus_tard` (sa réponse). Même règle : aucun identifiant.
+
+### Mesurer le retour
+
+La décision du soir garde, sans rien dire de qui, `rang` (0 : la première proposition a plu) et `raison` (ce qui était écrit sous le plat). Dans le **SQL Editor** :
+
+```sql
+-- Les dîners décidés, selon la raison affichée : part décidée à la première proposition, et idées écartées en moyenne.
+select raison, count(*) as diners, round(avg((rang = 0)::int) * 100) as pct_premiere_proposition, round(avg(rang), 1) as ecartees
+from ce_soir_choix where jour >= current_date - 28 and raison is not null group by raison order by diners desc;
+
+-- Comment Kaddie est ouverte, et la question « Prévenir la famille ? » (7 jours).
+select etape, sum(n) as fois from parcours_etapes
+where jour >= current_date - 7 and etape in ('ouverture_icone', 'ouverture_notification', 'ouverture_lien', 'ce_soir_affiche', 'autre_idee', 'prevenir_propose', 'prevenir_oui', 'prevenir_plus_tard')
+group by etape order by fois desc;
+```
+
+### La mémoire de la maison
+
+Kaddie retient ce que la famille mange, sans qu'on le lui dise (règles : `src/lib/domain/memoire.ts`) :
+
+- **Mangé sans « C'est fait »** : un dîner décidé (« Ce sera ça ») dont les courses sont faites compte comme mangé : la course terminée avec ce plat, au plus 10 jours avant ce soir-là ou jusqu'au lendemain ; ou, pour les deux derniers jours, la liste toute cochée. Le dîner d'aujourd'hui n'est jamais compté. La carte « C'était bon ? » du lendemain, les classiques et la liste des plats « à cuisiner » en profitent.
+- **La ligne sous le plat** dit une seule raison, la plus vraie, datée quand la date est connue : « Déjà acheté aux dernières courses », l'envie de quelqu'un, « Votre classique du mardi », « Adoré il y a 3 semaines », « Un classique : 4 fois », « Tu l'avais aimé », « Pas fait depuis 12 jours », « Une idée de Kaddie ».
+- **Un plat aimé et déjà mangé** (pas depuis une semaine) passe devant une idée neuve, jamais devant une envie ni un plat déjà acheté.
+- **Prévenir la famille ?** : juste après « Ce sera ça », une ligne d'un appui ouvre le message prêt (le plat, la liste faite, et « comme Karin le voulait » si quelqu'un en avait envie). Elle ne revient pas pour ce dîner ; sur l'écran de Karin : « ton envie ».
+- **Un lien partagé** n'expire jamais pour un membre de la famille : il arrive sur Ce soir, même au bout de 7 jours.
+- **« À ajouter ? »** : aux deux premières courses, le groupe « La dernière fois » propose ce qui a été acheté à la main à la course précédente (ensuite, ce sont « Tes habituels »).
 
 ### Temps réel
 

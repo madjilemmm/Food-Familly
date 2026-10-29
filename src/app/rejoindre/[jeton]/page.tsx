@@ -4,7 +4,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Logo, Scene } from "@/design-system/components/Kaddie";
 import { getSession } from "@/lib/auth";
-import { familleInvitee } from "@/lib/acces";
+import { familleInvitee, lienDeMaFamille } from "@/lib/acces";
+import { noterEtape } from "@/lib/etapes";
 import { apercuInvitation } from "@/lib/apercu";
 import { texteApercu, titreApercu } from "@/lib/domain/apercu";
 import { origineDuSite } from "@/lib/origine";
@@ -28,13 +29,18 @@ export const dynamic = "force-dynamic";
 
 /**
  * Un lien d'invitation, reçu dans le groupe de la famille : son prénom, un appui, et on voit
- * ce qu'on mange ce soir. Expiré ou annulé : on le dit, et le code reste possible.
+ * ce qu'on mange ce soir. Expiré ou annulé : on le dit, et le code reste possible. Un membre de la famille, lui, arrive
+ * toujours sur « Ce soir », quel que soit l'âge du lien.
  */
 export default async function InvitationPage({ params }: { params: Promise<{ jeton: string }> }) {
   const { jeton } = await params;
   const [famille, session] = await Promise.all([familleInvitee(jeton), getSession()]);
-  // Déjà dans cette famille sur ce téléphone : rien à faire.
-  if (famille && session?.familyId === famille.id) redirect(session.profileId ? "/" : "/profil");
+  // Déjà dans cette famille sur ce téléphone : rien à faire, même si le lien a plus de 7 jours (un message rouvert le lendemain,
+  // la semaine suivante) : on arrive sur « Ce soir ». Le lien expiré ne sert qu'à celles et ceux qui n'y sont pas encore.
+  if (session && (famille ? famille.id === session.familyId : await lienDeMaFamille(jeton, session.familyId))) {
+    await noterEtape("ouverture_lien");
+    redirect(session.profileId ? "/" : "/profil");
+  }
 
   return (
     <Scene

@@ -96,6 +96,16 @@ export async function familleInvitee(jeton: string): Promise<{ id: string; name:
   return { ...ligne.families, par };
 }
 
+/**
+ * Ce lien a-t-il été fait par ma famille, même s'il a plus de 7 jours ? Un membre qui rouvre un vieux message du groupe
+ * arrive chez lui, pas sur « Ce lien a expiré » : il n'y a rien à protéger, il est déjà dans la famille.
+ */
+export async function lienDeMaFamille(jeton: string, familyId: string): Promise<boolean> {
+  if (!JETON.test(jeton)) return false;
+  const { data } = await db().from("invitations").select("jeton").eq("jeton", jeton).eq("family_id", familyId).maybeSingle();
+  return Boolean(data);
+}
+
 /** Changer le code annule aussi les liens déjà envoyés. */
 export async function annulerInvitations(familyId: string) {
   await db().from("invitations").delete().eq("family_id", familyId);

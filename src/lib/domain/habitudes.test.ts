@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aAjouter, habituelsDus, pasPrisLaDerniereFois, vraimentFaite, type CoursePassee, type Reponse } from "./habitudes";
+import { aAjouter, achetesLaDerniereFois, habituelsDus, pasPrisLaDerniereFois, vraimentFaite, type CoursePassee, type Reponse } from "./habitudes";
 
 const now = Date.parse("2026-10-19T10:00:00Z");
 const J = 86_400_000;
@@ -84,5 +84,45 @@ describe("pas pris la dernière fois", () => {
     expect(r.reportes.map((s) => s.cle)).toEqual(["lait"]);
     expect(r.habituels).toEqual([]);
     expect(aAjouter(courses, [], { ...libre, repondusIci: new Set(["lait"]) }).reportes).toEqual([]);
+  });
+});
+
+describe("la dernière fois", () => {
+  const lait = achat("Lait");
+  const oeufs = achat("Œufs", "oeufs");
+
+  it("à la deuxième course : ce qui a été acheté à la main à la première", () => {
+    expect(achetesLaDerniereFois([course(7, [lait, oeufs])]).map((s) => s.nom)).toEqual(["Lait", "Œufs"]);
+    const { derniere, habituels, reportes } = aAjouter([course(7, [lait, oeufs])], [], libre);
+    expect(derniere.map((s) => s.origine)).toEqual(["derniere", "derniere"]);
+    expect([habituels, reportes]).toEqual([[], []]);
+  });
+  it("seulement ce qui a été acheté : ni un article pas pris, ni un ingrédient de recette", () => {
+    const pasPris = achat("Café", "cafe", false);
+    const poulet = { ...achat("Poulet"), source: "recipe" };
+    expect(achetesLaDerniereFois([course(7, [lait, pasPris, poulet])]).map((s) => s.nom)).toEqual(["Lait"]);
+  });
+  it("la dernière course faite, pas une plus ancienne", () => {
+    expect(achetesLaDerniereFois([course(7, [oeufs]), course(14, [lait])]).map((s) => s.nom)).toEqual(["Œufs"]);
+  });
+  it("rien avant la première course faite", () => {
+    expect(achetesLaDerniereFois([])).toEqual([]);
+    expect(achetesLaDerniereFois([course(3, [lait], { finie: false, close: false })])).toEqual([]);
+  });
+  it("à partir de trois courses faites, ce sont les habituels qui parlent", () => {
+    expect(achetesLaDerniereFois([course(7, [lait]), course(14, [lait]), course(21, [lait])])).toEqual([]);
+  });
+  it("jamais ce qui est déjà sur la liste ni ce qui a déjà reçu une réponse ici", () => {
+    const { derniere } = aAjouter([course(7, [lait, oeufs, achat("Pain")])], [], { ...libre, surLaListe: new Set(["lait"]), repondusIci: new Set(["pain"]) });
+    expect(derniere.map((s) => s.nom)).toEqual(["Œufs"]);
+  });
+  it("un article pas pris la dernière fois n'est pas aussi proposé là (même produit coché dans une course plus ancienne)", () => {
+    const { reportes, derniere } = aAjouter([course(7, [achat("Café", "cafe", false), lait]), course(14, [achat("Café", "cafe")])], [], libre);
+    expect(reportes.map((s) => s.nom)).toEqual(["Café"]);
+    expect(derniere.map((s) => s.nom)).toEqual(["Lait"]);
+  });
+  it("au plus 8 articles", () => {
+    const beaucoup = Array.from({ length: 12 }, (_, k) => achat(`Article ${k}`));
+    expect(aAjouter([course(7, beaucoup)], [], libre).derniere).toHaveLength(8);
   });
 });

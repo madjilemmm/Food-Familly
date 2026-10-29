@@ -4,8 +4,8 @@ import { memeSite } from "@/lib/origine";
 
 export const dynamic = "force-dynamic";
 
-/** Les deux étapes que seul le téléphone voit : l'accueil affiché, la liste ouverte. Les autres se comptent côté serveur. */
-const DU_TELEPHONE: Etape[] = ["accueil", "liste_ouverte"];
+/** Les étapes que seul le téléphone voit : l'accueil, la liste ouverte, « Ce soir » affiché, la question « Prévenir ? », comment Kaddie s'ouvre. */
+const DU_TELEPHONE: Etape[] = ["accueil", "liste_ouverte", "ce_soir_affiche", "prevenir_propose", "ouverture_icone", "ouverture_notification"];
 
 /**
  * Compte une étape du début : un total par jour, sans identifiant (voir /confidentialite). Ouvert sans connexion,

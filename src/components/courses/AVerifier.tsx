@@ -12,18 +12,30 @@ const pastille = "flex min-h-11 items-center gap-1.5 rounded-bouton border-[3px]
 
 /**
  * « À ajouter ? », avant de partir : ce qui n'a pas été pris la dernière fois, les achats
- * habituels dont c'est le moment, et les ingrédients sans doute déjà à la maison.
+ * habituels dont c'est le moment, aux premières courses ce qui a été acheté la dernière fois,
+ * et les ingrédients sans doute déjà à la maison.
  * Rien ne va sur la liste sans un geste : « + » ajoute, « × » dit « pas besoin ».
  */
-export function AVerifier({ noms, reportes = [], habituels = [] }: { noms: string[]; reportes?: Suggestion[]; habituels?: Suggestion[] }) {
+export function AVerifier({
+  noms,
+  reportes = [],
+  habituels = [],
+  derniere = [],
+}: {
+  noms: string[];
+  reportes?: Suggestion[];
+  habituels?: Suggestion[];
+  derniere?: Suggestion[];
+}) {
   const [, startTransition] = useTransition();
   const [masques, masquer] = useOptimistic(new Set<string>(), (state, cles: string[]) => new Set([...state, ...cles]));
   const { essayer, alerte } = useErreurReseau();
   const visibles = (l: Suggestion[]) => l.filter((s) => !masques.has(s.cle));
   const restesR = visibles(reportes);
   const restesH = visibles(habituels);
+  const restesD = visibles(derniere);
   const restesM = noms.filter((n) => !masques.has(`maison:${n}`));
-  if (restesR.length + restesH.length + restesM.length === 0) return alerte;
+  if (restesR.length + restesH.length + restesD.length + restesM.length === 0) return alerte;
 
   const ajouter = (s: Suggestion[]) =>
     startTransition(async () => {
@@ -35,7 +47,7 @@ export function AVerifier({ noms, reportes = [], habituels = [] }: { noms: strin
       masquer([s.cle]);
       await essayer(() => refuserSuggestion(s.cle));
     });
-  const tous = [...restesR, ...restesH];
+  const tous = [...restesR, ...restesH, ...restesD];
 
   const groupe = (titre: string, liste: Suggestion[]) =>
     liste.length > 0 && (
@@ -74,6 +86,7 @@ export function AVerifier({ noms, reportes = [], habituels = [] }: { noms: strin
         )}
       </div>
       {groupe("Pas pris la dernière fois", restesR)}
+      {groupe("La dernière fois", restesD)}
       {groupe("Tes habituels", restesH)}
       {restesM.length > 0 && (
         <div>

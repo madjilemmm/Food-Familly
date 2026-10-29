@@ -1,9 +1,9 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import type { Profile, Recipe, Trip } from "@/lib/data";
 import {
   forFamily,
   getCeSoirChoisi,
-  getClassiques,
   getDeck,
   getFamilyEnvies,
   getFamilySwipes,
@@ -14,15 +14,18 @@ import {
   getRecipes,
   getRecipesWithIngredients,
   getRepasAchetes,
+  getRepasManges,
   getTasteContext,
 } from "@/lib/data";
 import { platsDuMenu } from "@/lib/menu";
-import { choisirCeSoir } from "@/lib/domain/ce-soir";
+import { choisirCeSoir, PREVENU_COOKIE } from "@/lib/domain/ce-soir";
 import { contientPhrase } from "@/lib/domain/foods";
-import { phraseEnvie } from "@/lib/domain/convives";
+import { jourAParis } from "@/lib/domain/heure";
+import { commeVoulu, histoireDesRepas, platsARefaire, raisonDuSoir } from "@/lib/domain/memoire";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import { BoutonCommande } from "@/components/BoutonCommande";
 import { PartagerRepas } from "@/components/PartagerRepas";
+import { QuestionPrevenir } from "@/components/QuestionPrevenir";
 import { Logo } from "@/design-system/components/Kaddie";
 import {
   IconeAutre,
@@ -43,7 +46,7 @@ const enSemaine = () =>
     }).format(new Date()),
   );
 
-type Origine = "achete" | "menu" | "envie" | "idee";
+type Origine = "achete" | "menu" | "envie" | "refait" | "idee";
 
 /** Pour les ingrédients : sans la quantité (« 2 oignons » devient « oignons »). */
 const sansQuantite = (nom: string) =>
@@ -74,7 +77,7 @@ export async function CeSoirAccueil({
     pasCeSoir,
     avis,
     ctx,
-    classiques,
+    manges,
   ] = await Promise.all([
     getCeSoirChoisi(me.family_id),
     getRepasAchetes(me.family_id),
@@ -84,11 +87,13 @@ export async function CeSoirAccueil({
     getPasCeSoir(me.family_id),
     getFamilySwipes(me.family_id),
     getTasteContext(me.family_id),
-    getClassiques(me.family_id),
+    getRepasManges(me.family_id),
   ]);
   const parId = new Map(recipes.map((r) => [r.id, r]));
   const noms = new Map(profiles.map((p) => [p.id, p.name]));
   const allergieAVoir = !me.tastes_seen_at;
+  // Ce que la maison a mangé, jour par jour (« C'est fait », ou décidé et courses faites) : la phrase datée sous le plat.
+  const histoires = histoireDesRepas(manges.filter((r) => !r.provisoire));
 
   // ─── Le repas de ce soir est retenu ───
   const retenu = choisi ? parId.get(choisi.recipeId) : undefined;
@@ -114,6 +119,14 @@ export async function CeSoirAccueil({
     const resteAAcheter = ingredients.some((l) => !l.checked);
     const listeDabord = !achete && resteAAcheter;
     const jeChoisis = !choisi?.choisiPar || choisi.choisiPar === me.id;
+    // Celles et ceux qui en avaient envie : « comme Karin le voulait » dans le message, « ton envie » sur leur écran.
+    const enviePar = envies.get(retenu.id) ?? [];
+    const maEnvie = !jeChoisis && enviePar.includes(me.id);
+    const autresEnvies = enviePar.filter((id) => id !== me.id).flatMap((id) => noms.get(id) ?? []);
+    // « Prévenir la famille ? » : une fois par dîner et par téléphone, juste après « Ce sera ça », quand il y a quelqu'un à prévenir.
+    const quelquUnAPrevenir = profiles.length > 1 || ((await getFoyer(me.family_id)) ?? 1) > 1;
+    const dejaRepondu = (await cookies()).get(PREVENU_COOKIE)?.value === jourAParis();
+    const questionPrevenir = jeChoisis && quelquUnAPrevenir && !dejaRepondu;
     const lienRecette = `/recettes/${retenu.id}?depuis=/menu${cuisinable ? "&cuisine=1" : ""}`;
     const libelleRecette = cuisinable ? "Je cuisine" : "Voir la recette";
     const node = (
@@ -130,6 +143,12 @@ export async function CeSoirAccueil({
             {parQui && (
               <span>
                 choisi par <strong className="text-encre">{parQui}</strong>
+                {maEnvie && (
+                  <>
+                    {" "}
+                    · <span className="font-semibold text-violet">ton envie</span>
+                  </>
+                )}
               </span>
             )}
             {jeChoisis && (
@@ -137,6 +156,7 @@ export async function CeSoirAccueil({
                 titre={retenu.title}
                 articles={ingredients.length}
                 photo={retenu.photo_url}
+                commeVoulu={commeVoulu(autresEnvies)}
               />
             )}
           </p>
@@ -150,7 +170,7 @@ export async function CeSoirAccueil({
               .join(" · ")}
           </p>
 
-          {allergieAVoir && <QuestionAllergie />}
+          {allergieAVoir ? <QuestionAllergie /> : questionPrevenir && <QuestionPrevenir />}
 
           <Link
             href="/courses"
@@ -213,8 +233,19 @@ export async function CeSoirAccueil({
     minutes: number | null;
     auMenu: boolean;
     rang?: number;
+    refait: number | null;
     origine: Origine;
   })[] = [];
+  // Mes plats à refaire : aimés (ou classiques), déjà mangés, pas depuis une semaine. Jamais un plat que j'ai écarté.
+  const maintenant = Date.now();
+  const avisDe = (id: string) => avis.get(id)?.get(me.id);
+  const aRefaire = new Map(
+    platsARefaire(histoires, {
+      aimes: new Set([...avis.keys()].filter((id) => avisDe(id)?.liked === true)),
+      ecartes: new Set([...avis.keys()].filter((id) => avisDe(id)?.liked === false)),
+      now: maintenant,
+    }).map((x) => [x.recipeId, x.jours]),
+  );
   const vus = new Set<string>();
   const ajouter = (r: Recipe, origine: Origine, rang?: number) => {
     if (vus.has(r.id)) return;
@@ -227,6 +258,7 @@ export async function CeSoirAccueil({
       minutes: r.total_minutes,
       auMenu: origine === "menu",
       rang,
+      refait: aRefaire.get(r.id) ?? null,
       origine,
     });
   };
@@ -234,6 +266,8 @@ export async function CeSoirAccueil({
   for (const id of menu) if (parId.has(id)) ajouter(parId.get(id)!, "menu");
   for (const id of envies.keys())
     if (parId.has(id)) ajouter(parId.get(id)!, "envie");
+  // Un plat aimé et déjà mangé revient devant une idée neuve (jamais devant une envie ni un plat acheté).
+  for (const id of aRefaire.keys()) if (parId.has(id)) ajouter(parId.get(id)!, "refait");
   // Rien d'acheté, au Menu ni envié : Kaddie propose quand même, le haut de son paquet (jamais un plat que j'ai écarté).
   if (candidats.length < PROPOSITIONS_MIN) {
     const paquet = await getDeck(me.family_id, me.id);
@@ -251,19 +285,15 @@ export async function CeSoirAccueil({
   const idx = Math.max(0, i || 0);
   const plat = choix[idx % choix.length];
   const qui = (envies.get(plat.id) ?? []).flatMap((id) => noms.get(id) ?? []);
-  const fois = classiques.find((c) => c.recipeId === plat.id)?.fois;
-  const aime = avis.get(plat.id)?.get(me.id)?.liked === true;
-  // Une phrase qui dit pourquoi ce plat, sans mot interne (« à acheter », « au Menu »).
-  const raison =
-    plat.origine === "achete"
-      ? "Déjà acheté aux dernières courses"
-      : qui.length
-        ? phraseEnvie(qui, me.name)
-        : fois
-          ? `Un classique : ${fois} fois`
-          : aime
-            ? "Tu l'avais aimé"
-            : "Une idée de Kaddie";
+  const histoire = histoires.get(plat.id);
+  const monAvis = avisDe(plat.id);
+  const aime = monAvis?.liked === true;
+  // Une phrase qui dit pourquoi ce plat, la plus vraie, datée quand la date est connue (domain/memoire.ts), sans mot interne
+  // (« à acheter », « au Menu »). Sa clé est gardée avec la décision, pour voir ce qui convainc.
+  const { texte: raison, raison: cleRaison } = raisonDuSoir(
+    { achete: plat.origine === "achete", qui, histoire, aime, adore: aime && histoire != null && (monAvis?.likedAt ?? 0) >= histoire.dernier },
+    { moi: me.name, now: maintenant },
+  );
   const contient = contientPhrase(ctx.texts.get(plat.id) ?? [plat.title]);
   // Le nombre de personnes à table : celui de la course, sinon le foyer dit à la création, sinon la famille.
   const pour =
@@ -286,7 +316,7 @@ export async function CeSoirAccueil({
       <div className="soir-haut">
         <Photo recipe={plat} lien={lien} />
         <p className="mt-4 flex min-h-6 items-center gap-2.5 text-petit text-encre-douce">
-          {plat.origine === "idee" ? (
+          {plat.origine === "idee" || plat.origine === "refait" ? (
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-violet text-blanc">
               <Logo variante="monogramme" width={11} title="" />
             </span>
@@ -340,6 +370,7 @@ export async function CeSoirAccueil({
         <BoutonCommande
           commande="ceSeraCa"
           recipeId={plat.id}
+          raison={cleRaison}
           className="kd-btn kd-btn--large w-full"
           pendingLabel="C'est noté…"
         >
@@ -366,7 +397,7 @@ function Photo({ recipe, lien }: { recipe: Recipe; lien: string }) {
     <Link
       href={lien}
       aria-label={`Voir la recette : ${recipe.title}`}
-      className="relative min-h-[7.5rem] flex-1 overflow-hidden rounded-[0.875rem] bg-trait active:opacity-90"
+      className="relative min-h-[7.5rem] flex-1 overflow-hidden rounded-[0.875rem] bg-trait active:opacity-90 [@media(max-height:660px)]:min-h-24"
     >
       <RecipeVisual recipe={recipe} className="absolute inset-0 size-full" />
     </Link>

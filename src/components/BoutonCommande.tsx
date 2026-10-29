@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useErreurReseau } from "@/components/ErreurReseau";
 import { Spinner } from "@/components/Spinner";
 
-export type Commande = "ceSeraCa" | "autreIdee" | "changer" | "allergie" | "foyer";
+export type Commande = "ceSeraCa" | "autreIdee" | "changer" | "allergie" | "foyer" | "prevenu";
 
 /**
  * Si l'écran ne revient pas : on le redemande, puis une dernière fois, puis on recharge la page.
@@ -23,6 +23,9 @@ export function BoutonCommande({
   commande,
   recipeId,
   n,
+  raison,
+  reponse,
+  onAvant,
   className,
   pendingLabel = "…",
   children,
@@ -31,6 +34,12 @@ export function BoutonCommande({
   commande: Commande;
   recipeId?: string;
   n?: number;
+  /** « Ce sera ça » : la ligne affichée sous le plat (domain/memoire.ts), gardée avec la décision pour la mesure. */
+  raison?: string;
+  /** « Prévenir la famille ? » : la réponse. */
+  reponse?: "oui" | "plus_tard";
+  /** Au tap, avant l'envoi (ouvrir l'aperçu du message sans attendre le réseau). */
+  onAvant?: () => void;
   "aria-label"?: string;
   className?: string;
   pendingLabel?: string;
@@ -56,9 +65,10 @@ export function BoutonCommande({
         className={className}
         {...aria}
         onClick={async () => {
+          onAvant?.();
           setEnvoi(true);
           const ok = await essayer(async () => {
-            const r = await fetch("/api/ce-soir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commande, recipeId, n }) });
+            const r = await fetch("/api/ce-soir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commande, recipeId, n, raison, reponse }) });
             if (!r.ok) throw new Error(String(r.status));
           });
           setEnvoi(false);

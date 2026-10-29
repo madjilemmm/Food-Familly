@@ -18,7 +18,7 @@ export default function WelcomePage() {
         <p className="max-w-xs text-[1.1875rem] leading-[1.6rem] font-medium text-balance">On mange quoi ce soir ? Décidez à plusieurs, Kaddie remplit le caddie.</p>
       </div>
       <div className="mx-auto w-full max-w-md pb-4">
-        <NoterEtape etape="accueil" parVisite />
+        <NoterEtape etape="accueil" frequence="visite" />
         <ActionsAccueil />
         <Link href="/confidentialite" className="kd-petit mt-2 flex min-h-11 items-center justify-center text-blanc underline underline-offset-4">
           Confidentialité

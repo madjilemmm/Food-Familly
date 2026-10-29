@@ -77,10 +77,11 @@ export async function CoursesScreen({ me, notifications }: { me: Profile; notifi
       )}
 
       <AVerifier
-        key={[...prep.aVerifier, ...prep.reportes.map((s) => s.cle), ...prep.habituels.map((s) => s.cle)].join("|")}
+        key={[...prep.aVerifier, ...prep.reportes.map((s) => s.cle), ...prep.habituels.map((s) => s.cle), ...prep.derniere.map((s) => s.cle)].join("|")}
         noms={prep.aVerifier}
         reportes={prep.reportes}
         habituels={prep.habituels}
+        derniere={prep.derniere}
       />
 
       <ShoppingList tripId={trip.id} items={trip.shopping_list_items} requests={[]} appris={appris} />

@@ -9,7 +9,8 @@ import { avancerLesVoixManquantes, calculerMatchs, estEnvie, ordonnerPaquet, REG
 import { listeDeNoms } from "@/lib/domain/convives";
 import { aRedemander } from "@/lib/domain/ce-soir";
 import { jourAParis } from "@/lib/domain/heure";
-import { classiquesDe } from "@/lib/domain/classiques";
+import { classiquesDe, type RepasCuisine } from "@/lib/domain/classiques";
+import { courseCouvreLeDiner, mangesDeduits, platsCoches, type CourseFaite } from "@/lib/domain/memoire";
 import { bilanAnnee, type Annee } from "@/lib/domain/annee";
 import { passagesDesIngredients, sansDouteALaMaison } from "@/lib/domain/maison";
 import type { Style } from "@/lib/session";
@@ -456,21 +457,24 @@ async function getCuisinesRecemment(familyId: string): Promise<{ recipeId: strin
     .eq("family_id", familyId)
     .eq("status", "done")
     .gte("finished_at", new Date(Date.now() - 14 * JOUR).toISOString());
-  if (!trips?.length) return [];
-  // Base pas encore migrée : pas de repas notés.
-  const { data: repas } = await db()
-    .from("repas")
-    .select("trip_id, recipe_id, fait_le")
-    .in("trip_id", trips.map((t) => t.id))
-    .gte("fait_le", new Date(Date.now() - 2 * JOUR).toISOString());
-  const mangeurs = new Map(
-    trips.flatMap((t) => (t.trip_recipes as { recipe_id: string; eaters?: string[] | null }[]).map((r) => [`${t.id}:${r.recipe_id}`, r.eaters?.length ? r.eaters : null])),
-  );
-  return (repas ?? []).map((r) => ({
-    recipeId: r.recipe_id as string,
-    faitLe: Date.parse(r.fait_le as string),
-    mangeurs: mangeurs.get(`${r.trip_id}:${r.recipe_id}`) ?? null,
-  }));
+  const explicites: { recipeId: string; faitLe: number; mangeurs: string[] | null }[] = [];
+  if (trips?.length) {
+    // Base pas encore migrée : pas de repas notés.
+    const { data: repas } = await db()
+      .from("repas")
+      .select("trip_id, recipe_id, fait_le")
+      .in("trip_id", trips.map((t) => t.id))
+      .gte("fait_le", new Date(Date.now() - 2 * JOUR).toISOString());
+    const mangeurs = new Map(
+      trips.flatMap((t) => (t.trip_recipes as { recipe_id: string; eaters?: string[] | null }[]).map((r) => [`${t.id}:${r.recipe_id}`, r.eaters?.length ? r.eaters : null])),
+    );
+    for (const r of repas ?? []) explicites.push({ recipeId: r.recipe_id as string, faitLe: Date.parse(r.fait_le as string), mangeurs: mangeurs.get(`${r.trip_id}:${r.recipe_id}`) ?? null });
+  }
+  // Un dîner décidé dont les courses sont faites est mangé, sans « C'est fait » : la carte « C'était bon ? » vient toute seule (pour tout le monde).
+  const deduits = (await getRepasManges(familyId))
+    .filter((r) => r.deduit && r.faitLe >= Date.now() - 2 * JOUR)
+    .map((r) => ({ recipeId: r.recipeId, faitLe: r.faitLe, mangeurs: null }));
+  return [...explicites, ...deduits];
 }
 
 export async function getDeck(
@@ -676,22 +680,26 @@ export const getRepasAchetes = cache(async function getRepasAchetes(
   if (!trip) return null;
   const choisis = (trip.trip_recipes as { recipe_id: string; selected: boolean; eaters?: string[] | null }[]).filter((r) => r.selected);
   if (choisis.length === 0) return null;
-  const [recipes, profiles, repas] = await Promise.all([
+  const [recipes, profiles, repas, manges] = await Promise.all([
     getRecipes(familyId),
     getProfiles(familyId),
     // Base pas encore migrée : aucun repas noté, la liste reste utile.
     db().from("repas").select("recipe_id, fait_le").eq("trip_id", trip.id).then((r) => r.data ?? []),
+    getRepasManges(familyId),
   ]);
   const parId = new Map(recipes.map((r) => [r.id, r]));
   const noms = new Map(profiles.map((p) => [p.id, p.name]));
   const notes = new Map(repas.map((r) => [r.recipe_id as string, r]));
+  const le = Date.parse((trip.finished_at ?? trip.validated_at ?? trip.created_at) as string);
+  // Un dîner passé, décidé pour ces courses, est déjà mangé : le plat n'est plus « à cuisiner ».
+  const mangeDepuis = (id: string) => manges.some((m) => m.deduit && !m.provisoire && m.recipeId === id && courseCouvreLeDiner(jourAParis(new Date(m.faitLe)), le));
   const plats = choisis.flatMap((c) => {
     const r = parId.get(c.recipe_id);
     if (!r) return [];
     const note = notes.get(c.recipe_id);
-    return [{ ...r, fait: Boolean(note?.fait_le), mangeurs: (c.eaters ?? []).flatMap((id) => noms.get(id) ?? []) }];
+    return [{ ...r, fait: Boolean(note?.fait_le) || mangeDepuis(c.recipe_id), mangeurs: (c.eaters ?? []).flatMap((id) => noms.get(id) ?? []) }];
   });
-  return { tripId: trip.id as string, le: Date.parse((trip.finished_at ?? trip.validated_at ?? trip.created_at) as string), plats };
+  return { tripId: trip.id as string, le, plats };
 });
 
 // ─── Les dernières courses : le bilan et les mercis ────────────────────
@@ -818,17 +826,57 @@ export async function getAnnee(familyId: string): Promise<
 
 // ─── Les classiques du foyer ───────────────────────────────────────────
 
-/** Les plats cuisinés au moins 3 fois par la famille (« C'est fait »), avec le nombre de fois. */
+/** Un dîner mangé : `deduit` quand personne n'a dit « C'est fait » (voir getRepasManges), `provisoire` quand ce n'est pas encore sûr. */
+export type RepasMange = RepasCuisine & { deduit?: boolean; provisoire?: boolean };
+
+/**
+ * Les dîners mangés par la famille, les plus récents d'abord : ceux marqués « C'est fait », et ceux décidés (« Ce sera ça ») dont les
+ * courses sont faites, sans que personne ait à le dire (règles : domain/memoire.ts). `provisoire` : la liste est cochée mais « J'ai
+ * fini les courses » n'a pas été touché ; compté pour « C'était bon ? », pas pour les classiques. Base pas encore migrée : rien de déduit.
+ */
+export const getRepasManges = cache(async function getRepasManges(familyId: string): Promise<RepasMange[]> {
+  const { data: trips } = await db()
+    .from("shopping_trips")
+    .select("id, finished_at, trip_recipes(recipe_id, selected)")
+    .eq("family_id", familyId)
+    .eq("status", "done");
+  const finies = trips ?? [];
+  // Base pas encore migrée : aucun repas noté.
+  const { data: repas } = finies.length
+    ? await db().from("repas").select("recipe_id, fait_le").in("trip_id", finies.map((t) => t.id)).not("fait_le", "is", null)
+    : { data: [] };
+  const explicites: RepasMange[] = (repas ?? []).map((r) => ({ recipeId: r.recipe_id as string, faitLe: Date.parse(r.fait_le as string) }));
+
+  // Les dîners décidés (un par jour), et les courses qui les couvrent. Base pas encore migrée : aucune décision gardée.
+  const { data: choix } = await db()
+    .from("ce_soir_choix")
+    .select("jour, recipe_id")
+    .eq("family_id", familyId)
+    .gte("jour", jourAParis(new Date(Date.now() - 400 * JOUR)));
+  const decisions = (choix ?? []).map((c) => ({ recipeId: c.recipe_id as string, jour: c.jour as string }));
+  if (decisions.length === 0) return explicites.sort((a, b) => b.faitLe - a.faitLe);
+  const aujourdhui = jourAParis();
+  const courses: CourseFaite[] = finies.flatMap((t) =>
+    t.finished_at
+      ? [{ le: Date.parse(t.finished_at as string), recettes: (t.trip_recipes as { recipe_id: string; selected: boolean }[]).filter((r) => r.selected).map((r) => r.recipe_id) }]
+      : [],
+  );
+  const stables = mangesDeduits(decisions, courses, explicites, aujourdhui).map((r) => ({ ...r, deduit: true }));
+
+  // La liste en cours toute cochée : les courses sont faites même si « J'ai fini » n'a pas été touché.
+  const [trip, recipes] = await Promise.all([getCurrentTrip(familyId), getRecipes(familyId)]);
+  const titres = new Map(recipes.map((r) => [r.id, r.title]));
+  const menu = (trip?.trip_recipes ?? []).filter((r) => r.selected).flatMap((r) => (titres.has(r.recipe_id) ? [{ id: r.recipe_id, titre: titres.get(r.recipe_id)! }] : []));
+  const cochees = platsCoches(menu, trip?.shopping_list_items ?? []);
+  const provisoires = cochees.length
+    ? mangesDeduits(decisions, [{ le: Date.now(), recettes: cochees }], [...explicites, ...stables], aujourdhui).map((r) => ({ ...r, deduit: true, provisoire: true }))
+    : [];
+  return [...explicites, ...stables, ...provisoires].sort((a, b) => b.faitLe - a.faitLe);
+});
+
+/** Les plats cuisinés au moins 3 fois par la famille (« C'est fait », ou décidés et dont les courses sont faites), avec le nombre de fois. */
 export const getClassiques = cache(async function getClassiques(familyId: string): Promise<{ recipeId: string; fois: number }[]> {
-  const { data: trips } = await db().from("shopping_trips").select("id").eq("family_id", familyId).eq("status", "done");
-  if (!trips?.length) return [];
-  // Base pas encore migrée : aucun repas noté, donc aucun classique.
-  const { data: repas } = await db()
-    .from("repas")
-    .select("recipe_id, fait_le")
-    .in("trip_id", trips.map((t) => t.id))
-    .not("fait_le", "is", null);
-  return classiquesDe((repas ?? []).map((r) => ({ recipeId: r.recipe_id as string, faitLe: Date.parse(r.fait_le as string) })));
+  return classiquesDe((await getRepasManges(familyId)).filter((r) => !r.provisoire));
 });
 
 // ─── « Autre idée » ───────────────────────────────────────────────────

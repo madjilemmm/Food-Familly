@@ -40,9 +40,15 @@ export default function Confidentialite() {
           mesure d&apos;audience.
         </li>
         <li>
-          <strong>Des compteurs anonymes</strong> : combien de fois par jour chaque étape du début est atteinte (accueil affiché, famille
-          créée, premier plat choisi, liste ouverte, lien partagé). Un simple total, sans identifiant, sans famille ni prénom : on ne
-          peut pas savoir qui.
+          <strong>Des compteurs anonymes</strong> : combien de fois par jour chaque étape est atteinte (accueil affiché, famille créée,
+          premier plat choisi, liste ouverte, lien partagé ; puis comment Kaddie est ouverte, Ce soir affiché, « Autre idée »,
+          « Prévenir la famille ? » proposé et sa réponse). Un simple total, sans identifiant, sans famille ni prénom : on ne peut pas
+          savoir qui.
+        </li>
+        <li>
+          <strong>Comment un dîner est décidé</strong> : pour chaque plat retenu ce soir, combien d&apos;idées ont été écartées avant et
+          quelle phrase était écrite sous le plat. Sans prénom : on ne sait pas qui a décidé. Le plat retenu et ce qui a été acheté
+          servent aussi à vous dire, par exemple, « Adoré il y a 3 semaines », et disparaissent avec la famille.
         </li>
         <li>
           <strong>La sécurité</strong> : après un code famille erroné, une empreinte de l&apos;adresse internet (jamais l&apos;adresse

@@ -151,10 +151,14 @@ export async function platsDeLaCourse(familyId: string, trip: Trip): Promise<Pla
 
 /**
  * Avant de partir, sur la liste : les ingrédients des plats du Menu que la famille a
- * sans doute déjà (à vérifier), ce qui n'a pas été pris la dernière fois et les achats
- * habituels (à ajouter d'un geste, rien d'office).
+ * sans doute déjà (à vérifier), ce qui n'a pas été pris la dernière fois, les achats
+ * habituels et, aux premières courses, ce qui a été acheté la dernière fois
+ * (à ajouter d'un geste, rien d'office).
  */
-export async function aPreparer(familyId: string, trip: Trip): Promise<{ aVerifier: string[]; reportes: Suggestion[]; habituels: Suggestion[] }> {
+export async function aPreparer(
+  familyId: string,
+  trip: Trip,
+): Promise<{ aVerifier: string[]; reportes: Suggestion[]; habituels: Suggestion[]; derniere: Suggestion[] }> {
   const menu = trip.trip_recipes.filter((r) => r.selected).map((r) => r.recipe_id);
   const [hist, passees, appris] = await Promise.all([getHistorique(familyId), getCoursesPassees(familyId), getAppris(familyId)]);
   const ingredients = hist.aLaMaison.size && menu.length ? (await getRecipesWithIngredients(familyId, menu)).flatMap((r) => r.recipe_ingredients) : [];

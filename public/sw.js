@@ -113,7 +113,10 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  // « via=notification » : Kaddie le compte (un total par jour, sans identifiant) puis le retire de l'adresse.
+  const cible = new URL(event.notification.data?.url || "/", self.location.origin);
+  cible.searchParams.set("via", "notification");
+  const url = cible.href;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
