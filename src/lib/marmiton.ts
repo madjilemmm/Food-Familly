@@ -6,7 +6,7 @@ import { recipeConflicts } from "@/lib/domain/foods";
 import { getFamilyEnvies, getFamilyTastes, getProfiles, getProfilsGouts, getRecipes } from "@/lib/data";
 import { dureeMax, lireEnvies, pourJeunes } from "@/lib/domain/envies";
 import { etiquettesPreferees } from "@/lib/domain/profil-gouts";
-import { termesDeRecherche, tropProche } from "@/lib/domain/recherche";
+import { choisirTermes, recettesAOublier, tropProche } from "@/lib/domain/recherche";
 
 /*
  * Recettes importées toutes seules depuis Marmiton, pour que le swipe ne
@@ -99,13 +99,10 @@ async function importer(familyId: string, combien: number): Promise<number> {
   // Quelques recherches ciblées (domain/recherche.ts) : plats voisins des envies du moment,
   // styles que la famille aime vraiment, saison ; un peu de hasard parmi les suivantes.
   const titresEnvies = recipes.filter((r) => enviesDuMoment.has(r.id)).map((r) => r.title);
-  const tous = termesDeRecherche({
-    envies,
-    stylesAimes: etiquettesPreferees([...profils.values()], "style:", 3),
-    matchs: melange(titresEnvies),
-    mois: new Date().getMonth(),
-  });
-  const termes = [...tous.slice(0, 2), ...melange(tous.slice(2, 30))].slice(0, RECHERCHES_PAR_IMPORT);
+  const termes = choisirTermes(
+    { envies, stylesAimes: etiquettesPreferees([...profils.values()], "style:", 3), matchs: titresEnvies, mois: new Date().getMonth() },
+    RECHERCHES_PAR_IMPORT,
+  );
   // Les résultats des recherches en alternance : pas dix gratins de pâtes d'affilée.
   const parTerme = (await Promise.all(termes.map(chercher))).map((liens) => melange(liens.filter((l) => !connus.has(l))));
   const aEssayer = [...new Set(alterner(parTerme))].slice(0, ESSAIS_MAX);
@@ -163,26 +160,40 @@ async function enregistrer(familyId: string, url: string, r: ImportedRecipe): Pr
 }
 
 /**
- * Les recettes importées que personne n'a aimées laissent la place aux nouvelles :
- * au bout de 4 semaines, ou tout de suite si ce n'est pas un plat pour des jeunes
- * (importées avant le filtre : « chou-fleur gratiné léger », « joue de porc »…).
+ * Les recettes importées que personne n'a jamais swipées laissent la place aux nouvelles, au bout de 4 semaines, ou tout de suite
+ * si ce n'est pas un plat pour des jeunes (importées avant le filtre : « chou-fleur gratiné léger », « joue de porc »…).
+ * Une recette qui a reçu un avis, même un « Bof », reste : voir recettesAOublier (domain/recherche.ts).
  */
 async function oublierLesRecettesBoudees(familyId: string) {
-  const avant = new Date(Date.now() - OUBLI_JOURS * 24 * 60 * 60 * 1000).toISOString();
   const { data: importees } = await db()
     .from("recipes")
-    .select("id, title, created_at, swipes(liked), trip_recipes(recipe_id)")
+    .select("id, title, created_at")
     .eq("family_id", familyId)
     .not("source_url", "is", null)
+    .order("created_at")
     .limit(500);
-  const aOublier = (importees ?? [])
-    .filter(
-      (r) =>
-        (r.created_at < avant || !pourJeunes(r.title as string)) &&
-        !(r.swipes as { liked: boolean }[]).some((s) => s.liked) &&
-        (r.trip_recipes as unknown[]).length === 0,
-    )
+  const lignes = importees ?? [];
+  if (lignes.length === 0) return;
+  const ids = lignes.map((r) => r.id as string);
+  const [{ data: avis }, { data: courses }] = await Promise.all([
+    db().from("swipes").select("recipe_id").in("recipe_id", ids),
+    db().from("trip_recipes").select("recipe_id").in("recipe_id", ids),
+  ]);
+  const avecAvis = new Set((avis ?? []).map((a) => a.recipe_id as string));
+  const dansUneCourse = new Set((courses ?? []).map((c) => c.recipe_id as string));
+  const maintenant = Date.now();
+  const vieilles = recettesAOublier(
+    lignes.map((r) => ({ id: r.id as string, creeLe: Date.parse(r.created_at as string) })),
+    avecAvis,
+    dansUneCourse,
+    maintenant,
+    OUBLI_JOURS,
+  );
+  // Pas pour des jeunes et jamais swipée : on la retire sans attendre (même règle : aucun avis, aucune course).
+  const pasPourJeunes = lignes
+    .filter((r) => !pourJeunes(r.title as string) && !avecAvis.has(r.id as string) && !dansUneCourse.has(r.id as string))
     .map((r) => r.id as string);
+  const aOublier = [...new Set([...vieilles, ...pasPourJeunes])];
   if (aOublier.length) await db().from("recipes").delete().in("id", aOublier);
 }
 
