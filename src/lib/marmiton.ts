@@ -27,9 +27,13 @@ const BASE = process.env.MARMITON_BASE ?? "https://www.marmiton.org";
 const PAR_IMPORT = 12;
 /** On prépare la suite avant d'être à court : sous ce nombre de plats jamais vus, un import est tenté. */
 const RESERVE = 24;
-const RECHERCHES_PAR_IMPORT = 4;
-const NB_GRAINES = 2;
-const ESSAIS_MAX = 40;
+/** Plus on cherche large, moins on tombe sur ce que la famille a déjà vu : 6 recherches et les voisines de 5 recettes (3 aimées, 2 au hasard). */
+const RECHERCHES_PAR_IMPORT = 6;
+const NB_GRAINES = 5;
+const GRAINES_AIMEES = 3;
+const ESSAIS_MAX = 70;
+/** Deux titres se ressemblent « trop » à partir de ce seuil (0,6 écartait « Poulet rôti simple » face à « Poulet rôti » ; avec 100 plats connus, presque tout tombait). */
+const SEUIL_DOUBLON = 0.7;
 const OUBLI_JOURS = 28;
 /** Un import ne dépasse pas ce temps (la fonction serveur est coupée à 60 s) ; le verrou expire un peu après. */
 const BUDGET_MS = 25_000;
@@ -81,7 +85,7 @@ export function estUnBonPlat(r: ImportedRecipe): boolean {
   return (
     /plat principal/i.test(r.category ?? "") &&
     (r.rating ?? 0) >= 4 &&
-    (r.ratingCount ?? 0) >= 15 &&
+    (r.ratingCount ?? 0) >= 8 &&
     Boolean(r.imageUrl) &&
     r.ingredients.length >= 3 &&
     pourJeunes(r.title)
@@ -151,16 +155,19 @@ async function importer(familyId: string, combien: number): Promise<{ ajoutees: 
   // Les voisines de deux recettes de la famille : d'abord celles que quelqu'un a aimées, sinon des recettes importées au hasard.
   const importees = recipes.filter((r) => r.source_url);
   const aimees = importees.filter((r) => [...(avis.get(r.id)?.values() ?? [])].some((a) => a.likedAt != null));
-  const graines = melange(aimees.length >= NB_GRAINES ? aimees : [...aimees, ...importees.filter((r) => !aimees.includes(r))]).slice(0, NB_GRAINES);
+  const autres = importees.filter((r) => !aimees.includes(r));
+  const graines = [...melange(aimees).slice(0, GRAINES_AIMEES), ...melange(autres)].slice(0, NB_GRAINES);
   const [resultats, voisins] = await Promise.all([Promise.all(termes.map(chercher)), Promise.all(graines.map((r) => voisines(r.source_url!)))]);
   const reponses = [...resultats, ...voisins];
   // Aucune réponse : la source est en panne ou nous bloque, ce n'est pas « rien de nouveau ».
   const joignable = reponses.some((r) => r !== null) || reponses.length === 0;
   // Inutile de télécharger une fiche dont le titre (lu dans l'adresse) ressemble déjà à un plat de la famille : elle serait écartée après coup.
-  const parSource = reponses.map((liens) => melange((liens ?? []).filter((l) => !connus.has(l) && !tropProche(titreDepuisLien(l), titres))));
+  const parSource = reponses.map((liens) => melange((liens ?? []).filter((l) => !connus.has(l) && !tropProche(titreDepuisLien(l), titres, SEUIL_DOUBLON))));
   const origine = new Map<string, string>(); // lien → recherche qui l'a trouvé
   parSource.forEach((liens, i) => liens.forEach((l) => origine.set(l, i < termes.length ? termes[i] : "")));
+  const nbBrut = new Set(reponses.flatMap((l) => l ?? [])).size;
   const aEssayer = [...new Set(alterner(parSource))].slice(0, ESSAIS_MAX);
+  const nbConnues = nbBrut - new Set(parSource.flat()).size;
 
   // Rien que la famille ne peut pas manger (ni, en mode strict, ce que quelqu'un n'aime pas), rien de trop long.
   const convient = (r: ImportedRecipe) =>
@@ -169,20 +176,25 @@ async function importer(familyId: string, combien: number): Promise<{ ajoutees: 
 
   let ajoutees = 0;
   const donnees = new Set<string>();
+  // Pourquoi une recette candidate n'est pas retenue : sans ça, un import qui n'ajoute rien reste inexplicable.
+  const rejets = { illisible: 0, qualite: 0, famille: 0, doublon: 0 };
   // 6 pages à la fois, jusqu'à avoir assez de plats, ou jusqu'à la fin du temps imparti.
   for (let i = 0; i < aEssayer.length && ajoutees < combien && Date.now() - debut < BUDGET_MS; i += 6) {
     const lot = await Promise.all(aEssayer.slice(i, i + 6).map(lireRecette));
     for (const [url, recette] of lot) {
-      if (ajoutees >= combien || !recette || !estUnBonPlat(recette) || !convient(recette)) continue;
+      if (ajoutees >= combien) continue;
+      if (!recette) { rejets.illisible++; continue; }
+      if (!estUnBonPlat(recette)) { rejets.qualite++; continue; }
+      if (!convient(recette)) { rejets.famille++; continue; }
       // Pas un énième « gratin dauphinois facile » quand le gratin dauphinois est déjà là.
-      if (tropProche(recette.title, titres)) continue;
+      if (tropProche(recette.title, titres, SEUIL_DOUBLON)) { rejets.doublon++; continue; }
       if (await enregistrer(familyId, url, recette)) (ajoutees++, titres.push(recette.title), donnees.add(origine.get(url) ?? ""));
     }
   }
   // Les recherches qui n'ont rien donné ne sont pas refaites tout de suite.
   const termesVides = termes.filter((t) => !donnees.has(t));
   // Une trace dans les journaux : sans elle, un import bloqué passe inaperçu (paquet vide).
-  console.info(`Import Marmiton : ${termes.join(" / ")} + voisines de ${graines.length} recettes → ${aEssayer.length} recettes à essayer, ${ajoutees} ajoutées en ${Date.now() - debut} ms${joignable ? "" : " (source injoignable)"}`);
+  console.info(`Import Marmiton : ${termes.join(" / ")} + voisines de ${graines.length} recettes → ${aEssayer.length} recettes à essayer (${nbBrut} trouvées, ${nbConnues} déjà connues ou trop proches), ${ajoutees} ajoutées en ${Date.now() - debut} ms ; refusées : ${rejets.qualite} qualité, ${rejets.famille} goûts/durée, ${rejets.doublon} doublon, ${rejets.illisible} illisible${joignable ? "" : " (source injoignable)"}`);
   return { ajoutees, termesVides, joignable };
 }
 
