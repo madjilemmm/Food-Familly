@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence } from "motion/react";
 import { swipe, undoSwipe, type SwipeAvant } from "@/app/actions/swipes";
 import { lireAttente, mettreEnAttente, retirerDeLAttente } from "@/lib/attente";
@@ -50,10 +51,23 @@ export function SwipeDeck({
   const vues = useRef(new Set(initialDeck.map((r) => r.id)));
   useEffect(() => {
     const nouvelles = initialDeck.filter((r) => !vues.current.has(r.id));
-    if (nouvelles.length === 0) return;
-    nouvelles.forEach((r) => vues.current.add(r.id));
-    setDeck((d) => [...d, ...nouvelles]);
+    if (nouvelles.length > 0) {
+      nouvelles.forEach((r) => vues.current.add(r.id));
+      setDeck((d) => [...d, ...nouvelles]);
+      return;
+    }
+    // Plus rien devant soi, et le serveur propose des plats (à revoir, ou revenus) : on ne reste pas devant une pile vide.
+    setDeck((d) => (d.length === 0 ? initialDeck : d));
   }, [initialDeck]);
+  // Pile vide : on redemande le paquet au serveur quelques fois (l'import de nouveautés tourne après l'affichage), puis on s'arrête.
+  const router = useRouter();
+  const vide = deck.length === 0;
+  useEffect(() => {
+    if (!vide) return;
+    let essais = 0;
+    const t = setInterval(() => (essais++ < 4 ? router.refresh() : clearInterval(t)), 5000);
+    return () => clearInterval(t);
+  }, [vide, router]);
   // « attente » : pas de réseau, le choix est gardé sur le téléphone et partira tout seul.
   const [error, setError] = useState<null | "attente" | "erreur">(null);
   const pileRef = useRef<HTMLDivElement>(null);

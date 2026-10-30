@@ -3,7 +3,7 @@ import { broadcastRefresh, db } from "@/lib/supabase/server";
 import { extractRecipe, type ImportedRecipe } from "@/lib/domain/recipe-import";
 import { safeFetch } from "@/lib/safe-fetch";
 import { recipeConflicts } from "@/lib/domain/foods";
-import { getFamilyEnvies, getFamilyTastes, getProfiles, getProfilsGouts, getRecipes } from "@/lib/data";
+import { getFamilyEnvies, getFamilySwipes, getFamilyTastes, getProfiles, getProfilsGouts, getRecipes } from "@/lib/data";
 import { dureeMax, lireEnvies, pourJeunes } from "@/lib/domain/envies";
 import { etiquettesPreferees } from "@/lib/domain/profil-gouts";
 import { choisirTermes, recettesAOublier, tropProche } from "@/lib/domain/recherche";
@@ -20,6 +20,7 @@ import { piocherDansLeCatalogue } from "@/lib/catalogue";
 
 const PAR_IMPORT = 10;
 const RECHERCHES_PAR_IMPORT = 4;
+const NB_GRAINES = 2;
 const ESSAIS_MAX = 60;
 const OUBLI_JOURS = 28;
 
@@ -94,14 +95,30 @@ async function chercher(terme: string): Promise<string[]> {
   }
 }
 
+/**
+ * Les recettes voisines d'une recette Marmiton : sa page en propose une vingtaine d'autres. Les fiches de recettes sont autorisées par le robots.txt
+ * (comme la 1re page de recherche) ; c'est ce qui rend l'offre presque sans fin : chaque recette trouvée ouvre une vingtaine de voisines, à explorer
+ * à partir de ce que la famille aime déjà.
+ */
+async function voisines(url: string): Promise<string[]> {
+  try {
+    const page = await safeFetch(url, { maxBytes: 3 * 1024 * 1024, accept: "text/html" });
+    const liens = page.body.toString("utf8").matchAll(/href="(?:https:\/\/www\.marmiton\.org)?(\/recettes\/recette_[^"#?]+\.aspx)"/g);
+    return [...new Set([...liens].map((m) => `https://www.marmiton.org${m[1]}`))].filter((l) => l !== url);
+  } catch {
+    return [];
+  }
+}
+
 async function importer(familyId: string, combien: number): Promise<number> {
-  const [{ members, strict }, profiles, dejaLa, recipes, profils, enviesDuMoment] = await Promise.all([
+  const [{ members, strict }, profiles, dejaLa, recipes, profils, enviesDuMoment, avis] = await Promise.all([
     getFamilyTastes(familyId),
     getProfiles(familyId),
     db().from("recipes").select("source_url").eq("family_id", familyId).not("source_url", "is", null),
     getRecipes(familyId),
     getProfilsGouts(familyId),
     getFamilyEnvies(familyId),
+    getFamilySwipes(familyId),
   ]);
   const envies = profiles.map((p) => lireEnvies(p.envies));
   const maxi = dureeMax(envies);
@@ -115,9 +132,14 @@ async function importer(familyId: string, combien: number): Promise<number> {
     { envies, stylesAimes: etiquettesPreferees([...profils.values()], "style:", 3), matchs: titresEnvies, mois: new Date().getMonth() },
     RECHERCHES_PAR_IMPORT,
   );
-  // Les résultats des recherches en alternance : pas dix gratins de pâtes d'affilée.
-  const parTerme = (await Promise.all(termes.map(chercher))).map((liens) => melange(liens.filter((l) => !connus.has(l))));
-  const aEssayer = [...new Set(alterner(parTerme))].slice(0, ESSAIS_MAX);
+  // Les voisines de deux recettes de la famille : d'abord celles que quelqu'un a aimées, sinon des recettes importées au hasard.
+  const importees = recipes.filter((r) => r.source_url);
+  const aimees = importees.filter((r) => [...(avis.get(r.id)?.values() ?? [])].some((a) => a.likedAt != null));
+  const graines = melange(aimees.length >= NB_GRAINES ? aimees : [...aimees, ...importees.filter((r) => !aimees.includes(r))]).slice(0, NB_GRAINES);
+  const [resultats, voisins] = await Promise.all([Promise.all(termes.map(chercher)), Promise.all(graines.map((r) => voisines(r.source_url!)))]);
+  // Les résultats en alternance : pas dix gratins de pâtes d'affilée.
+  const parSource = [...resultats, ...voisins].map((liens) => melange(liens.filter((l) => !connus.has(l))));
+  const aEssayer = [...new Set(alterner(parSource))].slice(0, ESSAIS_MAX);
 
   // Rien que la famille ne peut pas manger (ni, en mode strict, ce que quelqu'un n'aime pas), rien de trop long.
   const convient = (r: ImportedRecipe) =>
@@ -136,7 +158,7 @@ async function importer(familyId: string, combien: number): Promise<number> {
     }
   }
   // Une trace dans les journaux : sans elle, un import bloqué passe inaperçu (paquet vide).
-  console.info(`Import Marmiton : ${termes.join(" / ")} → ${aEssayer.length} recettes trouvées, ${ajoutees} ajoutées`);
+  console.info(`Import Marmiton : ${termes.join(" / ")} + voisines de ${graines.length} recettes → ${aEssayer.length} recettes trouvées, ${ajoutees} ajoutées`);
   return ajoutees;
 }
 

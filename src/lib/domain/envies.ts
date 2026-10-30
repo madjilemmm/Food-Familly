@@ -86,6 +86,23 @@ export const RECHERCHES_JEUNES = [
   "one pot pasta", "poulet au curry", "croziflette", "kebab maison", "gratin de pates", "pates au poulet",
 ];
 
+/** Plus de vocabulaire : des plats et des ingrédients variés, pour que les recherches ne tournent pas toujours autour des mêmes plats. */
+export const RECHERCHES_VARIEES = [
+  "poulet a la creme", "poulet basquaise", "poulet au citron", "poulet moutarde", "blanc de poulet champignons", "cuisses de poulet au four", "poulet tikka",
+  "boulettes de boeuf", "boeuf aux oignons", "steak hache gratine", "tomates farcies", "poivrons farcies", "courgettes farcies", "paupiettes de veau",
+  "saute de porc", "filet mignon moutarde", "travers de porc", "saucisses lentilles", "endives au jambon", "cordon bleu maison",
+  "saumon a la creme", "saumon en papillote", "cabillaud au four", "crevettes curry", "moules frites", "gratin de poisson", "thon a la tomate",
+  "gratin de courgettes", "gratin de chou fleur", "gratin de brocolis", "gratin de pommes de terre", "puree et saucisse", "pommes de terre farcies",
+  "risotto poulet", "risotto aux legumes", "riz sauté aux legumes", "semoule couscous", "tajine de poulet", "boulgour legumes",
+  "pates aux legumes", "pates au pesto", "pates courgettes", "penne a la tomate", "tagliatelles saumon", "raviolis gratines", "gnocchis gratines",
+  "omelette garnie", "tortilla", "galette complete", "crepes salees", "wraps legumes", "tarte aux legumes", "tarte au thon", "pizza blanche",
+  "soupe de legumes", "veloute de potiron", "curry de legumes", "chili sin carne", "lentilles saucisse", "pois chiches epices", "falafels", "dahl",
+  "nems", "bo bun", "sushi maison", "poke bowl saumon", "pad thai", "boeuf teriyaki", "porc au caramel", "nouilles sautees poulet",
+  "fajitas", "burrito", "quesadilla", "tacos de poulet", "nachos gratines", "enchiladas", "chili con carne",
+  "salade de pates", "salade de riz", "salade de poulet", "salade cesar", "taboule",
+  "hamburger maison", "hot dog maison", "croque madame", "sandwich poulet", "bagel saumon", "quiche poireaux", "quiche saumon epinards",
+];
+
 /** Dans le titre : pas pour des ados (régime, abats, plats « d'adulte »). */
 const PAS_POUR_JEUNES = [
   "leger", "legere", "light", "minceur", "detox", "regime", "sans matiere grasse", "allege", "ww", "weight watcher", "healthy", "dietetique",
@@ -128,7 +145,7 @@ export function dureeMax(envies: Envies[]): number {
 export function recherchesPour(envies: Envies[]): string[] {
   const styles = new Set(envies.flatMap((e) => e.styles));
   const aimees = STYLES.filter((s) => styles.has(s.key)).flatMap((s) => s.recherches);
-  return [...new Set([...aimees, ...aimees, ...RECHERCHES_JEUNES])];
+  return [...new Set([...aimees, ...aimees, ...RECHERCHES_JEUNES, ...RECHERCHES_VARIEES])];
 }
 
 /** Lit des envies enregistrées (jsonb), en tolérant les données incomplètes. */
