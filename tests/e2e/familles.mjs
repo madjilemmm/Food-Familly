@@ -77,9 +77,9 @@ await karin.goto(BASE + "/envies"); await shot(karin, "47-simple-swipe");
 // Une seule envie (Yoalem) : la voix de Karin ferait le match, la carte arrive en premier.
 ok((await karin.locator("h2").last().textContent()).trim() === t, `Karin voit d'abord « ${t} » (ta voix fait le match)`);
 ok(await karin.getByText("Ta voix fait le match").count() === 1, "la carte le dit");
-await karin.getByRole("button", { name: "Miam", exact: true }).click(); await karin.getByText("C'est un match !").waitFor({ timeout: 5000 });
+await karin.getByRole("button", { name: "Miam", exact: true }).click(); await karin.getByText(/et toi :/).first().waitFor({ timeout: 5000 });
 await karin.waitForTimeout(500); await shot(karin, "48-simple-match"); ok(true, "2 likes sur 3 = match (majorité)");
-ok(await karin.getByText(/\d+ ingrédients? ajoutés? à ta liste/).count() === 1, "le match va au Menu");
+ok(await karin.getByText(/\d+ articles? dans le caddie/).count() === 1, "le match va au Menu");
 await madji.reload(); await madji.getByText(`pour ${t}`).first().waitFor(); ok(true, "ses ingrédients arrivent sur la liste de Madji");
 
 // 7. Nouvelle famille

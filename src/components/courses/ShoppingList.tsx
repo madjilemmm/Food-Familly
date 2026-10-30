@@ -12,6 +12,7 @@ import type { ListItem } from "@/lib/data";
 import { IconeCroix, IconePlus } from "@/components/ui";
 import { ConfirmButton } from "./ConfirmButton";
 import { useAnnuler } from "@/components/Annuler";
+import { vibrer } from "@/lib/retour";
 import { useErreurReseau } from "@/components/ErreurReseau";
 
 type Ajout = Entree & { sorte: "ajouter" };
@@ -64,7 +65,10 @@ export function ShoppingList({
   ];
   const [list, retirer] = useOptimistic(base, (state, id: string) => state.filter((i) => i.id !== id));
 
-  const cocher = (item: ListItem) => mettreEnAttente({ sorte: "cocher", trip: tripId, id: item.id, checked: !item.checked });
+  const cocher = (item: ListItem) => {
+    vibrer();
+    return mettreEnAttente({ sorte: "cocher", trip: tripId, id: item.id, checked: !item.checked });
+  };
 
   const add = (articles: Article[], source: "manual" | "request", id?: string) =>
     articles.map((article) => {
@@ -266,7 +270,7 @@ export function ShoppingList({
         </div>
       )}
 
-      {list.length === 0 && <p className="text-center text-encre-douce">La liste est vide.</p>}
+      {list.length === 0 && <p className="text-center text-encre-douce">Rien à acheter pour l&apos;instant.</p>}
 
       {groups.map((group) => (
         <section key={group.id} data-glisse={`rayon-${group.id}`} className="mb-6">

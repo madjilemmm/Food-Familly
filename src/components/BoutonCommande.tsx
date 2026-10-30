@@ -4,9 +4,14 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useErreurReseau } from "@/components/ErreurReseau";
 import { Spinner } from "@/components/Spinner";
+import { useAnnuler } from "@/components/Annuler";
 import { SessionExpiree } from "@/lib/reseau";
+import { vibrer } from "@/lib/retour";
 
-export type Commande = "ceSeraCa" | "autreIdee" | "changer" | "allergie" | "foyer" | "prevenu";
+/** Le plat qui vient d'être retenu : l'écran « Ce soir » s'en sert pour faire arriver les articles dans le caddie (CaddieArrive). */
+export const ARRIVEE_CLE = "kd-arrivee";
+
+export type Commande = "ceSeraCa" | "defaire" | "autreIdee" | "changer" | "allergie" | "foyer" | "prevenu";
 
 /**
  * Si l'écran ne revient pas : on le redemande, puis une dernière fois, puis on recharge la page.
@@ -27,6 +32,7 @@ export function BoutonCommande({
   raison,
   reponse,
   onAvant,
+  annulable,
   className,
   pendingLabel = "…",
   children,
@@ -39,6 +45,8 @@ export function BoutonCommande({
   raison?: string;
   /** « Prévenir la famille ? » : la réponse. */
   reponse?: "oui" | "plus_tard";
+  /** « Ce sera ça » : une fois la décision prise, « Annuler » la défait pendant quelques secondes (message et détail du bandeau). */
+  annulable?: { message: string; detail?: string };
   /** Au tap, avant l'envoi (ouvrir l'aperçu du message sans attendre le réseau). */
   onAvant?: () => void;
   "aria-label"?: string;
@@ -50,6 +58,7 @@ export function BoutonCommande({
   const [envoi, setEnvoi] = useState(false);
   const [rechargement, recharger] = useTransition();
   const { essayer, alerte } = useErreurReseau();
+  const proposer = useAnnuler();
   const occupe = envoi || rechargement;
 
   useEffect(() => {
@@ -67,13 +76,28 @@ export function BoutonCommande({
         {...aria}
         onClick={async () => {
           onAvant?.();
+          if (annulable) vibrer();
           setEnvoi(true);
+          let dejaChoisi = false;
           const ok = await essayer(async () => {
             const r = await fetch("/api/ce-soir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commande, recipeId, n, raison, reponse }) });
             if (r.status === 401) throw new SessionExpiree();
             if (!r.ok) throw new Error(String(r.status));
+            dejaChoisi = Boolean((await r.json().catch(() => ({}))).dejaChoisi);
           });
           setEnvoi(false);
+          if (ok && annulable && recipeId && !dejaChoisi) {
+            try {
+              sessionStorage.setItem(ARRIVEE_CLE, recipeId);
+            } catch {
+              // Sans stockage, les articles apparaissent sans animation.
+            }
+            proposer(annulable.message, () => {
+              void fetch("/api/ce-soir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commande: "defaire", recipeId }) })
+                .then(() => router.refresh())
+                .catch(() => {});
+            }, annulable.detail);
+          }
           if (ok) recharger(() => router.refresh());
         }}
       >

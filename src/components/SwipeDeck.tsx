@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence } from "motion/react";
 import { swipe, undoSwipe, type SwipeAvant } from "@/app/actions/swipes";
 import { lireAttente, mettreEnAttente, retirerDeLAttente } from "@/lib/attente";
 import { estErreurReseau } from "@/lib/reseau";
 import { BandeauAnnuler, useProposition } from "@/components/Annuler";
-import { Bouton, CarteRecette, Logo, Scene } from "@/design-system/components/Kaddie";
+import { Bouton, CarteRecette } from "@/design-system/components/Kaddie";
 import type { Recipe } from "@/lib/data";
 import { listeDeNoms } from "@/lib/domain/convives";
+import { ROUTES } from "@/lib/routes";
+import { vibrer } from "@/lib/retour";
 import { CarteGeste, PILE } from "./CarteGeste";
-import { RecipeVisual } from "./RecipeVisual";
 
 /*
  * Le swipe des recettes : à droite « Miam », à gauche « Bof ».
@@ -24,6 +24,7 @@ import { RecipeVisual } from "./RecipeVisual";
  * « voix » : une seule autre personne en a envie (son prénom) ; un « Miam » et c'est un match.
  */
 /** « contient » : les allergènes courants, dits comme sur « Ce soir » (« Contient du lait »). */
+type Accord = { avec: string[]; auMenu: boolean };
 type CarteDuPaquet = Recipe & { hier?: boolean; voix?: string; voixNb?: number; contient?: string | null };
 
 /** Les trois premiers choix expliquent « Miam » : l'utilisateur sait à quoi ses envies servent. */
@@ -53,12 +54,9 @@ export function SwipeDeck({
     nouvelles.forEach((r) => vues.current.add(r.id));
     setDeck((d) => [...d, ...nouvelles]);
   }, [initialDeck]);
-  const [match, setMatch] = useState<{ recipe: Recipe; avec: string[]; auMenu: boolean; ingredients: number } | null>(null);
   // « attente » : pas de réseau, le choix est gardé sur le téléphone et partira tout seul.
   const [error, setError] = useState<null | "attente" | "erreur">(null);
   const pileRef = useRef<HTMLDivElement>(null);
-  const [monte, setMonte] = useState(false);
-  useEffect(() => setMonte(true), []);
   const top = deck[0];
 
   // « Annuler » est posé en haut de la pile : il ne recouvre ni Bof ni Miam, ni le nom du plat suivant.
@@ -72,12 +70,12 @@ export function SwipeDeck({
     setDeck((d) => d.slice(1));
     setFaits((n) => n + 1);
     setAnnonce(deck[1] ? `Plat suivant : ${deck[1].title}` : "Plus de plats pour l'instant");
-    const envoi: Promise<{ avant: SwipeAvant; auMenu: boolean; articles: number } | "attente" | null> = swipe(carte.id, liked)
+    vibrer();
+    const envoi: Promise<{ avant: SwipeAvant; auMenu: boolean; articles: number; accord: Accord | null } | "attente" | null> = swipe(carte.id, liked)
       .then((res) => {
         setError(null);
-        if (res.match) setMatch({ recipe: carte, avec: res.avec, auMenu: res.auMenu, ingredients: res.ingredients });
         // « Annuler » ne sort du Menu qu'un plat que ce swipe vient d'y faire entrer.
-        return { avant: res.avant, auMenu: res.auMenu && res.entre, articles: res.auMenu ? res.ingredients : 0 };
+        return { avant: res.avant, auMenu: res.auMenu && res.entre, articles: res.auMenu ? res.ingredients : 0, accord: res.match ? { avec: res.avec, auMenu: res.auMenu } : null };
       })
       .catch((e) => {
         if (!estErreurReseau(e)) {
@@ -90,7 +88,6 @@ export function SwipeDeck({
       });
     // Un doigt qui glisse trop vite : la carte revient, et le swipe redevient ce qu'il était.
     const annuler = () => {
-      setMatch((m) => (m?.recipe.id === carte.id ? null : m));
       setDeck((d) => [carte, ...d.filter((r) => r.id !== carte.id)]);
       setFaits((n) => Math.max(0, n - 1));
       envoi.then((res) => {
@@ -106,7 +103,16 @@ export function SwipeDeck({
     void envoi.then((res) => {
       if (res === null) return;
       const articles = res === "attente" ? 0 : res.articles;
-      proposer(`Miam : ${carte.title}`, annuler, articles > 0 ? `${articles} article${articles > 1 ? "s" : ""} dans le caddie` : undefined);
+      const caddie = articles > 0 ? `${articles} article${articles > 1 ? "s" : ""} dans le caddie` : undefined;
+      // Un accord de la famille s'annonce dans le bandeau, sans interrompre : on peut continuer à swiper.
+      const accord = res === "attente" ? null : res.accord;
+      if (!accord) return proposer(`Miam : ${carte.title}`, annuler, caddie);
+      proposer(
+        accord.avec.length ? `${listeDeNoms(accord.avec)} et toi : ${carte.title}` : `Au Menu : ${carte.title}`,
+        annuler,
+        accord.auMenu ? caddie : "Il est complet ou tu l'avais retiré : tu peux le remettre depuis le Menu.",
+        { href: ROUTES.menu, libelle: "Voir" },
+      );
     });
   }
 
@@ -117,7 +123,7 @@ export function SwipeDeck({
   // Sur ordinateur : flèches ← → pour swiper.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (match || (e.target as HTMLElement)?.closest("input, textarea")) return;
+      if ((e.target as HTMLElement)?.closest("input, textarea")) return;
       if (e.key === "ArrowRight") press(true);
       if (e.key === "ArrowLeft") press(false);
     };
@@ -190,12 +196,6 @@ export function SwipeDeck({
         </p>
       )}
 
-      {/* Au-dessus de tout (la scène isole ses calques) : rendu directement dans <body>. */}
-      {monte &&
-        createPortal(
-          <AnimatePresence>{match && <EcranMatch recipe={match.recipe} avec={match.avec} auMenu={match.auMenu} ingredients={match.ingredients} onClose={() => setMatch(null)} />}</AnimatePresence>,
-          document.body,
-        )}
     </div>
   );
 }
@@ -263,72 +263,5 @@ function PileVide({ toutCache }: { toutCache: boolean }) {
         Ajouter une recette
       </Link>
     </div>
-  );
-}
-
-/** « C'est un match » : monogramme qui éclot, puis la carte qui monte (120 ms après). */
-function EcranMatch({
-  recipe,
-  avec,
-  auMenu,
-  ingredients,
-  onClose,
-}: {
-  recipe: Recipe;
-  avec: string[];
-  auMenu: boolean;
-  ingredients: number;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
-    <motion.div
-      className="fixed inset-0 z-50"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.24 }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={avec.length ? "C'est un match" : "Au Menu"}
-    >
-      <Scene
-        duo="aubergine"
-        seed={31}
-        className="pb-safe mx-auto flex h-full max-w-xl flex-col justify-between gap-5 px-6 pt-[max(env(safe-area-inset-top),2.5rem)] text-center"
-      >
-        <div className="flex flex-col items-center gap-4 pt-6">
-          <div className="kd-pop text-accent">
-            <Logo variante="monogramme" width={96} title="" />
-          </div>
-          <h2 className="kd-display text-[56px]!">{avec.length ? "C'est un match\u00a0!" : "Au Menu\u00a0!"}</h2>
-          <p className="kd-titre-3">{avec.length ? `${listeDeNoms(avec)} et toi en avez envie.` : "Tu en as envie : il est au Menu."}</p>
-          {!auMenu && (
-            <p className="font-semibold">Il n&apos;est pas entré au Menu : il est complet, ou tu l&apos;en avais retiré. Tu peux l&apos;y remettre depuis le Menu.</p>
-          )}
-          {auMenu && (
-            <p className="font-semibold">
-              {ingredients > 0
-                ? `${ingredients} ingrédient${ingredients > 1 ? "s" : ""} ajouté${ingredients > 1 ? "s" : ""} à ta liste.`
-                : "Les ingrédients sont sur ta liste."}
-            </p>
-          )}
-        </div>
-        {/* La carte du plat, à hauteur fixe : le nom reste visible et tout tient sur l'écran. */}
-        <div className="kd-carte kd-monte shrink-0 text-left [animation-delay:120ms]">
-          <RecipeVisual recipe={recipe} className="h-[22dvh] w-full" />
-          <p className="kd-titre-2 p-5 text-aubergine">{recipe.title}</p>
-        </div>
-        <div className="pb-4">
-          <Bouton variante="like" large onClick={onClose} autoFocus>
-            Continuer
-          </Bouton>
-        </div>
-      </Scene>
-    </motion.div>
   );
 }

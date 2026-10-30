@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { aucuneAllergie, autreIdee, ceSeraCa, changerCeSoir, pourCombien, prevenuAujourdhui } from "@/app/actions/ce-soir";
+import { aucuneAllergie, autreIdee, ceSeraCa, changerCeSoir, defaireCeSoir, pourCombien, prevenuAujourdhui } from "@/app/actions/ce-soir";
 import { memeSite } from "@/lib/origine";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +21,7 @@ export async function POST(req: Request) {
   // « dejaChoisi » : quelqu'un a décidé avant, l'écran se recharge sur son choix.
   if (commande === "ceSeraCa" && typeof recipeId === "string") return NextResponse.json({ ok: true, ...(await ceSeraCa(recipeId, typeof raison === "string" ? raison : undefined)) });
   else if (commande === "autreIdee" && typeof recipeId === "string") await autreIdee(recipeId);
+  else if (commande === "defaire" && typeof recipeId === "string") await defaireCeSoir(recipeId);
   else if (commande === "changer") await changerCeSoir();
   else if (commande === "allergie") await aucuneAllergie();
   else if (commande === "foyer" && typeof n === "number") await pourCombien(n);

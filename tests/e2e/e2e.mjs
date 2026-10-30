@@ -54,10 +54,9 @@ await madji.getByRole("button", { name: "Bof", exact: true }).click(); await mad
 // Yoalem : like les 2 premiers -> match sur le premier, qui va tout seul au Menu
 const tMatch = await title(yoalem);
 await yoalem.getByRole("button", { name: "Miam", exact: true }).click();
-await yoalem.getByText("C'est un match !").waitFor({ timeout: 5000 }); await yoalem.waitForTimeout(600);
-await shot(yoalem, "05-enfant-match"); ok(true, "overlay de match affiché");
-ok(await yoalem.getByText(/\d+ ingrédients? ajoutés? à ta liste/).count() === 1, `match « ${tMatch} » : ajouté au Menu`);
-await yoalem.getByRole("button", { name: "Continuer" }).click();
+await yoalem.getByText(/en avez envie|et toi :/).first().waitFor({ timeout: 5000 }); await yoalem.waitForTimeout(600);
+await shot(yoalem, "05-enfant-match"); ok(true, "bandeau de match affiché");
+ok(await yoalem.getByText(/\d+ articles? dans le caddie/).count() === 1, `match « ${tMatch} » : ajouté au Menu`);
 await yoalem.getByRole("button", { name: "Miam", exact: true }).click(); await yoalem.waitForTimeout(800);
 await yoalem.goto(BASE + "/menu"); await shot(yoalem, "06-enfant-menu");
 ok(await yoalem.getByRole("button", { name: `Retirer ${tMatch} du Menu` }).count() === 1, "le match est au Menu");

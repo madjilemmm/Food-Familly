@@ -242,10 +242,23 @@ img.kd-motif { object-fit: cover; object-position: center; }
   from { transform: translateY(24px); opacity: 0; }
   to { transform: none; opacity: 1; }
 }
+@keyframes kd-pose {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes kd-tick {
+  from { transform: scale(1.5); }
+  to { transform: none; }
+}
+/* Le moment signature : les articles se posent dans le caddie, puis le compteur de l'onglet marque le coup. 420 ms en tout. */
+.kd-arrivee > * { animation: kd-pose var(--duree-rapide) var(--courbe-sortie) both; }
+.kd-arrivee > :nth-child(2) { animation-delay: 120ms; }
+.kd-arrivee > :nth-child(3) { animation-delay: 240ms; }
+.kd-tick { animation: kd-tick var(--duree) var(--courbe-rebond) both; animation-delay: 300ms; }
 .kd-pop { animation: kd-pop var(--duree-lente) var(--courbe-rebond) both; }
 .kd-monte { animation: kd-monte var(--duree-lente) var(--courbe-sortie) both; }
 
 @media (prefers-reduced-motion: reduce) {
   .kd-btn, .kd-case, .kd-case::after { transition: none; }
-  .kd-pop, .kd-monte { animation: none; }
+  .kd-pop, .kd-monte, .kd-tick, .kd-arrivee > * { animation: none; }
 }

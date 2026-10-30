@@ -107,11 +107,33 @@ export async function changerCeSoir() {
   changed();
 }
 
+/**
+ * « Annuler » juste après « Ce sera ça » : le choix est défait comme s'il n'avait pas eu lieu. Le plat ne passe pas après les autres
+ * (contrairement à « Changer de plat »), il sort du Menu s'il n'y était que par ce choix. Si quelqu'un a choisi un autre plat entre-temps, rien n'est défait.
+ */
+export async function defaireCeSoir(recipeId: string) {
+  const user = await requireUser();
+  const jour = jourAParis();
+  const { data: supprime } = await db().from("ce_soir_choix").delete().eq("family_id", user.familyId).eq("jour", jour).eq("recipe_id", recipeId).select("recipe_id");
+  // Base pas encore migrée : le choix est sur ce téléphone.
+  const c = (await cookies()).get(CE_SOIR_COOKIE)?.value ?? "";
+  const surCeTelephone = c.startsWith(`${jour}:${recipeId}:`);
+  if (!supprime?.length && !surCeTelephone) return;
+  (await cookies()).delete(CE_SOIR_COOKIE);
+  (await cookies()).delete(PREVENU_COOKIE);
+  await sortirDuMenuSiPasVoulu(user.familyId, recipeId);
+  changed();
+}
+
 /** Le plat qu'on quitte passe après les autres pendant deux jours ; il sort du Menu s'il n'y était que par le choix du soir. */
 async function quitterLePlat(familyId: string, recipeId: string) {
   await db()
     .from("pas_ce_soir")
     .upsert({ family_id: familyId, recipe_id: recipeId, jusqu_a: new Date(Date.now() + PAS_CE_SOIR_JOURS * 86_400_000).toISOString() }, { onConflict: "family_id,recipe_id" });
+  await sortirDuMenuSiPasVoulu(familyId, recipeId);
+}
+
+async function sortirDuMenuSiPasVoulu(familyId: string, recipeId: string) {
   const [envies, membres] = await Promise.all([getFamilyEnvies(familyId), getProfiles(familyId)]);
   // Même règle que pour entrer au Menu tout seul : au moins deux envies (une seule dans une famille d'une personne).
   const voulu = (envies.get(recipeId)?.length ?? 0) >= (membres.length === 1 ? 1 : 2);

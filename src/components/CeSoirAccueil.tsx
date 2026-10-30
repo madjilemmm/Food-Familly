@@ -24,6 +24,7 @@ import { jourAParis } from "@/lib/domain/heure";
 import { commeVoulu, histoireDesRepas, platsARefaire, raisonDuSoir } from "@/lib/domain/memoire";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import { BoutonCommande } from "@/components/BoutonCommande";
+import { CaddieArrive } from "@/components/CaddieArrive";
 import { PartagerRepas } from "@/components/PartagerRepas";
 import { QuestionPrevenir } from "@/components/QuestionPrevenir";
 import { Logo } from "@/design-system/components/Kaddie";
@@ -175,6 +176,7 @@ export async function CeSoirAccueil({
 
           {allergieAVoir ? <QuestionAllergie /> : questionPrevenir && <QuestionPrevenir />}
 
+          <CaddieArrive recipeId={retenu.id}>
           <Link
             href="/courses"
             className="soir-ligne mt-3 flex min-h-14 items-center gap-3 border-t-2 border-trait text-petit font-medium active:bg-trait/40"
@@ -191,6 +193,7 @@ export async function CeSoirAccueil({
             </span>
             <IconeRetour className="size-5 rotate-180 text-violet" />
           </Link>
+          </CaddieArrive>
         </div>
         <div className="soir-bas">
           <Link
@@ -369,7 +372,8 @@ export async function CeSoirAccueil({
           recipeId={plat.id}
           raison={cleRaison}
           className="kd-btn kd-btn--large w-full"
-          pendingLabel="C'est noté…"
+          pendingLabel="Je mets au caddie…"
+          annulable={{ message: `Au menu ce soir : ${plat.title}`, detail: noms2.length > 0 ? `${noms2.length} article${noms2.length > 1 ? "s" : ""} dans le caddie` : undefined }}
         >
           Ce sera ça
         </BoutonCommande>

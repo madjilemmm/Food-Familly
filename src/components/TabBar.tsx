@@ -75,7 +75,7 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
                 </span>
                 {tab.label}
                 {tab.badge ? (
-                  <span className="absolute top-1 left-1/2 ml-3 min-w-5 rounded-full bg-accent px-1.5 text-center text-etiquette leading-5 font-semibold text-on-accent">
+                  <span data-pastille={tab.label} className="absolute top-1 left-1/2 ml-3 min-w-5 rounded-full bg-accent px-1.5 text-center text-etiquette leading-5 font-semibold text-on-accent">
                     {tab.badge}
                   </span>
                 ) : null}
