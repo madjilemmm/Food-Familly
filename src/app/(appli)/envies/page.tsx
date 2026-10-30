@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { after } from "next/server";
 import { requireProfile, requireUser } from "@/lib/auth";
-import { remplirSiBesoin } from "@/lib/marmiton";
-import { getCurrentTrip, getDeck, getMesSwipes, getProfiles, getRecipes, getTasteContext } from "@/lib/data";
+import { lireEtatImport, remplirSiBesoin } from "@/lib/marmiton";
+import { conflictsOf, getCurrentTrip, getDeck, getFamilySwipes, getMesSwipes, getProfiles, getRecipes, getTasteContext } from "@/lib/data";
 import { momentDe } from "@/lib/domain/reco";
 import { allergenesSurLaCarte } from "@/lib/domain/foods";
 import { SwipeDeck } from "@/components/SwipeDeck";
@@ -15,19 +15,26 @@ export const maxDuration = 60;
 const EN_COURSE_MS = 6 * 60 * 60 * 1000;
 const jourDe = (d: Date) => new Intl.DateTimeFormat("fr-FR", { weekday: "long", timeZone: "Europe/Paris" }).format(d);
 
-export default async function Envies({ searchParams }: { searchParams: Promise<{ tout?: string }> }) {
+export default async function Envies({ searchParams }: { searchParams: Promise<{ tout?: string; revoir?: string }> }) {
   const user = await requireUser();
   // Soir de semaine : les plats rapides d'abord (on peut tout revoir d'un appui).
   const maintenant = new Date();
-  const moment = (await searchParams).tout === "1" ? null : momentDe(maintenant);
+  const params = await searchParams;
+  const moment = params.tout === "1" ? null : momentDe(maintenant);
+  // « Revoir » : ses plats aimés ou refusés, à la demande (jamais automatique).
+  const revoir = params.revoir === "aimes" || params.revoir === "refuses" ? params.revoir : null;
   // Profil, paquet, course en cours et membres : tout part en même temps.
-  const [me, deck, trip, members, mesSwipes] = await Promise.all([
+  const [me, deck, trip, members, mesSwipes, etatImport, avisFamille] = await Promise.all([
     requireProfile(),
-    getDeck(user.familyId, user.profileId, moment),
+    getDeck(user.familyId, user.profileId, moment, revoir),
     getCurrentTrip(user.familyId),
     getProfiles(user.familyId),
     getMesSwipes(user.familyId, user.profileId),
+    lireEtatImport(user.familyId),
+    getFamilySwipes(user.familyId),
   ]);
+  const mesAvis = [...avisFamille.values()].flatMap((m) => m.get(user.profileId) ?? []);
+  const aRevoir = { aimes: mesAvis.filter((a) => a.likedAt != null).length, refuses: mesAvis.filter((a) => a.likedAt == null && !a.liked).length };
   // « Je pars faire les courses » : une dernière envie peut encore partir sur la liste.
   const enCourse = trip?.created_by && Date.now() - Date.parse(trip.departs_at) < EN_COURSE_MS ? trip.created_by : null;
   const iAmShopper = enCourse === me.id;
@@ -36,11 +43,12 @@ export default async function Envies({ searchParams }: { searchParams: Promise<{
 
   // Presque plus rien à découvrir : de nouvelles recettes arrivent de Marmiton, sans rien faire.
   // (Seules les cartes jamais vues comptent : les plats qui reviennent ne sont pas des nouveautés.)
-  after(() => remplirSiBesoin(user.familyId, deck.filter((r) => !r.dejaVu).length));
-  // Paquet vide alors que la famille a des recettes : ce sont les goûts qui cachent tout.
-  const toutCache = deck.length === 0 && (await getRecipes(user.familyId)).length > 0;
+  if (!revoir) after(() => remplirSiBesoin(user.familyId, deck.filter((r) => !r.dejaVu).length));
   // Les allergènes courants, dits comme sur « Ce soir » : une carte dit la même chose partout.
   const gouts = await getTasteContext(user.familyId);
+  // Paquet vide : soit les goûts de la famille cachent TOUTES ses recettes, soit elles ont toutes été tranchées (rien n'est rejoué pour combler).
+  const recettes = deck.length === 0 ? await getRecipes(user.familyId) : [];
+  const toutCache = recettes.length > 0 && recettes.every((r) => conflictsOf(gouts, r, me.id).verdict === "cache");
 
   return (
     // Comme Recettes : le bandeau illustré, puis la pile de cartes sur le lilas, jusqu'aux onglets.
@@ -70,6 +78,9 @@ export default async function Envies({ searchParams }: { searchParams: Promise<{
       <SwipeDeck
         initialDeck={deck.map((r) => ({ ...r, contient: allergenesSurLaCarte(gouts.texts.get(r.id) ?? [r.title]) }))}
         toutCache={toutCache}
+        source={etatImport.etat}
+        revoir={revoir}
+        aRevoir={aRevoir}
         dejaSwipes={mesSwipes}
         ensuite={
           moment === "rapide" && (

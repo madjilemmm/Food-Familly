@@ -222,19 +222,19 @@ describe("paquet de swipe", () => {
     // Deux autres en ont vraiment envie : il passe même devant un ingrédient adoré.
     expect(p.map((c) => c.id)).toEqual(["e", "d", "a", "c"]);
   });
-  it("un plat aimé revient après 3 semaines, un refusé après 6 ; jamais avant tant qu'il y a de quoi swiper", () => {
+  it("un plat aimé revient après 3 semaines, un refusé après 3 mois ; jamais avant", () => {
     const nouveautes = Array.from({ length: 12 }, (_, i) => carte(`nouveau-${i}`));
     const p = ordonnerPaquet(
       [
         ...nouveautes,
         carte("aime-10j", { avis: like(10) }),
         carte("aime-25j", { avis: like(25) }),
-        carte("refuse-30j", { avis: bof(30) }),
-        carte("refuse-50j", { avis: bof(50) }),
+        carte("refuse-60j", { avis: bof(60) }),
+        carte("refuse-100j", { avis: bof(100) }),
       ],
       now,
     );
-    expect(p.map((c) => c.id).filter((id) => !id.startsWith("nouveau")).sort()).toEqual(["aime-25j", "refuse-50j"]);
+    expect(p.map((c) => c.id).filter((id) => !id.startsWith("nouveau")).sort()).toEqual(["aime-25j", "refuse-100j"]);
   });
   it("les favoris reviennent une carte sur 5, au milieu des découvertes", () => {
     const nouvelles = Array.from({ length: 8 }, (_, i) => carte(`n${i}`, { created_at: `2026-10-0${i + 1}` }));
@@ -320,7 +320,7 @@ describe("Paquet du moment", () => {
   });
 });
 
-describe("Le paquet ne s'épuise jamais", () => {
+describe("Politique de répétition : rien n'est rejoué pour cacher un manque de contenu", () => {
   const vue = (id: string, liked: boolean, ilYA: number): CartePaquet & { id: string } => ({
     id,
     created_at: "2026-10-01",
@@ -332,12 +332,29 @@ describe("Le paquet ne s'épuise jamais", () => {
     style: null,
     avis: { liked, swipedAt: jours(ilYA), likedAt: liked ? jours(ilYA) : null },
   });
-  it("tout swipé récemment : des plats reviennent en avance, les aimés d'abord, les plus anciens d'abord", () => {
-    const paquet = ordonnerPaquet([vue("refuse", false, 3), vue("aime-recent", true, 1), vue("aime-ancien", true, 5)], now);
-    expect(paquet.map((c) => c.id)).toEqual(["aime-ancien", "aime-recent", "refuse"]);
+  it("tout a été swipé récemment : le paquet est vide, pas rempli de plats refusés ou déjà vus", () => {
+    expect(ordonnerPaquet([vue("refuse", false, 3), vue("aime-recent", true, 1), vue("aime-ancien", true, 5)], now)).toEqual([]);
   });
-  it("un plat caché (interdit) ne revient jamais", () => {
+  it("un plat refusé il y a 2 mois n'est pas rejoué ; un plat aimé il y a 3 semaines revient", () => {
+    const ids = ordonnerPaquet([vue("refuse-2-mois", false, 60), vue("aime-3-semaines", true, 22)], now).map((c) => c.id);
+    expect(ids).toEqual(["aime-3-semaines"]);
+  });
+  it("un plat caché (interdit) ne revient jamais, même à la demande", () => {
     expect(ordonnerPaquet([{ ...vue("x", true, 2), cache: true }], now)).toEqual([]);
+    expect(ordonnerPaquet([{ ...vue("x", true, 2), cache: true }], now, null, "aimes")).toEqual([]);
+  });
+  it("à la demande : revoir ses plats aimés, du plus récent au plus ancien, sans mélanger les refus", () => {
+    const cartes = [vue("aime-vieux", true, 40), vue("aime-recent", true, 2), vue("refuse", false, 5), { ...vue("nouveau", true, 1), avis: undefined, vuParLaFamille: false }];
+    expect(ordonnerPaquet(cartes, now, null, "aimes").map((c) => c.id)).toEqual(["aime-recent", "aime-vieux"]);
+  });
+  it("à la demande : revoir ses plats refusés, jamais ceux qu'on a aimés", () => {
+    const cartes = [vue("refuse-vieux", false, 40), vue("refuse-recent", false, 2), vue("aime", true, 5), { ...vue("nouveau", true, 1), avis: undefined, vuParLaFamille: false }];
+    expect(ordonnerPaquet(cartes, now, null, "refuses").map((c) => c.id)).toEqual(["refuse-recent", "refuse-vieux"]);
+  });
+  it("un plat aimé puis « Bof » (pas envie ce soir) n'est pas un plat refusé", () => {
+    const aimeEtBof: CartePaquet & { id: string } = { ...vue("x", false, 2), avis: { liked: false, swipedAt: jours(2), likedAt: jours(30) } };
+    expect(ordonnerPaquet([aimeEtBof], now, null, "refuses")).toEqual([]);
+    expect(ordonnerPaquet([aimeEtBof], now, null, "aimes").map((c) => c.id)).toEqual(["x"]);
   });
 });
 

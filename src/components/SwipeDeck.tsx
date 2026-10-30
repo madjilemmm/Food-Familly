@@ -10,6 +10,7 @@ import { estErreurReseau } from "@/lib/reseau";
 import { BandeauAnnuler, useProposition } from "@/components/Annuler";
 import { Bouton, CarteRecette } from "@/design-system/components/Kaddie";
 import type { Recipe } from "@/lib/data";
+import type { EtatSource } from "@/lib/domain/import-etat";
 import { listeDeNoms } from "@/lib/domain/convives";
 import { ROUTES } from "@/lib/routes";
 import { vibrer } from "@/lib/retour";
@@ -34,11 +35,20 @@ const PREMIERS_CHOIX = 3;
 export function SwipeDeck({
   initialDeck,
   toutCache = false,
+  source = "ok",
+  revoir = null,
+  aRevoir = { aimes: 0, refuses: 0 },
   dejaSwipes = PREMIERS_CHOIX,
   ensuite,
 }: {
   initialDeck: CarteDuPaquet[];
   toutCache?: boolean;
+  /** Où en est la recherche de nouveautés : en cours, épuisée pour l'instant, en panne, ou rien à signaler. */
+  source?: EtatSource;
+  /** « Revoir » à la demande : ses plats aimés ou refusés. */
+  revoir?: "aimes" | "refuses" | null;
+  /** Combien de plats cette personne pourrait revoir (aimés, refusés). */
+  aRevoir?: { aimes: number; refuses: number };
   /** Combien de plats cette personne a déjà swipés (avant d'ouvrir l'écran). */
   dejaSwipes?: number;
   /** Ce qui remplace la légende des premiers choix, une fois ceux-ci faits. */
@@ -56,18 +66,24 @@ export function SwipeDeck({
       setDeck((d) => [...d, ...nouvelles]);
       return;
     }
-    // Plus rien devant soi, et le serveur propose des plats (à revoir, ou revenus) : on ne reste pas devant une pile vide.
-    setDeck((d) => (d.length === 0 ? initialDeck : d));
-  }, [initialDeck]);
-  // Pile vide : on redemande le paquet au serveur quelques fois (l'import de nouveautés tourne après l'affichage), puis on s'arrête.
+    }, [initialDeck]);
+  // Pile vide : si une recherche de nouveautés est en cours (ou va démarrer), on redemande le paquet quelques fois, 20 secondes au plus ;
+  // ensuite l'écran dit clairement où l'on en est. Jamais d'attente sans fin.
   const router = useRouter();
   const vide = deck.length === 0;
+  const [attenteFinie, setAttenteFinie] = useState(false);
   useEffect(() => {
-    if (!vide) return;
+    if (!vide || revoir || attenteFinie || source === "epuisee" || source === "indisponible") return;
     let essais = 0;
-    const t = setInterval(() => (essais++ < 4 ? router.refresh() : clearInterval(t)), 5000);
+    const t = setInterval(() => {
+      if (essais++ < 5) router.refresh();
+      else {
+        clearInterval(t);
+        setAttenteFinie(true);
+      }
+    }, 4000);
     return () => clearInterval(t);
-  }, [vide, router]);
+  }, [vide, revoir, attenteFinie, source, router]);
   // « attente » : pas de réseau, le choix est gardé sur le téléphone et partira tout seul.
   const [error, setError] = useState<null | "attente" | "erreur">(null);
   const pileRef = useRef<HTMLDivElement>(null);
@@ -161,7 +177,7 @@ export function SwipeDeck({
       {/* Jamais moins de 12rem, même sur iPhone SE : la page défile alors un peu. */}
       <div ref={pileRef} className="relative mx-auto min-h-[12rem] w-full flex-1 sm:max-h-[36rem] sm:max-w-sm">
         {deck.length === 0 ? (
-          <PileVide toutCache={toutCache} />
+          <PileVide toutCache={toutCache} etat={revoir ? "revoir" : source === "ok" || source === "en_cours" ? (attenteFinie ? "epuisee" : "cherche") : source} revoir={revoir} aRevoir={aRevoir} />
         ) : (
           <AnimatePresence initial={false}>
             {deck
@@ -255,7 +271,17 @@ function Carte({
   );
 }
 
-function PileVide({ toutCache }: { toutCache: boolean }) {
+function PileVide({
+  toutCache,
+  etat,
+  revoir,
+  aRevoir,
+}: {
+  toutCache: boolean;
+  etat: "cherche" | "epuisee" | "indisponible" | "revoir";
+  revoir: "aimes" | "refuses" | null;
+  aRevoir: { aimes: number; refuses: number };
+}) {
   if (toutCache) {
     return (
       <div className="kd-carte h-full justify-center gap-4 p-6 text-center">
@@ -269,13 +295,54 @@ function PileVide({ toutCache }: { toutCache: boolean }) {
       </div>
     );
   }
+  if (etat === "revoir") {
+    return (
+      <div className="kd-carte h-full justify-center gap-4 p-6 text-center">
+        <p className="kd-titre-2 text-aubergine">{revoir === "aimes" ? "Tu as tout revu" : "Rien d'autre à revoir"}</p>
+        <p className="text-encre-douce">{revoir === "aimes" ? "Ce sont tous les plats que tu as aimés." : "Ce sont tous les plats que tu avais refusés."}</p>
+        <Link href="/envies" className="kd-btn kd-btn--large">
+          Retour aux idées
+        </Link>
+      </div>
+    );
+  }
+  if (etat === "cherche") {
+    return (
+      <div role="status" className="kd-carte h-full justify-center gap-4 p-6 text-center">
+        <p className="kd-titre-2 text-aubergine">Kaddie cherche de nouvelles idées…</p>
+        <p className="text-encre-douce">Quelques secondes.</p>
+      </div>
+    );
+  }
+  // Rien de nouveau pour l'instant : on le dit, et on propose de revoir ses plats, à la demande.
+  const principal = aRevoir.aimes > 0 ? "aimes" : null;
   return (
-    <div className="kd-carte h-full justify-center gap-4 p-6 text-center">
-      <p className="kd-titre-2 text-aubergine">De nouvelles recettes arrivent…</p>
-      <p className="text-encre-douce">Kaddie va en chercher sur Marmiton. Reviens dans une minute.</p>
-      <Link href="/recettes/nouvelle" className="kd-btn kd-btn--large">
-        Ajouter une recette
-      </Link>
+    <div role="status" className="kd-carte h-full justify-center gap-4 p-6 text-center">
+      <p className="kd-titre-2 text-aubergine">{etat === "indisponible" ? "Kaddie n'arrive pas à chercher de nouvelles idées" : "Tu as fait le tour des idées du moment"}</p>
+      <p className="text-encre-douce">
+        {etat === "indisponible" ? "Réessaie dans quelques minutes : tes choix sont gardés." : "Kaddie en cherchera d'autres plus tard. En attendant, tu peux revoir tes plats ou ajouter une recette."}
+      </p>
+      {principal ? (
+        <Link href="/envies?revoir=aimes" className="kd-btn kd-btn--large">
+          Revoir mes plats aimés ({aRevoir.aimes})
+        </Link>
+      ) : (
+        <Link href="/recettes/nouvelle" className="kd-btn kd-btn--large">
+          Ajouter une recette
+        </Link>
+      )}
+      <div className="flex flex-wrap justify-center gap-x-4">
+        {aRevoir.refuses > 0 && (
+          <Link href="/envies?revoir=refuses" className="flex min-h-11 items-center font-semibold text-violet">
+            Revoir ceux que j&apos;ai refusés ({aRevoir.refuses})
+          </Link>
+        )}
+        {principal && (
+          <Link href="/recettes/nouvelle" className="flex min-h-11 items-center font-semibold text-violet">
+            Ajouter une recette
+          </Link>
+        )}
+      </div>
     </div>
   );
 }

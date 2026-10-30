@@ -24,12 +24,10 @@ export const REGLAGES = {
   ENVIE_JOURS: 14,
   /** Un plat aimé revient dans le paquet après 3 semaines : on retrouve ses favoris sans qu'ils tournent en boucle. */
   RETOUR_AIME_JOURS: 21,
-  /** Un plat refusé revient après 6 semaines : les goûts changent, mais lentement. */
-  RETOUR_REFUSE_JOURS: 45,
+  /** Un plat refusé (« Bof », jamais aimé) revient après 3 mois : les goûts changent, lentement. Avant, 6 semaines. */
+  RETOUR_REFUSE_JOURS: 90,
   /** Dans le paquet, un plat déjà vu revient au plus une carte sur 5 (le reste : des découvertes). */
   RYTHME_RETOUR: 5,
-  /** Le paquet n'est jamais plus court : à défaut de nouveautés, des plats déjà vus reviennent en avance. */
-  PAQUET_MIN: 12,
 
   // ─── Score individuel (de −1 à 1 ; null = on ne sait rien) ───
   AIME: 0.6,
@@ -204,6 +202,9 @@ export type CartePaquet = {
 /** Le moment : un soir de semaine, on a peu de temps ; le reste du temps, on a le temps de découvrir. */
 export type Moment = "rapide" | null;
 
+/** Revoir à la demande : ses plats aimés ou ses plats refusés. */
+export type Revoir = "aimes" | "refuses" | null;
+
 /** Lundi à jeudi, à partir de 15 h (heure de Paris) : le paquet favorise les plats rapides. */
 export function momentDe(date: Date): Moment {
   const parts = new Intl.DateTimeFormat("fr-FR", { weekday: "short", hour: "numeric", hour12: false, timeZone: "Europe/Paris" }).formatToParts(date);
@@ -217,9 +218,15 @@ export function momentDe(date: Date): Moment {
  * (mes goûts, ce dont les autres ont envie, la découverte) ; un plat déjà vu et revenu
  * (aimé : 3 semaines, refusé : 6 semaines) toutes les RYTHME_RETOUR cartes ;
  * pas plus de deux plats du même style d'affilée quand on peut l'éviter ;
- * les plats qu'un autre n'aime pas à la fin. Le paquet ne s'épuise jamais.
+ * les plats qu'un autre n'aime pas à la fin. Quand il n'y a plus de nouveauté, le paquet est court, voire vide : l'écran le dit
+ * (source épuisée ou en panne) et propose de revoir ses plats à la demande ; rien n'est rejoué automatiquement.
  */
-export function ordonnerPaquet<C extends CartePaquet>(cartes: C[], now: number, moment: Moment = null): C[] {
+export function ordonnerPaquet<C extends CartePaquet>(cartes: C[], now: number, moment: Moment = null, revoir: Revoir = null): C[] {
+  // Revoir, à la demande : les plats aimés, ou ceux qu'on a refusés, du plus récent au plus ancien. Jamais mélangé aux nouveautés, jamais automatique.
+  if (revoir) {
+    const voulu = (c: C) => (revoir === "aimes" ? c.avis?.likedAt != null : c.avis != null && c.avis.likedAt == null && !c.avis.liked);
+    return cartes.filter((c) => !c.cache && !c.fin && voulu(c)).sort((a, b) => b.avis!.swipedAt - a.avis!.swipedAt);
+  }
   const disponible = (c: C) => {
     if (!c.avis) return true;
     const jours = c.avis.likedAt != null ? REGLAGES.RETOUR_AIME_JOURS : REGLAGES.RETOUR_REFUSE_JOURS;
@@ -257,17 +264,9 @@ export function ordonnerPaquet<C extends CartePaquet>(cartes: C[], now: number, 
     melange.push(c);
   }
   melange.push(...retours.slice(r));
-  // Presque plus rien (tout swipé récemment, nouvelles recettes pas encore arrivées) :
-  // des plats déjà vus reviennent en avance, les aimés d'abord, les plus anciens d'abord.
-  // Le paquet n'est jamais vide tant que la famille a des plats qu'elle peut manger.
-  const enAvance =
-    melange.length + finales.length >= REGLAGES.PAQUET_MIN
-      ? []
-      : cartes
-          .filter((c) => !c.cache && !c.fin && !disponible(c))
-          .sort((a, b) => Number(b.avis!.likedAt != null) - Number(a.avis!.likedAt != null) || a.avis!.swipedAt - b.avis!.swipedAt)
-          .slice(0, REGLAGES.PAQUET_MIN - melange.length - finales.length);
-  return [...varier(melange), ...finales, ...enAvance];
+  // Plus rien de nouveau : on ne remplit PAS la pile avec des plats refusés ou déjà vus pour cacher un manque de contenu. Les retours (aimés après
+  // 3 semaines, refusés après 3 mois) restent au rythme prévu ; le reste se revoit à la demande (paramètre « revoir »).
+  return [...varier(melange), ...finales];
 }
 
 /**

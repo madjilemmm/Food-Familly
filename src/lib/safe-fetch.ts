@@ -38,6 +38,8 @@ async function assertPublicUrl(raw: string): Promise<URL> {
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("Ce lien n'est pas valide.");
   const host = url.hostname.replace(/^\[|\]$/g, "");
+  // Essais de bout en bout seulement : une fausse source sur cette machine (KADDIE_TEST_SOURCES n'est jamais renseigné en production).
+  if (process.env.KADDIE_TEST_SOURCES === "1" && (host === "localhost" || host === "127.0.0.1")) return url;
   const addresses = isIP(host) ? [host] : (await lookup(host, { all: true }).catch(() => [])).map((a) => a.address);
   if (addresses.length === 0) throw new Error("Ce site est introuvable.");
   if (addresses.some(isPrivateAddress)) throw new Error("Ce lien n'est pas autorisé.");

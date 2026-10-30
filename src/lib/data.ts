@@ -5,7 +5,7 @@ import { CE_SOIR_COOKIE } from "@/lib/domain/ce-soir";
 import { db } from "@/lib/supabase/server";
 import { nAimePas, recipeConflicts, type Conflicts, type MemberTastes, type TasteLevel } from "@/lib/domain/foods";
 import { correspondAuxStyles, dureeMax, lireEnvies, styleDe, type Envies } from "@/lib/domain/envies";
-import { avancerLesVoixManquantes, calculerMatchs, estEnvie, ordonnerPaquet, REGLAGES, type Avis, type Moment, type Signaux } from "@/lib/domain/reco";
+import { avancerLesVoixManquantes, calculerMatchs, estEnvie, ordonnerPaquet, REGLAGES, type Avis, type Moment, type Revoir, type Signaux } from "@/lib/domain/reco";
 import { listeDeNoms } from "@/lib/domain/convives";
 import { aRedemander } from "@/lib/domain/ce-soir";
 import { jourAParis } from "@/lib/domain/heure";
@@ -485,6 +485,7 @@ export async function getDeck(
   familyId: string,
   profileId: string,
   moment: Moment = null,
+  revoir: Revoir = null,
 ): Promise<(Recipe & { dejaVu?: boolean; hier?: boolean; voix?: string; voixNb?: number })[]> {
   const [recipes, avis, envies, ctx, profiles, etiquettes, profils, hist, cuisines] = await Promise.all([
     getRecipes(familyId),
@@ -534,13 +535,15 @@ export async function getDeck(
       lassitude: style ? (stylesRecents.get(style) ?? 0) : 0,
     };
   });
-  const ordonne = ordonnerPaquet(cartes, now, moment).map(
+  const ordonne = ordonnerPaquet(cartes, now, moment, revoir).map(
     ({ cache: _c, fin, avis, signaux: _s, enviesDesAutres: _e, vuParLaFamille: _v, style: _st, minutes: _m, matchProbable: _mp, lassitude: _l, ...r }) => {
       const c = conflicts.get(r.id)!;
       const carte = { ...r, ...(avis ? { dejaVu: true } : {}) };
       return fin && c.pasFanDe.length ? { ...carte, pastille: nAimePas(c.pasFanDe) } : carte;
     },
   );
+  // Revoir à la demande : la liste telle quelle (plats aimés ou refusés), sans nouveautés ni « voix qui manque ».
+  if (revoir) return ordonne;
   // « Ta voix fait le match » : ce dont une seule autre personne a envie passe devant
   // (jamais un plat qu'un autre membre n'aime pas).
   const noms = new Map(profiles.map((p) => [p.id, p.name]));

@@ -54,10 +54,12 @@ export function termesDeRecherche(e: EntreesRecherche): string[] {
  * Les recherches d'un import : les termes personnalisés d'abord (au plus la moitié), puis des termes tirés au sort parmi tous les autres.
  * Avant, les deux premiers termes (la saison) étaient les mêmes à chaque import : leurs premiers résultats, toujours identiques,
  * occupaient la moitié des recherches. Le tirage change à chaque import, donc la source est interrogée sur tout son vocabulaire.
+ * `aEviter` : les recherches qui n'ont rien donné récemment (même les personnalisées : en production, deux d'entre elles revenaient
+ * à chaque import et ne trouvaient plus rien).
  */
-export function choisirTermes(e: EntreesRecherche, combien: number, hasard: () => number = Math.random): string[] {
-  const perso = termesPersonnalises(e).slice(0, Math.floor(combien / 2));
-  const reste = termesDeRecherche(e).filter((t) => !perso.includes(t));
+export function choisirTermes(e: EntreesRecherche, combien: number, hasard: () => number = Math.random, aEviter: Set<string> = new Set()): string[] {
+  const perso = termesPersonnalises(e).filter((t) => !aEviter.has(t)).slice(0, Math.floor(combien / 2));
+  const reste = termesDeRecherche(e).filter((t) => !perso.includes(t) && !aEviter.has(t));
   const a = [...reste];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(hasard() * (i + 1));
