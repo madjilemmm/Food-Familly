@@ -98,7 +98,7 @@ body {
 
 /* Espace réservé sous le contenu pour la barre d'onglets */
 .pb-tabbar {
-  padding-bottom: calc(var(--onglets) + 1.25rem);
+  padding-bottom: calc(var(--onglets) + 2rem);
 }
 /* Remplit l'écran au-dessus des onglets ; s'allonge (et la page défile) si le contenu ne tient pas. */
 .h-screen-tabbar {
@@ -206,6 +206,13 @@ a {
   flex-direction: column;
 }
 
+/* Téléphone tourné (écran bas) : le bandeau s'efface, la pile de cartes et Bof / Miam reprennent la place. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .ecran-envies .bandeau {
+    display: none;
+  }
+}
+
 /* Le bandeau de « Ce soir » : un titre un peu plus petit, pour que la photo, le texte et le bouton tiennent sur l'écran. */
 .bandeau--fin .kd-titre-1 {
   font-size: calc(var(--taille-titre-1) * 0.84);
@@ -214,7 +221,8 @@ a {
 
 /* Ce soir : le bandeau, puis la réponse du soir qui remplit l'écran jusqu'aux onglets (la photo prend ce que le texte lui laisse). */
 .ecran-soir {
-  height: calc(100dvh - var(--onglets));
+  /* « min-height » : si le texte est agrandi et que la photo ne peut plus rétrécir, la page défile (le nom du plat n'est jamais caché). */
+  min-height: calc(100dvh - var(--onglets));
   padding-bottom: 0.5rem;
   display: flex;
   flex-direction: column;
@@ -225,14 +233,8 @@ a {
   z-index: 2;
   margin-top: -1.75rem;
   display: flex;
-  min-height: 0;
-  flex: 1 1 0;
+  flex: 1 1 auto;
   flex-direction: column;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-.soir-haut::-webkit-scrollbar {
-  display: none;
 }
 .soir-q-court {
   display: none;
@@ -254,6 +256,10 @@ a {
   }
 }
 .soir-bas {
+  position: sticky;
+  bottom: var(--onglets);
+  z-index: 3;
+  background: var(--fond);
   display: flex;
   flex-shrink: 0;
   flex-direction: column;

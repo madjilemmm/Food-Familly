@@ -21,7 +21,7 @@ export default async function SettingsPage() {
     { href: `/profil/gouts?suite=${encodeURIComponent("/reglages")}`, label: "Mes goûts", detail: "Allergies, envies, j'aime / j'aime pas" },
   ];
   return (
-    <main className="ecran-famille pb-safe mx-auto flex max-w-xl flex-col gap-10 px-5 pb-16">
+    <main className="ecran-famille mx-auto flex max-w-xl flex-col gap-10 px-5">
       {/* Le même bandeau que La table, dont on vient : le rond y ramène. */}
       <BandeauScene
         compact

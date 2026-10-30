@@ -38,8 +38,31 @@ export function TabBar({ tabs }: { tabs: Tab[] }) {
     path === href || path.startsWith(`${href}/`) || (href === "/menu" && (path === "/ce-soir" || path.startsWith("/recettes")));
   const isActive = (href: string) => (pressed ? pressed === href : matches(href, pathname));
 
+  // Pendant la saisie sur téléphone, le clavier prend déjà la moitié de l'écran : la barre s'efface le temps d'écrire.
+  const [saisie, setSaisie] = useState(false);
+  useEffect(() => {
+    if (!window.matchMedia("(pointer: coarse)").matches) return;
+    const champ = (e: EventTarget | null) => e instanceof HTMLElement && e.matches("input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=file]), textarea, select");
+    let minuteur: ReturnType<typeof setTimeout>;
+    const dedans = (e: FocusEvent) => {
+      clearTimeout(minuteur);
+      if (champ(e.target)) setSaisie(true);
+    };
+    // Un court délai : passer d'un champ à l'autre ne fait pas clignoter la barre.
+    const dehors = (e: FocusEvent) => {
+      if (champ(e.target)) minuteur = setTimeout(() => setSaisie(false), 150);
+    };
+    document.addEventListener("focusin", dedans);
+    document.addEventListener("focusout", dehors);
+    return () => {
+      clearTimeout(minuteur);
+      document.removeEventListener("focusin", dedans);
+      document.removeEventListener("focusout", dehors);
+    };
+  }, []);
+
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-trait bg-surface pb-[max(env(safe-area-inset-bottom),0.25rem)]">
+    <nav hidden={saisie} className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-trait bg-surface pb-[max(env(safe-area-inset-bottom),0.25rem)]">
       <ul className="mx-auto flex max-w-xl">
         {tabs.map((tab) => {
           const active = isActive(tab.href);

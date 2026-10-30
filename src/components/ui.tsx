@@ -139,7 +139,7 @@ export function LienReglages({ surScene = false, initiale }: { surScene?: boolea
         surScene ? "bg-blanc text-aubergine" : "bg-aubergine text-blanc"
       }`}
     >
-      {initiale ? <span className="font-display text-[24px] leading-none">{initiale.slice(0, 1).toUpperCase()}</span> : <IconePersonne />}
+      {initiale ? <span className="font-display text-[1.5rem] leading-none">{initiale.slice(0, 1).toUpperCase()}</span> : <IconePersonne />}
     </Link>
   );
 }

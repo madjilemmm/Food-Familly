@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useFeuille } from "@/lib/useFeuille";
 import { createPortal } from "react-dom";
 import { IconeCroix } from "@/components/ui";
 import { Spinner } from "@/components/Spinner";
@@ -30,18 +31,14 @@ export function PartagerRepas({ titre, articles, photo, commeVoulu = null }: { t
     window.addEventListener(EVENEMENT_PREVENIR, ouvrir);
     return () => window.removeEventListener(EVENEMENT_PREVENIR, ouvrir);
   }, []);
-  useEffect(() => {
-    if (!ouvert) return;
-    fermer.current?.focus();
-    const declencheur = bouton.current;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOuvert(false);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      // Le focus revient là où l'on était, au clavier comme au lecteur d'écran.
-      declencheur?.focus();
-    };
-  }, [ouvert]);
+  // Focus dans la fenêtre, Tab qui y reste, Échap qui ferme, focus rendu au bouton « Prévenir ».
+  useFeuille({
+    actif: ouvert,
+    onClose: () => setOuvert(false),
+    racine: () => document.querySelector<HTMLElement>("[aria-labelledby=partager-titre]"),
+    premier: () => fermer.current,
+    retour: () => bouton.current,
+  });
 
   // Le message tel que la famille le lira, puis le lien (ou l'adresse et le code, si les liens ne sont pas prêts).
   const entete = `Ce soir : ${titre}${commeVoulu ? `, ${commeVoulu}` : ""}`;

@@ -141,7 +141,7 @@ export async function CeSoirAccueil({
         <div className="soir-haut">
           <Photo recipe={retenu} lien={`/recettes/${retenu.id}?depuis=/menu`} />
           <p className="mt-4 flex min-h-6 items-center gap-2.5 text-petit text-encre-douce">
-            <span className="kd-pop inline-flex items-center gap-1.5 rounded-pastille bg-pistache py-0.5 pr-2.5 pl-1.5 text-[0.75rem] leading-4 font-semibold tracking-wider text-aubergine uppercase">
+            <span className="kd-pop inline-flex items-center gap-1.5 rounded-pastille bg-pistache py-0.5 pr-2.5 pl-1.5 text-etiquette font-semibold tracking-wider text-aubergine uppercase">
               <IconeCoche className="size-4" /> Décidé
             </span>
             {parQui && (
@@ -325,7 +325,7 @@ export async function CeSoirAccueil({
               {profiles.slice(0, 4).map((p, k) => (
                 <span
                   key={p.id}
-                  className={`flex size-6 items-center justify-center rounded-full border-2 border-fond text-[0.6875rem] leading-none font-semibold ${k ? "-ml-1.5" : ""} ${
+                  className={`flex size-6 items-center justify-center rounded-full border-2 border-fond text-etiquette leading-none font-semibold ${k ? "-ml-1.5" : ""} ${
                     qui.includes(p.name)
                       ? "bg-aubergine text-blanc"
                       : "bg-fond text-encre-douce ring-2 ring-trait ring-inset"

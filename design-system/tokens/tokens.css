@@ -46,14 +46,14 @@
   --police-display: "BoldenVan", var(--font-rubik, "Rubik"), system-ui, sans-serif;
   --police-texte: var(--font-rubik, "Rubik"), system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  --taille-display: 96px;   --interligne-display: 0.92;
-  --taille-titre-1: 48px;   --interligne-titre-1: 1;
-  --taille-titre-2: 32px;   --interligne-titre-2: 1.05;
-  --taille-titre-3: 24px;   --interligne-titre-3: 1.1;
-  --taille-bouton: 20px;    --interligne-bouton: 1;
-  --taille-corps: 17px;     --interligne-corps: 24px;
-  --taille-petit: 14px;     --interligne-petit: 20px;
-  --taille-etiquette: 12px; --interligne-etiquette: 16px;
+  --taille-display: 6rem;   --interligne-display: 0.92;
+  --taille-titre-1: 3rem;   --interligne-titre-1: 1;
+  --taille-titre-2: 2rem;   --interligne-titre-2: 1.05;
+  --taille-titre-3: 1.5rem;   --interligne-titre-3: 1.1;
+  --taille-bouton: 1.25rem;    --interligne-bouton: 1;
+  --taille-corps: 1.0625rem;     --interligne-corps: 1.5rem;
+  --taille-petit: 0.875rem;     --interligne-petit: 1.25rem;
+  --taille-etiquette: 0.75rem; --interligne-etiquette: 1rem;
 
   /* Espaces */
   --espace-1: 4px;

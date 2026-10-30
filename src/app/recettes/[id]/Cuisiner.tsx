@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useFeuille } from "@/lib/useFeuille";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Scene } from "@/design-system/components/Kaddie";
@@ -91,6 +92,8 @@ function ModeCuisine({
   const [pending, startTransition] = useTransition();
   const depart = useRef<number | null>(null);
   const aller = (k: number) => setI(Math.max(0, Math.min(total - 1, k)));
+  // Fenêtre modale : le focus y entre, Tab y reste, Échap la quitte, le focus revient au bouton « Je cuisine ».
+  useFeuille({ actif: true, onClose: onFermer, racine: () => document.querySelector<HTMLElement>("[data-feuille=cuisine]") });
 
   // L'écran reste allumé pendant qu'on cuisine (si le téléphone le permet).
   useEffect(() => {
@@ -126,6 +129,7 @@ function ModeCuisine({
       seed={23}
       role="dialog"
       aria-modal="true"
+      data-feuille="cuisine"
       aria-label="Je cuisine"
       className="pb-safe fixed inset-0 z-50 flex flex-col px-5 pt-[max(env(safe-area-inset-top),1rem)]"
       onPointerDown={(e: React.PointerEvent) => (depart.current = e.clientX)}

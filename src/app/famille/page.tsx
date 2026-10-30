@@ -25,7 +25,7 @@ export default async function FamilyPage({ searchParams }: { searchParams: Promi
   const invitation = await lienAPartager(user.familyId, me.id);
 
   return (
-    <main className="ecran-famille pb-safe mx-auto flex max-w-xl flex-col gap-6 px-5 pb-16">
+    <main className="ecran-famille mx-auto flex max-w-xl flex-col gap-6 px-5">
       {/* Le même bandeau que Ce soir, Idées et le caddie ; le rond y devient un retour. */}
       <BandeauScene
         compact
