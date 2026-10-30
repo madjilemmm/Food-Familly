@@ -114,26 +114,25 @@ const scenarios = {
   async epuisement() {
     remiseAZero(); await source("/__reset"); await source("/__pool?n=40");
     const p = await ouvrir(browser);
-    let vues = 0; let dernier = null;
-    for (let i = 0; i < 400; i++) {
+    let vues = 0; let texte = ""; const evolution = []; const t0 = Date.now(); let terminal = false;
+    while (!terminal && Date.now() - t0 < 240_000) {
       const e = await etat(p);
-      if (!e.carte) { dernier = e.vide; break; }
-      vues++; await swiper(p, false);
+      if (e.carte) { vues++; await swiper(p, false); continue; }
+      texte = e.vide ?? ""; if (!evolution.length || evolution.at(-1) !== texte) evolution.push(texte);
+      if (/fait le tour|n'arrive pas/i.test(texte)) terminal = true; else await p.waitForTimeout(1500);
     }
-    mesure(`avant la fin : ${vues} cartes vues (refusées toutes)`);
-    // Laisser le temps à la recherche, sans rien faire : la page doit finir sur un état stable et lisible.
-    const t0 = Date.now(); let texte = dernier; const evolution = [];
-    for (let i = 0; i < 40; i++) { await p.waitForTimeout(1500); const e = await etat(p); texte = e.vide ?? `carte:${e.carte}`; if (!evolution.length || evolution.at(-1) !== texte) evolution.push(texte); if (/fait le tour|n'arrive pas/i.test(texte)) break; }
-    const attente = Date.now() - t0;
-    mesure(`messages successifs : ${evolution.join("  →  ")} (stable après ${Math.round(attente / 1000)} s)`);
+    mesure(`${vues} cartes vues (toutes refusées) avant la fin ; messages successifs : ${evolution.join("  →  ")} ; message final après ${Math.round((Date.now() - t0) / 1000)} s`);
     const s0 = await stats(); await p.waitForTimeout(20_000); const s1 = await stats();
-    mesure(`requêtes vers la source pendant 20 s d'attente sur l'écran « fait le tour » : ${s1.recherches - s0.recherches} recherches, ${s1.fiches - s0.fiches} fiches`);
+    mesure(`requêtes vers la source pendant 20 s sur l'écran final : ${s1.recherches - s0.recherches} recherches, ${s1.fiches - s0.fiches} fiches`);
     ok(/fait le tour/i.test(texte), `l'épuisement est dit clairement (« ${texte} »)`);
     ok(s1.recherches - s0.recherches <= 2, "plus de martèlement de la source une fois épuisé");
-    const etatBase = sql("select dernier_resultat||' / vides='||essais_vides from import_decouverte limit 1");
-    mesure(`mémoire en base : ${etatBase}`);
-    ok(await p.getByRole("link", { name: /revoir/i }).count() > 0, "un lien pour revoir ses plats est proposé");
-    ok(await p.getByRole("link", { name: /ajouter une recette/i }).count() > 0, "un lien pour ajouter sa propre recette est proposé");
+    mesure(`mémoire en base : ${sql("select dernier_resultat||' / essais vides='||essais_vides||' / prochain essai dans '||round(extract(epoch from (prochain_essai-now()))/60)||' min' from import_decouverte limit 1")}`);
+    ok((await p.getByRole("link", { name: /revoir/i }).count()) > 0, "un lien pour revoir ses plats est proposé");
+    ok((await p.getByRole("link", { name: /ajouter une recette/i }).count()) > 0, "un lien pour ajouter sa propre recette est proposé");
+    // « Revoir » : la demande explicite fait revenir les plats refusés, un par un, sans rien cacher.
+    await p.goto(BASE + "/envies?revoir=refuses"); await p.waitForTimeout(1200);
+    const e = await etat(p);
+    ok(Boolean(e.carte), `« revoir mes refus » montre bien des plats refusés à la demande (« ${e.carte ?? e.vide} »)`);
     await p.ctx.close();
   },
 

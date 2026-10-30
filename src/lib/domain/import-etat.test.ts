@@ -17,8 +17,8 @@ describe("quand retenter un import", () => {
 describe("l'état à annoncer", () => {
   it("rien d'enregistré : tout va bien", () => expect(etatDeLaSource(null)).toBe("ok"));
   it("un import en cours : on cherche", () => expect(etatDeLaSource({ verrouJusqua: T + 30_000, essaisVides: 0, dernierResultat: null, maintenant: T })).toBe("en_cours"));
-  it("deux essais vides de suite : l'offre est épuisée pour l'instant", () => expect(etatDeLaSource({ verrouJusqua: null, essaisVides: 2, dernierResultat: "rien", maintenant: T })).toBe("epuisee"));
-  it("un seul essai vide : pas encore de conclusion", () => expect(etatDeLaSource({ verrouJusqua: null, essaisVides: 1, dernierResultat: "rien", maintenant: T })).toBe("ok"));
+  it("un essai vide : l'offre est épuisée pour l'instant (la recherche reprend plus tard)", () => expect(etatDeLaSource({ verrouJusqua: null, essaisVides: 1, dernierResultat: "rien", maintenant: T })).toBe("epuisee"));
+  it("aucun essai vide (le dernier a réussi) : tout va bien", () => expect(etatDeLaSource({ verrouJusqua: null, essaisVides: 0, dernierResultat: "ajoutees", maintenant: T })).toBe("ok"));
   it("la source a échoué : indisponible", () => expect(etatDeLaSource({ verrouJusqua: null, essaisVides: 0, dernierResultat: "erreur", maintenant: T })).toBe("indisponible"));
   it("un verrou périmé n'est plus un import en cours", () => expect(etatDeLaSource({ verrouJusqua: T - 1, essaisVides: 0, dernierResultat: "ajoutees", maintenant: T })).toBe("ok"));
 });

@@ -29,7 +29,7 @@ export function etatDeLaSource(e: { verrouJusqua: number | null; essaisVides: nu
   if (!e) return "ok";
   if (e.verrouJusqua && e.verrouJusqua > e.maintenant) return "en_cours";
   if (e.dernierResultat === "erreur") return "indisponible";
-  if (e.dernierResultat === "rien" && e.essaisVides >= 2) return "epuisee";
+  if (e.dernierResultat === "rien" && e.essaisVides >= 1) return "epuisee";
   return "ok";
 }
 
