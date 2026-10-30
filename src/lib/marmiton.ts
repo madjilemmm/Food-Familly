@@ -7,6 +7,7 @@ import { getFamilyEnvies, getFamilyTastes, getProfiles, getProfilsGouts, getReci
 import { dureeMax, lireEnvies, pourJeunes } from "@/lib/domain/envies";
 import { etiquettesPreferees } from "@/lib/domain/profil-gouts";
 import { choisirTermes, recettesAOublier, tropProche } from "@/lib/domain/recherche";
+import { piocherDansLeCatalogue } from "@/lib/catalogue";
 
 /*
  * Recettes importées toutes seules depuis Marmiton, pour que le swipe ne
@@ -42,16 +43,27 @@ async function remplir(familyId: string) {
     .from("recipes")
     .select("id")
     .eq("family_id", familyId)
-    .not("source_url", "is", null)
+    .or("source_url.not.is.null,catalogue_id.not.is.null")
     .gte("created_at", new Date(Date.now() - 2 * 60 * 1000).toISOString())
     .limit(1);
   if (recent?.length) return;
 
   await oublierLesRecettesBoudees(familyId);
-  const ajoutees = await importer(familyId, PAR_IMPORT).catch((err) => {
-    console.warn("Import Marmiton impossible :", err);
+  // La source principale : le catalogue commun (recettes complètes, avec photo, de sources autorisées), sans appel au réseau.
+  const duCatalogue = await piocherDansLeCatalogue(familyId, PAR_IMPORT).catch((err) => {
+    console.warn("Catalogue commun impossible :", err);
     return 0;
   });
+  // Marmiton n'est plus qu'un secours, pour compléter si le catalogue ne suffit pas. IMPORT_MARMITON=0 le coupe
+  // (conditions d'utilisation de Marmiton : pas d'extraction de sa base hors usage privé).
+  const secours = duCatalogue < PAR_IMPORT && process.env.IMPORT_MARMITON !== "0";
+  const deMarmiton = secours
+    ? await importer(familyId, PAR_IMPORT - duCatalogue).catch((err) => {
+        console.warn("Import Marmiton impossible :", err);
+        return 0;
+      })
+    : 0;
+  const ajoutees = duCatalogue + deMarmiton;
   // Les téléphones ouverts sur le swipe reçoivent les nouvelles cartes.
   if (ajoutees > 0) await broadcastRefresh(familyId);
 }

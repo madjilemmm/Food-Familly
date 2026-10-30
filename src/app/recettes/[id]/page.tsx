@@ -6,6 +6,7 @@ import { db } from "@/lib/supabase/server";
 import { extractRecipe } from "@/lib/domain/recipe-import";
 import { allergenesSurLaCarte, sansIngredients } from "@/lib/domain/foods";
 import { safeFetch } from "@/lib/safe-fetch";
+import { creditsDeLaRecette } from "@/lib/catalogue";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import { LienRetour } from "@/components/LienRetour";
 import { IconeRetour } from "@/components/ui";
@@ -45,7 +46,7 @@ export default async function RecipePage({
   const retour = depuis && RETOURS[depuis] ? { href: depuis, label: RETOURS[depuis] } : { href: "/recettes", label: "Les recettes" };
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const user = await requireUser();
-  const [, found, members, trip, swipes, envies, repas] = await Promise.all([
+  const [, found, members, trip, swipes, envies, repas, credits] = await Promise.all([
     requireProfile(),
     getRecipe(user.familyId, id),
     getProfiles(user.familyId),
@@ -53,6 +54,7 @@ export default async function RecipePage({
     getFamilySwipes(user.familyId),
     getFamilyEnvies(user.familyId),
     getRepasAchetes(user.familyId),
+    creditsDeLaRecette(user.familyId, id),
   ]);
   if (!found) notFound();
   // Acheté aux dernières courses : on le cuisine pour celles et ceux qui le mangent.
@@ -121,6 +123,14 @@ export default async function RecipePage({
           <p className="text-encre-douce">Pas encore d&apos;étapes pour cette recette. Tu peux les ajouter en la modifiant.</p>
         )}
       </section>
+
+      {credits && (
+        <p className="mt-8 text-center text-petit text-encre-douce">
+          <a href={credits.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">
+            {credits.texte}
+          </a>
+        </p>
+      )}
 
       {recipe.source_url && (
         <a href={recipe.source_url} target="_blank" rel="noopener noreferrer" className="mt-8 flex min-h-14 items-center justify-center text-encre-douce underline underline-offset-4">

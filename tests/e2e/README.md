@@ -46,3 +46,7 @@ La base de départ (`stack/atable-base.dump`) contient le schéma des migrations
 
 Les scripts `audit-*` **observent et affichent** ce qu'ils voient ; relire leur sortie avant de conclure. Les règles qu'ils protègent
 (allergènes, quantités, titres, pages de lecture) sont aussi couvertes par des tests unitaires (`npm test`).
+| `audit-finition.mjs` | La finition mobile : débordements, zones tactiles, un seul h1, texte ≥ 12 px, « Ce soir » à texte agrandi, paysage, clavier dans « Je cuisine ». |
+| `audit-catalogue.mjs` | Le catalogue commun : recettes complètes avec photo, sécurité alimentaire, mémoire des refus, rien d'ajouté deux fois, aucun appel à Marmiton (lancer l'appli avec `IMPORT_MARMITON=0`). |
+| `audit-marmiton.mjs` | Diagnostic manuel du bug Marmiton avec la vraie source (réseau requis). |
+
