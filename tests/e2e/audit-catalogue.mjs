@@ -54,6 +54,8 @@ ok(!fs.readFileSync(JOURNAL, "utf8").includes("Import Marmiton :"), "aucun appel
 // L'utilisateur refuse tout ce qui vient d'arriver ; il rouvre « Idées ».
 const premieres = sql("select catalogue_id from recipes where catalogue_id is not null").split("\n");
 sql(`insert into swipes (profile_id, recipe_id, liked, swiped_at) select '${M}', id, false, now() from recipes where catalogue_id is not null on conflict do nothing`);
+// Le répit de quelques secondes après un import est écoulé.
+sql("update import_decouverte set prochain_essai = null, verrou_jusqu = null");
 const a2 = await ronde();
 const toutes = sql("select catalogue_id from recipes where catalogue_id is not null").split("\n");
 ok(a2 >= 1, `2e ouverture : ${a2} recettes de plus`);
