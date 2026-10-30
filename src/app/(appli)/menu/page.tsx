@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, requireUser } from "@/lib/auth";
 import { forFamily, getCeSoirChoisi, getClassiques, getFamilyEnvies, getFamilySwipes, getProfiles, getRecipes, getRepasAchetes } from "@/lib/data";
 import { platsDuMenu, synchroniserMenu } from "@/lib/menu";
 import { listeDeNoms, phraseEnvie } from "@/lib/domain/convives";
@@ -25,16 +25,17 @@ const PROPOSES_MIN = 3;
  * Au-dessus, ce qui est déjà acheté et reste à cuisiner.
  */
 export default async function Menu({ searchParams }: { searchParams: Promise<{ i?: string }> }) {
-  const me = await requireProfile();
-  const [{ trip }, profiles, recipes, envies, repas, classiques, avis, choisi, params] = await Promise.all([
-    synchroniserMenu(me.family_id),
-    getProfiles(me.family_id),
-    getRecipes(me.family_id),
-    getFamilyEnvies(me.family_id),
-    getRepasAchetes(me.family_id),
-    getClassiques(me.family_id),
-    getFamilySwipes(me.family_id),
-    getCeSoirChoisi(me.family_id),
+  const user = await requireUser(); // cookie seulement : le profil et les lectures partent ensemble
+  const [me, { trip }, profiles, recipes, envies, repas, classiques, avis, choisi, params] = await Promise.all([
+    requireProfile(),
+    synchroniserMenu(user.familyId),
+    getProfiles(user.familyId),
+    getRecipes(user.familyId),
+    getFamilyEnvies(user.familyId),
+    getRepasAchetes(user.familyId),
+    getClassiques(user.familyId),
+    getFamilySwipes(user.familyId),
+    getCeSoirChoisi(user.familyId),
     searchParams,
   ]);
   const noms = new Map(profiles.map((p) => [p.id, p.name]));

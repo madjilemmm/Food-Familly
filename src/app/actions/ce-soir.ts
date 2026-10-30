@@ -6,6 +6,7 @@ import { db } from "@/lib/supabase/server";
 import { CE_SOIR_COOKIE, PAS_CE_SOIR_JOURS, PREVENU_COOKIE } from "@/lib/domain/ce-soir";
 import { jourAParis } from "@/lib/domain/heure";
 import { raisonValide, type RaisonSoir } from "@/lib/domain/memoire";
+import { getFamilyEnvies, getProfiles } from "@/lib/data";
 import { changerFoyer, choisirPlat } from "@/lib/menu";
 import { noterEtape } from "@/lib/etapes";
 import { changed } from "./_shared";
@@ -52,35 +53,69 @@ async function noterLaDecision(familyId: string, raison: RaisonSoir | null) {
 
 /**
  * « Ce sera ça » : le plat est celui de ce soir, il entre au Menu et ses ingrédients vont sur la liste
- * (le caddie). Pour toute la famille ; un seul plat par soir : le dernier choix remplace le précédent.
+ * (le caddie). Pour toute la famille ; un seul plat par soir : le premier choix gagne. Si quelqu'un a décidé entre-temps
+ * (un écran pas encore à jour), on ne le remplace pas et le plat de celui qui arrive après n'entre ni au Menu ni sur la liste :
+ * l'écran se recharge sur le choix déjà fait, « choisi par Karin ».
  * Base pas encore migrée : le plat entre quand même au Menu, le choix est gardé sur ce téléphone.
  * `raison` : la ligne affichée sous le plat (domain/memoire.ts), gardée avec la décision pour la mesure.
  */
-export async function ceSeraCa(recipeId: string, raison?: string) {
+export async function ceSeraCa(recipeId: string, raison?: string): Promise<{ dejaChoisi?: boolean }> {
   const user = await requireUser();
   const { data: recette } = await db().from("recipes").select("id").eq("id", recipeId).eq("family_id", user.familyId).maybeSingle();
-  if (!recette) return;
-  await choisirPlat(user.familyId, recipeId, true);
+  if (!recette) return {};
+  const jour = jourAParis();
   const { count: dejaChoisi } = await db().from("ce_soir_choix").select("jour", { count: "exact", head: true }).eq("family_id", user.familyId);
-  const { error } = await db()
+  const { data: prise, error } = await db()
     .from("ce_soir_choix")
-    .upsert({ family_id: user.familyId, jour: jourAParis(), recipe_id: recipeId, choisi_par: user.profileId, choisi_le: new Date().toISOString() }, { onConflict: "family_id,jour" });
-  if (error) (await cookies()).set(CE_SOIR_COOKIE, `${jourAParis()}:${recipeId}:${user.profileId}`, { path: "/", maxAge: 86_400, httpOnly: true, sameSite: "lax" });
+    .upsert({ family_id: user.familyId, jour, recipe_id: recipeId, choisi_par: user.profileId, choisi_le: new Date().toISOString() }, { onConflict: "family_id,jour", ignoreDuplicates: true })
+    .select("recipe_id");
+  const gagne = !error && Boolean(prise?.length);
+  if (!error && !gagne) {
+    // Une décision existe déjà pour ce soir : le même plat (un double appui), ou un autre, arrivé avant.
+    const { data: existant } = await db().from("ce_soir_choix").select("recipe_id").eq("family_id", user.familyId).eq("jour", jour).maybeSingle();
+    if (existant && existant.recipe_id !== recipeId) {
+      changed();
+      return { dejaChoisi: true };
+    }
+  }
+  if (error) (await cookies()).set(CE_SOIR_COOKIE, `${jour}:${recipeId}:${user.profileId}`, { path: "/", maxAge: 86_400, httpOnly: true, sameSite: "lax" });
+  await choisirPlat(user.familyId, recipeId, true);
   // Le tout premier choix de la famille : une étape du début à compter.
-  if (!error && dejaChoisi === 0) await noterEtape("premier_choix");
+  if (gagne && dejaChoisi === 0) await noterEtape("premier_choix");
   // Dans une écriture à part : sans les colonnes de mesure (base pas encore migrée), la décision, elle, est bien enregistrée.
-  if (!error) await noterLaDecision(user.familyId, raisonValide(raison));
+  if (gagne) await noterLaDecision(user.familyId, raisonValide(raison));
   changed();
+  return {};
 }
 
-/** « Changer de plat » : le choix de ce soir est annulé, Kaddie propose à nouveau. Le plat reste au Menu. */
+/**
+ * « Changer de plat » : le choix de ce soir est annulé, Kaddie propose à nouveau. Le plat quitté ne revient pas en tête
+ * (comme « Autre idée ») et sort du Menu, donc ses articles de la liste, sauf si la famille le voulait déjà (un match).
+ */
 export async function changerCeSoir() {
   const user = await requireUser();
-  await db().from("ce_soir_choix").delete().eq("family_id", user.familyId).eq("jour", jourAParis());
+  const jour = jourAParis();
+  const { data: ancien } = await db().from("ce_soir_choix").select("recipe_id").eq("family_id", user.familyId).eq("jour", jour).maybeSingle();
+  // Base pas encore migrée : le choix est sur ce téléphone.
+  const [cookieJour, cookieRecette] = ((await cookies()).get(CE_SOIR_COOKIE)?.value ?? "").split(":");
+  const quitte = (ancien?.recipe_id as string | undefined) ?? (cookieJour === jour ? cookieRecette : undefined);
+  await db().from("ce_soir_choix").delete().eq("family_id", user.familyId).eq("jour", jour);
   (await cookies()).delete(CE_SOIR_COOKIE);
   // Un autre plat sera retenu : la famille sera à nouveau à prévenir.
   (await cookies()).delete(PREVENU_COOKIE);
+  if (quitte) await quitterLePlat(user.familyId, quitte);
   changed();
+}
+
+/** Le plat qu'on quitte passe après les autres pendant deux jours ; il sort du Menu s'il n'y était que par le choix du soir. */
+async function quitterLePlat(familyId: string, recipeId: string) {
+  await db()
+    .from("pas_ce_soir")
+    .upsert({ family_id: familyId, recipe_id: recipeId, jusqu_a: new Date(Date.now() + PAS_CE_SOIR_JOURS * 86_400_000).toISOString() }, { onConflict: "family_id,recipe_id" });
+  const [envies, membres] = await Promise.all([getFamilyEnvies(familyId), getProfiles(familyId)]);
+  // Même règle que pour entrer au Menu tout seul : au moins deux envies (une seule dans une famille d'une personne).
+  const voulu = (envies.get(recipeId)?.length ?? 0) >= (membres.length === 1 ? 1 : 2);
+  if (!voulu) await choisirPlat(familyId, recipeId, false);
 }
 
 /** « Non » : pas d'allergie ni de régime à signaler. On ne redemande pas. */

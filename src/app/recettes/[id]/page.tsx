@@ -4,6 +4,7 @@ import { requireProfile, requireUser } from "@/lib/auth";
 import { getCurrentTrip, getFamilyEnvies, getFamilySwipes, getFoyer, getProfiles, getRecipe, getRepasAchetes, type RecipeWithIngredients } from "@/lib/data";
 import { db } from "@/lib/supabase/server";
 import { extractRecipe } from "@/lib/domain/recipe-import";
+import { allergenesSurLaCarte, sansIngredients } from "@/lib/domain/foods";
 import { safeFetch } from "@/lib/safe-fetch";
 import { RecipeVisual } from "@/components/RecipeVisual";
 import { LienRetour } from "@/components/LienRetour";
@@ -61,6 +62,10 @@ export default async function RecipePage({
   const monAvis = swipes.get(id)?.get(user.profileId);
   const etat: EtatAvis = envies.get(id)?.includes(user.profileId) ? "envie" : monAvis?.likedAt != null ? "aime" : monAvis ? "refuse" : null;
   const infos = [recipe.total_minutes && duree(recipe.total_minutes), recipe.servings && `prévue pour ${recipe.servings}`].filter(Boolean);
+  // Ce que dit la fiche des allergènes, et d'où ça vient : jamais « aucun », seulement « rien repéré d'après la liste saisie ».
+  const texte = [recipe.title, ...recipe.recipe_ingredients.map((i) => i.name)];
+  const allergenes = allergenesSurLaCarte(texte);
+  const provenance = recipe.source_url ? `Recette importée de ${new URL(recipe.source_url).hostname.replace(/^www\./, "")} : ingrédients et quantités à vérifier. ` : "";
 
   return (
     <article className="pt-safe pb-6">
@@ -76,6 +81,15 @@ export default async function RecipePage({
       <RecipeVisual recipe={recipe} className="mt-2 aspect-[4/3] w-full rounded-carte" />
       <h1 className="kd-titre-1 mt-5 text-aubergine">{recipe.title}</h1>
       {infos.length > 0 && <p className="kd-etiquette mt-2">{infos.join(" · ")}</p>}
+
+      <p className="mt-3 text-petit text-encre-douce">
+        {provenance}
+        {sansIngredients(texte)
+          ? "Sans liste d'ingrédients, Kaddie ne peut pas dire ce que contient ce plat."
+          : allergenes
+            ? `${allergenes}, d'après les ingrédients saisis. Vérifie toujours les étiquettes.`
+            : "Aucun allergène courant repéré d'après les ingrédients saisis. Vérifie toujours les étiquettes."}
+      </p>
 
       <AvisRecette key={etat ?? "aucun"} recipeId={recipe.id} etat={etat} />
 

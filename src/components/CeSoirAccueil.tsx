@@ -12,14 +12,14 @@ import {
   getProfiles,
   getRecipe,
   getRecipes,
-  getRecipesWithIngredients,
   getRepasAchetes,
   getRepasManges,
   getTasteContext,
 } from "@/lib/data";
 import { platsDuMenu } from "@/lib/menu";
 import { choisirCeSoir, PREVENU_COOKIE } from "@/lib/domain/ce-soir";
-import { contientPhrase } from "@/lib/domain/foods";
+import { allergenesSurLaCarte } from "@/lib/domain/foods";
+import { estPourLaRecette } from "@/lib/domain/shopping-list";
 import { jourAParis } from "@/lib/domain/heure";
 import { commeVoulu, histoireDesRepas, platsARefaire, raisonDuSoir } from "@/lib/domain/memoire";
 import { RecipeVisual } from "@/components/RecipeVisual";
@@ -78,6 +78,8 @@ export async function CeSoirAccueil({
     avis,
     ctx,
     manges,
+    foyer,
+    detailChoisi,
   ] = await Promise.all([
     getCeSoirChoisi(me.family_id),
     getRepasAchetes(me.family_id),
@@ -88,6 +90,9 @@ export async function CeSoirAccueil({
     getFamilySwipes(me.family_id),
     getTasteContext(me.family_id),
     getRepasManges(me.family_id),
+    getFoyer(me.family_id),
+    // La fiche du plat décidé (ses étapes : « Je cuisine » ou « Voir la recette ») part avec le reste, sans attendre.
+    getCeSoirChoisi(me.family_id).then((c) => (c ? getRecipe(me.family_id, c.recipeId) : null)),
   ]);
   const parId = new Map(recipes.map((r) => [r.id, r]));
   const noms = new Map(profiles.map((p) => [p.id, p.name]));
@@ -98,22 +103,20 @@ export async function CeSoirAccueil({
   // ─── Le repas de ce soir est retenu ───
   const retenu = choisi ? parId.get(choisi.recipeId) : undefined;
   if (retenu) {
-    const ingredients = trip.shopping_list_items.filter(
-      (l) =>
-        l.source === "recipe" &&
-        (l.for_recipes ?? "").split(", ").includes(retenu.title),
-    );
+    // Un titre peut contenir une virgule : on lit « pour A, B » avec les titres de la famille.
+    const titres = recipes.map((r) => r.title);
+    const ingredients = trip.shopping_list_items.filter((l) => l.source === "recipe" && estPourLaRecette(l.for_recipes, retenu.title, titres));
     const parQui = choisi?.choisiPar
       ? choisi.choisiPar === me.id
         ? "toi"
         : noms.get(choisi.choisiPar)
       : null;
-    const contient = contientPhrase(ctx.texts.get(retenu.id) ?? [retenu.title]);
+    const contient = allergenesSurLaCarte(ctx.texts.get(retenu.id) ?? [retenu.title]);
     const achete = (repas?.plats ?? []).some(
       (p) => p.id === retenu.id && !p.fait,
     );
     // Sans étapes (recette à peine saisie), « Je cuisine » n'a rien à ouvrir : la fiche de la recette suffit.
-    const detail = await getRecipe(me.family_id, retenu.id);
+    const detail = detailChoisi;
     const cuisinable = (detail?.steps?.length ?? 0) > 0;
     // Le prochain pas utile : acheter tant que la liste n'est pas faite, puis cuisiner.
     const resteAAcheter = ingredients.some((l) => !l.checked);
@@ -124,7 +127,7 @@ export async function CeSoirAccueil({
     const maEnvie = !jeChoisis && enviePar.includes(me.id);
     const autresEnvies = enviePar.filter((id) => id !== me.id).flatMap((id) => noms.get(id) ?? []);
     // « Prévenir la famille ? » : une fois par dîner et par téléphone, juste après « Ce sera ça », quand il y a quelqu'un à prévenir.
-    const quelquUnAPrevenir = profiles.length > 1 || ((await getFoyer(me.family_id)) ?? 1) > 1;
+    const quelquUnAPrevenir = profiles.length > 1 || (foyer ?? 1) > 1;
     const dejaRepondu = (await cookies()).get(PREVENU_COOKIE)?.value === jourAParis();
     const questionPrevenir = jeChoisis && quelquUnAPrevenir && !dejaRepondu;
     const lienRecette = `/recettes/${retenu.id}?depuis=/menu${cuisinable ? "&cuisine=1" : ""}`;
@@ -294,17 +297,11 @@ export async function CeSoirAccueil({
     { achete: plat.origine === "achete", qui, histoire, aime, adore: aime && histoire != null && (monAvis?.likedAt ?? 0) >= histoire.dernier },
     { moi: me.name, now: maintenant },
   );
-  const contient = contientPhrase(ctx.texts.get(plat.id) ?? [plat.title]);
+  const contient = allergenesSurLaCarte(ctx.texts.get(plat.id) ?? [plat.title]);
   // Le nombre de personnes à table : celui de la course, sinon le foyer dit à la création, sinon la famille.
-  const pour =
-    trip.people ??
-    Math.max((await getFoyer(me.family_id)) ?? 1, profiles.length);
-  const [avecIngredients] = await getRecipesWithIngredients(me.family_id, [
-    plat.id,
-  ]);
-  const noms2 = (avecIngredients?.recipe_ingredients ?? []).map((l) =>
-    sansQuantite(l.name),
-  );
+  const pour = trip.people ?? Math.max(foyer ?? 1, profiles.length);
+  // Les ingrédients du plat : déjà chargés avec le titre (domain/foods.ts), pas de requête de plus.
+  const noms2 = (ctx.texts.get(plat.id) ?? [plat.title]).slice(1).map((nom) => sansQuantite(nom));
   const lien = `/recettes/${plat.id}?depuis=/menu`;
 
   const node = (

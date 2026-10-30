@@ -4,7 +4,7 @@ import { requireProfile, requireUser } from "@/lib/auth";
 import { remplirSiBesoin } from "@/lib/marmiton";
 import { getCurrentTrip, getDeck, getMesSwipes, getProfiles, getRecipes, getTasteContext } from "@/lib/data";
 import { momentDe } from "@/lib/domain/reco";
-import { contientPhrase } from "@/lib/domain/foods";
+import { allergenesSurLaCarte } from "@/lib/domain/foods";
 import { SwipeDeck } from "@/components/SwipeDeck";
 import { BandeauScene, IconePanier } from "@/components/ui";
 import { CarteGouts, CarteInviter } from "@/components/Envies";
@@ -68,7 +68,7 @@ export default async function Envies({ searchParams }: { searchParams: Promise<{
       {!bandeauCourse && members.length === 1 && <CarteInviter />}
       {!bandeauCourse && members.length > 1 && !me.tastes_done_at && <CarteGouts retour="/envies" />}
       <SwipeDeck
-        initialDeck={deck.map((r) => ({ ...r, contient: contientPhrase(gouts.texts.get(r.id) ?? [r.title]) }))}
+        initialDeck={deck.map((r) => ({ ...r, contient: allergenesSurLaCarte(gouts.texts.get(r.id) ?? [r.title]) }))}
         toutCache={toutCache}
         dejaSwipes={mesSwipes}
         ensuite={

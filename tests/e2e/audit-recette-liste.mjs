@@ -1,0 +1,40 @@
+// Audit : une recette déjà au Menu est modifiée, ou supprimée : la liste de courses suit-elle ?
+import { devices } from "@playwright/test";
+import { lancer } from "./navigateur.mjs";
+import { execSync } from "node:child_process";
+import { settle } from "./settle.mjs";
+const SP = process.env.SP, BASE = "http://localhost:3000";
+const sql = (q) => execSync("PGPASSWORD=postgres psql -h localhost -U postgres -d atable -qAt", { input: q }).toString().trim();
+const K = "00000000-0000-4000-8000-000000000001", M = "00000000-0000-4000-8000-000000000002", GRATIN = "10000000-0000-4000-8000-000000000003";
+execSync(`bash ${SP}/restore-base.sh`, { stdio: "ignore" }); execSync(`bash ${SP}/reset.sh`);
+sql(`insert into swipes (profile_id, recipe_id, liked, swiped_at, liked_at) values ('${K}','${GRATIN}',true,now(),now()),('${M}','${GRATIN}',true,now(),now());`);
+const b = await lancer();
+const ctx = await b.newContext({ ...devices["iPhone 13"], locale: "fr-FR", timezoneId: "Europe/Paris" });
+const p = settle(await ctx.newPage());
+await p.goto(BASE + "/"); await p.getByRole("button", { name: "J'ai déjà un code" }).click();
+await p.getByLabel("Code famille").fill(" Poulet Test "); await p.getByRole("button", { name: "C'est parti" }).click();
+await p.waitForURL("**/profil"); await p.getByRole("button", { name: "Karin" }).click(); await p.waitForURL(/menu/);
+const liste = () => sql("select string_agg(name||' '||coalesce(quantity::text,'')||coalesce(unit,'')||' [pour '||coalesce(for_recipes,'-')||']', E'\\n' order by name) from shopping_list_items i join shopping_trips t on t.id=i.trip_id where t.status<>'done'");
+await p.goto(BASE + "/courses"); await p.waitForTimeout(1000);
+console.log("Liste au départ :\n" + liste());
+// La recette est modifiée par le formulaire (« Modifier » puis « Enregistrer ») : titre, un ingrédient retiré, une quantité changée.
+await p.goto(BASE + `/recettes/${GRATIN}/modifier`);
+await p.locator('input[name="title"]').fill("Gratin dauphinois du dimanche");
+const noms = await p.locator('[data-champ^="nom-"]').evaluateAll((els) => els.map((e) => e.value));
+const iMuscade = noms.findIndex((n) => /muscade/i.test(n)), iLait = noms.findIndex((n) => /^lait/i.test(n));
+await p.locator('[data-champ="qte-' + iLait + '"]').fill("100");
+await p.getByRole("button", { name: "Supprimer l'ingrédient" }).nth(iMuscade).click();
+await p.getByRole("button", { name: "Enregistrer" }).click();
+await p.waitForURL("**/recettes", { timeout: 10000 });
+await p.goto(BASE + "/courses"); await p.waitForTimeout(800);
+console.log("\nAprès modification de la recette par le formulaire :\n" + liste());
+console.log("Le caddie dit : " + (await p.locator("main").innerText()).replace(/\s+/g, " ").slice(0, 150));
+// La recette est supprimée (« Supprimer cette recette », puis « Oui, supprimer »).
+await p.goto(BASE + `/recettes/${GRATIN}/modifier`);
+await p.getByRole("button", { name: "Supprimer cette recette" }).click();
+await p.getByRole("button", { name: "Oui, supprimer" }).click();
+await p.waitForURL("**/recettes", { timeout: 10000 });
+await p.goto(BASE + "/courses"); await p.waitForTimeout(800);
+console.log("\nAprès suppression de la recette :\n" + (liste() || "(liste vide)"));
+console.log("Écran du caddie : " + (await p.locator("main").innerText()).replace(/\s+/g, " ").slice(0, 330));
+await b.close();

@@ -60,8 +60,8 @@ export function cartesPour(diets: string[]): Food[] {
 
 const PORC = ["porc", "lardon", "jambon", "chorizo", "saucisse", "saucisson", "bacon", "pancetta", "rillette", "coppa", "lard", "poitrine fumee", "chair a saucisse", "andouille", "andouillette", "boudin", "cervelas", "mortadelle", "prosciutto", "speck", "travers de porc", "echine de porc", "knack", "chipolata", "salami", "rosette"];
 const PORC_SAUF = ["jambon de dinde", "jambon de poulet", "lardons de volaille", "lardons de dinde", "saucisse de volaille", "saucisse vegetale", "bacon de dinde"];
-const POISSON = ["poisson", "saumon", "thon", "cabillaud", "colin", "merlu", "lieu noir", "lieu jaune", "dorade", "daurade", "bar", "truite", "sardine", "maquereau", "hareng", "anchois", "sole", "lotte", "haddock", "morue", "raie", "rouget", "tilapia", "pangasius", "espadon", "eglefin", "surimi", "brandade", "loup de mer", "flétan"];
-const FRUITS_DE_MER = ["fruits de mer", "crevette", "gambas", "moule", "huitre", "homard", "langouste", "langoustine", "crabe", "saint jacques", "st jacques", "calamar", "encornet", "seiche", "poulpe", "palourde", "bulot", "bigorneau", "ecrevisse", "tourteau", "praire"];
+const POISSON = ["poisson", "saumon", "thon", "cabillaud", "colin", "merlu", "lieu noir", "lieu jaune", "dorade", "daurade", "bar", "truite", "sardine", "maquereau", "hareng", "anchois", "sole", "lotte", "haddock", "morue", "raie", "rouget", "tilapia", "pangasius", "espadon", "eglefin", "surimi", "brandade", "loup de mer", "flétan", "nuoc mam", "sauce de poisson", "worcestershire", "fumet de poisson", "bouillon de poisson", "tarama", "caviar", "rollmop", "dashi", "bonite"];
+const FRUITS_DE_MER = ["fruits de mer", "crevette", "gambas", "moule", "huitre", "homard", "langouste", "langoustine", "crabe", "saint jacques", "st jacques", "calamar", "encornet", "seiche", "poulpe", "palourde", "bulot", "bigorneau", "ecrevisse", "tourteau", "praire", "escargot", "coquillage", "crustace", "oursin", "bisque"];
 const VIANDE = [...PORC, "viande", "boeuf", "veau", "poulet", "dinde", "volaille", "agneau", "mouton", "canard", "magret", "lapin", "steak", "escalope", "bavette", "entrecote", "faux filet", "paleron", "macreuse", "joue de boeuf", "gigot", "merguez", "kebab", "cordon bleu", "nugget", "pintade", "caille", "oie", "gibier", "chevreuil", "sanglier", "cheval", "foie", "foie gras", "rognon", "gesier", "bouillon de volaille", "bouillon de boeuf", "fond de veau", "fond de volaille", "gelatine", "osso bucco", "blanquette", "bourguignon"];
 
 /** Régimes et allergies : niveau « interdit », pour toute la famille. */
@@ -71,25 +71,38 @@ export const DIETS: Food[] = [
   {
     key: "sans_gluten",
     label: "Sans gluten",
-    words: ["gluten", "farine", "ble", "pate", "pain", "baguette", "brioche", "chapelure", "semoule", "couscous", "boulgour", "orge", "seigle", "epeautre", "biere", "biscuit", "spaghetti", "tagliatelle", "lasagne", "penne", "coquillette", "macaroni", "fusilli", "linguine", "ravioli", "gnocchi", "nouille", "vermicelle", "croissant", "crepe", "pizza", "tortilla", "wrap", "cracker", "panure", "pane", "chapati", "naan", "galette de ble"],
-    except: ["farine de riz", "farine de mais", "farine de sarrasin", "farine de pois chiche", "farine sans gluten", "pain sans gluten", "pate sans gluten", "nouille de riz", "vermicelle de riz", "galette de riz", "tortilla de mais", "pate de curry", "pate d amande", "pate de sesame", "pate d arachide", "pate de tomate"],
+    words: ["gluten", "farine", "ble", "pate", "pain", "baguette", "brioche", "chapelure", "semoule", "couscous", "boulgour", "orge", "seigle", "epeautre", "biere", "biscuit", "spaghetti", "tagliatelle", "lasagne", "penne", "coquillette", "macaroni", "fusilli", "linguine", "ravioli", "gnocchi", "nouille", "vermicelle", "croissant", "crepe", "pizza", "tortilla", "wrap", "cracker", "panure", "pane", "chapati", "naan", "galette de ble", "avoine", "flocon d avoine", "kamut", "malt", "panko", "crouton", "boudoir", "seitan", "bulgur", "sauce soja"],
+    except: ["farine de riz", "farine de mais", "farine de sarrasin", "farine de pois chiche", "farine d amande", "farine de coco", "farine de chataigne", "farine de lupin", "farine de manioc", "farine de tapioca", "farine sans gluten", "pain sans gluten", "pate sans gluten", "nouille de riz", "vermicelle de riz", "galette de riz", "tortilla de mais", "pate de curry", "pate d amande", "pate de sesame", "pate d arachide", "pate de tomate"],
   },
   {
     key: "sans_lactose",
     label: "Sans lactose",
-    words: ["lactose", "lait", "creme", "creme fraiche", "beurre", "fromage", "yaourt", "yogourt", "gruyere", "emmental", "comte", "parmesan", "mozzarella", "feta", "ricotta", "mascarpone", "raclette", "reblochon", "camembert", "roquefort", "cheddar", "bechamel", "brie", "mimolette", "chevre", "fromage blanc", "petit suisse", "cancoillotte", "burrata", "gorgonzola", "munster", "maroilles", "tomme", "beaufort", "cantal", "bleu", "boursin", "kiri", "lait concentre"],
+    words: ["lactose", "lait", "creme", "creme fraiche", "beurre", "fromage", "yaourt", "yogourt", "gruyere", "emmental", "comte", "parmesan", "mozzarella", "feta", "ricotta", "mascarpone", "raclette", "reblochon", "camembert", "roquefort", "cheddar", "bechamel", "brie", "mimolette", "chevre", "fromage blanc", "petit suisse", "cancoillotte", "burrata", "gorgonzola", "munster", "maroilles", "tomme", "beaufort", "cantal", "bleu", "boursin", "kiri", "lait concentre", "ghee", "chantilly", "creme anglaise", "caseine", "lactoserum", "babeurre", "kefir", "skyr", "chocolat au lait"],
     except: ["lait de coco", "creme de coco", "lait d amande", "lait de soja", "lait d avoine", "lait de riz", "creme de soja", "beurre de cacahuete", "beurre d arachide", "beurre de cacao", "creme de marron", "sans lactose", "beurre vegetal", "creme vegetale"],
   },
-  { key: "arachide", label: "Arachides", words: ["arachide", "cacahuete", "beurre de cacahuete", "beurre d arachide"] },
+  { key: "arachide", label: "Arachides", words: ["arachide", "cacahuete", "cacahouete", "cacahuette", "cacahouette", "beurre de cacahuete", "beurre d arachide", "satay"] },
   {
     key: "fruits_a_coque",
     label: "Fruits à coque",
-    words: ["noix", "noisette", "amande", "pistache", "cajou", "pecan", "macadamia", "noix du bresil", "praline", "pralin", "nougat", "frangipane", "pate d amande", "gianduja", "nutella"],
-    except: ["noix de coco", "noix de muscade", "noix de saint jacques", "noix de st jacques", "noix de veau", "noix de beurre", "noix de jambon"],
+    words: ["noix", "noisette", "amande", "pistache", "cajou", "pecan", "macadamia", "noix du bresil", "praline", "pralin", "nougat", "frangipane", "pate d amande", "gianduja", "nutella", "pate a tartiner", "massepain", "orgeat", "amaretto"],
+    except: ["noix de coco", "noix de muscade", "noix de saint jacques", "noix de st jacques", "noix de veau", "noix de beurre", "noix de jambon", "noisette de beurre", "beurre noisette"],
   },
   { key: "fruits_de_mer", label: "Fruits de mer", words: FRUITS_DE_MER },
   { key: "poisson", label: "Poisson", words: POISSON },
-  { key: "oeufs", label: "Œufs", words: ["oeuf", "jaune d oeuf", "blanc d oeuf", "mayonnaise", "meringue", "omelette", "quiche"] },
+  { key: "oeufs", label: "Œufs", words: ["oeuf", "jaune d oeuf", "blanc d oeuf", "mayonnaise", "meringue", "omelette", "quiche", "aioli", "hollandaise", "bearnaise", "sabayon", "creme anglaise", "creme patissiere"] },
+  { key: "soja", label: "Soja", words: ["soja", "tofu", "edamame", "miso", "tempeh", "tamari", "natto", "okara", "lecithine de soja", "sauce soja"] },
+  { key: "sesame", label: "Sésame", words: ["sesame", "tahini", "tahin", "gomasio", "halva", "halwa", "dukkah", "zaatar"] },
+  { key: "celeri", label: "Céleri", words: ["celeri", "celeri rave", "celeri branche", "sel de celeri"] },
+  { key: "moutarde", label: "Moutarde", words: ["moutarde"] },
+];
+
+/**
+ * Les deux derniers des 14 allergènes à déclaration obligatoire : on les repère et on les dit sur la carte,
+ * mais ils ne sont pas proposés en pastille (rares) : on les tape dans « Autre » (« sulfites », « lupin »).
+ */
+export const ALLERGENES_RARES: Food[] = [
+  { key: "sulfites", label: "Sulfites", words: ["sulfite", "metabisulfite", "vin", "vin rouge", "vin blanc", "vin jaune", "vin cuit", "vinaigre de vin", "champagne", "cidre", "porto", "xeres", "madere", "marsala", "vermouth", "abricot sec"] },
+  { key: "lupin", label: "Lupin", words: ["lupin"] },
 ];
 
 /** Les cartes du questionnaire : « j'aime pas », « ça me va » ou « j'adore ». */
@@ -150,7 +163,7 @@ export const INGREDIENTS: Food[] = [
   { key: "sucre_sale", label: "Sucré-salé", words: ["pruneau", "raisin sec", "abricot sec", "figue seche", "datte", "tajine aux pruneaux"] },
 ];
 
-const ALL: Food[] = [...DIETS, ...INGREDIENTS.filter((f) => !DIETS.some((d) => d.key === f.key))];
+const ALL: Food[] = [...DIETS, ...ALLERGENES_RARES, ...INGREDIENTS.filter((f) => !DIETS.some((d) => d.key === f.key))];
 const BY_KEY = new Map(ALL.map((f) => [f.key, f]));
 
 export function foodLabel(key: string): string {
@@ -166,21 +179,52 @@ const pad = (s: string) => ` ${normalizeName(s)} `;
 /** Le texte d'une recette (titre + ingrédients), une ligne par élément. */
 export type RecipeText = string[];
 
+/** « Pâté » n'est pas de la « pâte » : sans accent, les deux se confondraient (un pâté de campagne n'est pas de la pâte à tarte). */
+const sansPate = (s: string) => s.normalize("NFC").replace(/p[âa]t[é]s?/gi, "terrine");
+
 function contains(lines: string[], food: Food): boolean {
   const words = food.words.map(pad);
   const except = (food.except ?? []).map(pad);
   return lines.some((raw) => {
-    let line = pad(raw);
+    let line = pad(sansPate(raw));
     for (const e of except) line = line.split(e).join(" ");
     return words.some((w) => line.includes(w));
   });
+}
+
+/**
+ * Les noms sous lesquels on tape un allergène dans « Autre » : « cacahouète », « soja », « sulfites ».
+ * Seuls les noms de la catégorie (jamais un membre précis : « noisette » reste « noisette »).
+ */
+const ALIAS: Record<string, string[]> = {
+  sans_gluten: ["gluten"],
+  sans_lactose: ["lait", "lactose", "laitage", "produit laitier"],
+  oeufs: ["oeuf"],
+  arachide: ["arachide", "cacahuete", "cacahouete", "cacahuette", "cacahouette"],
+  fruits_a_coque: ["fruit a coque", "fruits a coque"],
+  poisson: ["poisson"],
+  fruits_de_mer: ["fruit de mer", "fruits de mer", "crustace", "mollusque", "coquillage"],
+  soja: ["soja"],
+  sesame: ["sesame"],
+  celeri: ["celeri"],
+  moutarde: ["moutarde"],
+  sulfites: ["sulfite", "sulfites"],
+  lupin: ["lupin"],
+};
+
+/** Un interdit tapé à la main : ce qui a été écrit, et, si c'est un allergène connu, tout ce qui le contient. */
+function foodAutre(key: string): Food {
+  const mot = key.slice(AUTRE.length);
+  const n = normalizeName(mot);
+  const connu = ALL.find((f) => ALIAS[f.key]?.some((a) => normalizeName(a) === n));
+  return connu ? { key, label: mot, words: [...new Set([mot, ...connu.words])], except: connu.except } : { key, label: mot, words: [mot] };
 }
 
 /** Les aliments (clés) repérés dans une recette, parmi ceux demandés. */
 export function foodsIn(text: RecipeText, keys: Iterable<string>): Set<string> {
   const found = new Set<string>();
   for (const key of keys) {
-    const food = isAutre(key) ? { key, label: key, words: [key.slice(AUTRE.length)] } : BY_KEY.get(key);
+    const food = isAutre(key) ? foodAutre(key) : BY_KEY.get(key);
     if (food && food.words.some((w) => normalizeName(w)) && contains(text, food)) found.add(key);
   }
   return found;
@@ -195,6 +239,12 @@ export const ALLERGENES_DITS: { key: string; dit: string }[] = [
   { key: "fruits_a_coque", dit: "des fruits à coque" },
   { key: "poisson", dit: "du poisson" },
   { key: "fruits_de_mer", dit: "des fruits de mer" },
+  { key: "soja", dit: "du soja" },
+  { key: "sesame", dit: "du sésame" },
+  { key: "celeri", dit: "du céleri" },
+  { key: "moutarde", dit: "de la moutarde" },
+  { key: "sulfites", dit: "des sulfites" },
+  { key: "lupin", dit: "du lupin" },
 ];
 
 /**
@@ -206,6 +256,19 @@ export function contientPhrase(text: RecipeText): string | null {
   const dits = ALLERGENES_DITS.filter((a) => trouves.has(a.key)).map((a) => a.dit);
   if (dits.length === 0) return null;
   return `Contient ${dits.length === 1 ? dits[0] : `${dits.slice(0, -1).join(", ")} et ${dits[dits.length - 1]}`}`;
+}
+
+/** Sans ingrédient saisi, le texte d'une recette se réduit à son titre : on ne peut rien affirmer de ce que le plat contient. */
+export const sansIngredients = (text: RecipeText) => text.length <= 1;
+
+/**
+ * Ce que dit la carte d'un plat : les allergènes repérés (« Contient du lait »), ou, sans ingrédients saisis, que la liste manque.
+ * Une carte sans phrase ne veut pas dire « aucun allergène » : seulement « rien repéré d'après les ingrédients saisis ».
+ */
+export function allergenesSurLaCarte(text: RecipeText): string | null {
+  const contient = contientPhrase(text);
+  if (!sansIngredients(text)) return contient;
+  return contient ? `${contient} · ingrédients non renseignés` : "Ingrédients non renseignés";
 }
 
 export type MemberTastes = { id: string; name: string; tastes: Record<string, TasteLevel> };

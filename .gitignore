@@ -45,3 +45,15 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /.e2e/
+
+# captures d'essai déposées par erreur à la racine
+/undefined/
+
+# essais de bout en bout : seuls les scripts de la pile locale sont versionnés (voir tests/e2e/README.md)
+/tests/e2e/stack/*
+!/tests/e2e/stack/up.sh
+!/tests/e2e/stack/reset.sh
+!/tests/e2e/stack/restore-base.sh
+!/tests/e2e/stack/fake-supabase.mjs
+!/tests/e2e/stack/postgrest.conf
+!/tests/e2e/stack/atable-base.dump

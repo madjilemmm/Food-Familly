@@ -1,0 +1,34 @@
+name: Contrôles
+
+# À chaque envoi : types, règles de code, tests unitaires et compilation. Rien n'est mis en ligne d'ici.
+on:
+  push:
+    branches: [main, produit/fondations]
+  pull_request:
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # De quoi compiler : aucune de ces valeurs ne sert à joindre un vrai service.
+      NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci
+      SUPABASE_SERVICE_ROLE_KEY: ci
+      SESSION_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci
+      FAMILY_CODE: ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Types
+        run: npm run typecheck
+      - name: Règles de code
+        run: npm run lint
+      - name: Tests unitaires
+        run: npm test
+      - name: Compilation
+        run: npm run build

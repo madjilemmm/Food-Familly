@@ -319,7 +319,7 @@ export function ShoppingList({
             action={async () => {
               // Les dernières coches partent d'abord : le report des articles pas pris en dépend.
               await attendreFile();
-              await finishTrip();
+              await finishTrip(tripId);
             }}
             question="Les courses sont finies ?"
             detail={

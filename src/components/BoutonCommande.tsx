@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useErreurReseau } from "@/components/ErreurReseau";
 import { Spinner } from "@/components/Spinner";
+import { SessionExpiree } from "@/lib/reseau";
 
 export type Commande = "ceSeraCa" | "autreIdee" | "changer" | "allergie" | "foyer" | "prevenu";
 
@@ -69,6 +70,7 @@ export function BoutonCommande({
           setEnvoi(true);
           const ok = await essayer(async () => {
             const r = await fetch("/api/ce-soir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commande, recipeId, n, raison, reponse }) });
+            if (r.status === 401) throw new SessionExpiree();
             if (!r.ok) throw new Error(String(r.status));
           });
           setEnvoi(false);

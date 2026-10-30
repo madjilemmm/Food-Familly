@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { jePars } from "@/app/actions/trips";
 import { useErreurReseau } from "@/components/ErreurReseau";
+import { JeNePartsPlus } from "./DepartCourses";
 
 /**
  * Facultatif : la liste est prête ; on prévient la famille, pour une dernière envie.
@@ -16,7 +17,10 @@ export function JePars({ compact = false }: { compact?: boolean }) {
     return compact ? (
       <p role="status" className="kd-petit max-w-40 text-right font-semibold">La famille est prévenue</p>
     ) : (
-      <p className="mb-6 font-semibold">La famille est prévenue : une dernière envie peut encore arriver sur la liste.</p>
+      <div className="mb-6">
+        <p className="font-semibold">La famille est prévenue : une dernière envie peut encore arriver sur la liste.</p>
+        <JeNePartsPlus />
+      </div>
     );
   }
   if (compact) {

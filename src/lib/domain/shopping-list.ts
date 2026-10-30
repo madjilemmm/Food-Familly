@@ -48,8 +48,13 @@ export function normalizeUnit(unit: string): string {
   return u.length > 3 ? u.replace(/[sx]$/, "") : u;
 }
 
+/**
+ * Additionne les ingrédients de plusieurs plats : un par nom et par unité. Avec `arrondir`, la somme est arrondie une seule
+ * fois, comme on l'écrirait sur une liste (3 plats qui demandent un quart d'oignon : un oignon, pas trois).
+ */
 export function mergeIngredients(
   entries: { recipeTitle: string; ingredients: Ingredient[] }[],
+  options: { arrondir?: boolean } = {},
 ): MergedItem[] {
   const byKey = new Map<string, MergedItem & { baseQuantity: number | null; baseUnit: string }>();
 
@@ -82,7 +87,7 @@ export function mergeIngredients(
 
   return [...byKey.values()].map(({ baseQuantity, baseUnit, ...item }) => {
     const { quantity, unit } = toReadableUnit(baseQuantity, baseUnit, item.unit);
-    return { ...item, quantity, unit };
+    return { ...item, quantity: options.arrondir && quantity != null ? arrondirQuantite(quantity, unit) : quantity, unit };
   });
 }
 
@@ -102,11 +107,55 @@ function toReadableUnit(qty: number | null, baseUnit: string, originalUnit: stri
   return { quantity: round(qty), unit: originalUnit };
 }
 
+/** Les unités qui se comptent, au singulier et au pluriel : « 1 gousse », « 2 gousses », « 2 boîtes ». */
+const PLURIELS: Record<string, string> = {
+  gousse: "gousses", tranche: "tranches", feuille: "feuilles", boîte: "boîtes", sachet: "sachets", paquet: "paquets",
+  bouquet: "bouquets", botte: "bottes", branche: "branches", brin: "brins", verre: "verres", tasse: "tasses", pot: "pots",
+  brique: "briques", rouleau: "rouleaux", poignée: "poignées", tête: "têtes", morceau: "morceaux", pincée: "pincées",
+  cube: "cubes", tablette: "tablettes", boule: "boules", barquette: "barquettes", bocal: "bocaux", bol: "bols",
+};
+const SINGULIERS = new Map(Object.entries(PLURIELS).flatMap(([s, p]) => [[s, s], [p, s]] as [string, string][]));
+
+/** L'unité accordée à la quantité : « 1 gousse », « 0,5 gousse », « 2 gousses ». Les autres unités (g, cl, c. à soupe) ne changent pas. */
+export function uniteAccordee(quantity: number | null, unit: string): string {
+  const singulier = SINGULIERS.get(unit.trim().toLowerCase());
+  if (!singulier) return unit;
+  return quantity != null && quantity > 1 ? PLURIELS[singulier] : singulier;
+}
+
 /** "1,5 kg", "3", "2 gousses", "" si pas de quantité. */
 export function formatQuantity(quantity: number | null, unit: string): string {
   if (quantity == null) return unit;
   const n = quantity.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
-  return unit ? `${n} ${unit}` : n;
+  const u = uniteAccordee(quantity, unit);
+  return u ? `${n} ${u}` : n;
+}
+
+/**
+ * Les titres de recettes que porte un article (« pour A, B »), joints par une virgule. Un titre peut contenir une virgule
+ * (« Gratin dauphinois, version crème ») : on lit avec les titres qu'on connaît, le plus long d'abord, au lieu de couper à
+ * chaque virgule. Un titre inconnu (recette renommée ou supprimée depuis) est lu jusqu'à la virgule suivante.
+ */
+export function titresPourLesquels(forRecipes: string | null | undefined, connus: string[] = []): string[] {
+  const texte = forRecipes ?? "";
+  if (!texte) return [];
+  const SEP = ", ";
+  const longsDabord = [...new Set(connus.filter(Boolean))].sort((a, b) => b.length - a.length);
+  const titres: string[] = [];
+  let i = 0;
+  while (i < texte.length) {
+    const titre = longsDabord.find((t) => texte.startsWith(t, i) && (i + t.length === texte.length || texte.startsWith(SEP, i + t.length)));
+    const suivante = texte.indexOf(SEP, i);
+    const fin = titre ? i + titre.length : suivante === -1 ? texte.length : suivante;
+    titres.push(titre ?? texte.slice(i, fin));
+    i = fin + SEP.length;
+  }
+  return titres;
+}
+
+/** Cet article est-il pour cette recette ? (`connus` : les autres titres, pour bien lire ceux qui contiennent une virgule.) */
+export function estPourLaRecette(forRecipes: string | null | undefined, titre: string, connus: string[] = []): boolean {
+  return titresPourLesquels(forRecipes, [...connus, titre]).includes(titre);
 }
 
 /** Clé utilisée pour retrouver un article déjà présent dans la liste. */
@@ -120,7 +169,7 @@ export function itemKey(name: string, unit: string): string {
 /** Unités qu'on ne multiplie pas (« 1 pincée » reste « 1 pincée »). */
 const FIXES = new Set(["pincee", "filet", "trait", "zeste", "noisette", "soupcon"]);
 /** Unités qui se comptent : arrondies à l'unité, jamais moins d'une. */
-const ENTIERES = new Set(["", "gousse", "tranche", "boite", "sachet", "paquet", "brin", "feuille", "botte", "pot", "bocal", "tablette", "rouleau", "pate", "boule", "barquette", "conserve", "cube", "branche", "verre", "bol", "tasse"]);
+const ENTIERES = new Set(["", "gousse", "tranche", "boite", "sachet", "paquet", "brin", "feuille", "botte", "pot", "bocal", "tablette", "rouleau", "pate", "boule", "barquette", "conserve", "cube", "branche", "verre", "bol", "tasse", "tete", "bouquet", "brique", "morceau"]);
 const CUILLERES = /cuill|c a s|c a c|cas|cac|cs|cc/;
 
 /**
@@ -131,7 +180,21 @@ export function scaleQuantity(quantity: number | null, unit: string, factor: num
   if (quantity == null || !Number.isFinite(factor) || factor <= 0 || Math.abs(factor - 1) < 0.01) return quantity;
   const u = normalizeUnit(unit).replace(/\./g, "").replace(/\s+/g, " ").trim();
   if (FIXES.has(u)) return quantity;
-  const q = quantity * factor;
+  return arrondirQuantite(quantity * factor, unit);
+}
+
+/**
+ * La quantité pour `factor` fois la recette, sans arrondi : pour additionner plusieurs plats avant d'arrondir une seule fois
+ * (un quart d'oignon dans trois plats fait trois quarts d'oignon, pas trois oignons).
+ */
+export function scaleQuantityBrut(quantity: number | null, unit: string, factor: number): number | null {
+  if (quantity == null || !Number.isFinite(factor) || factor <= 0 || Math.abs(factor - 1) < 0.01) return quantity;
+  return FIXES.has(normalizeUnit(unit).replace(/\./g, "").replace(/\s+/g, " ").trim()) ? quantity : quantity * factor;
+}
+
+/** Une quantité écrite comme sur une liste : entière pour ce qui se compte (jamais moins d'une), au demi près pour les cuillères… */
+export function arrondirQuantite(q: number, unit: string): number {
+  const u = normalizeUnit(unit).replace(/\./g, "").replace(/\s+/g, " ").trim();
   if (ENTIERES.has(u) || ENTIERES.has(u.replace(/[sx]$/, ""))) return Math.max(1, Math.round(q));
   if (CUILLERES.test(u)) return Math.max(0.5, Math.round(q * 2) / 2);
   if (u === "g" || u === "ml") return q >= 50 ? Math.round(q / 10) * 10 : Math.max(1, Math.round(q / 5) * 5 || Math.round(q));
@@ -140,12 +203,21 @@ export function scaleQuantity(quantity: number | null, unit: string, factor: num
   return Math.round(q * 10) / 10;
 }
 
-/** Les ingrédients d'une recette prévue pour `servings` personnes, pour `people` personnes. */
+/** Une recette sans nombre de personnes écrit est lue pour 4 (le formulaire le propose), et on le dit. */
+export const PORTIONS_PAR_DEFAUT = 4;
+
+/**
+ * Les ingrédients d'une recette prévue pour `servings` personnes, pour `people` personnes.
+ * `brut` : sans arrondir (pour additionner plusieurs plats avant d'arrondir, voir mergeIngredients).
+ */
 export function scaleIngredients<T extends { quantity: number | null; unit: string }>(
   ingredients: T[],
   servings: number | null | undefined,
   people: number,
+  brut = false,
 ): T[] {
-  if (!servings || servings <= 0 || people <= 0 || servings === people) return ingredients;
-  return ingredients.map((i) => ({ ...i, quantity: scaleQuantity(i.quantity, i.unit, people / servings) }));
+  const base = servings && servings > 0 ? servings : PORTIONS_PAR_DEFAUT;
+  if (people <= 0 || base === people) return ingredients;
+  const echelle = brut ? scaleQuantityBrut : scaleQuantity;
+  return ingredients.map((i) => ({ ...i, quantity: echelle(i.quantity, i.unit, people / base) }));
 }

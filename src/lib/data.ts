@@ -15,6 +15,7 @@ import { bilanAnnee, type Annee } from "@/lib/domain/annee";
 import { passagesDesIngredients, sansDouteALaMaison } from "@/lib/domain/maison";
 import type { Style } from "@/lib/session";
 import { isAisle } from "@/lib/domain/aisles";
+import { lirePages } from "@/lib/domain/pages";
 import { cleProduit, type Appris } from "@/lib/domain/reconnaissance";
 import type { CoursePassee, Reponse } from "@/lib/domain/habitudes";
 import { etiquettesDe, prediction, profilDe, type ProfilGouts } from "@/lib/domain/profil-gouts";
@@ -127,6 +128,8 @@ function check<T>(result: { data: T | null; error: { message: string } | null })
   return result.data as T;
 }
 
+const toutesLesLignes = lirePages;
+
 const PROFILE_FIELDS = "id, family_id, name, style, emoji, tastes_seen_at, tastes_done_at, envies, envies_done_at";
 
 // ─── Familles et profils ───────────────────────────────────────────────
@@ -163,7 +166,7 @@ export const getProfile = cache(async function getProfile(familyId: string, id: 
 // ─── Recettes ──────────────────────────────────────────────────────────
 
 export const getRecipes = cache(async function getRecipes(familyId: string): Promise<Recipe[]> {
-  return check(await db().from("recipes").select(RECIPE_FIELDS).eq("family_id", familyId).order("title"));
+  return toutesLesLignes<Recipe>((de, a) => db().from("recipes").select(RECIPE_FIELDS).eq("family_id", familyId).order("title").order("id").range(de, a));
 });
 
 export async function getRecipe(familyId: string, id: string): Promise<RecipeWithIngredients | null> {
@@ -219,9 +222,9 @@ export const getFamilyTastes = cache(async function getFamilyTastes(
 
 /** Titre + noms d'ingrédients de chaque recette : de quoi y repérer les aliments. */
 export const getRecipeTexts = cache(async function getRecipeTexts(familyId: string): Promise<Map<string, string[]>> {
-  const rows = check(
-    await db().from("recipes").select("id, title, recipe_ingredients(name)").eq("family_id", familyId),
-  ) as { id: string; title: string; recipe_ingredients: { name: string }[] }[];
+  const rows = await toutesLesLignes<{ id: string; title: string; recipe_ingredients: { name: string }[] }>((de, a) =>
+    db().from("recipes").select("id, title, recipe_ingredients(name)").eq("family_id", familyId).order("id").range(de, a),
+  );
   return new Map(rows.map((r) => [r.id, [r.title, ...r.recipe_ingredients.map((i) => i.name)]]));
 });
 
@@ -247,16 +250,17 @@ const JOUR = 86_400_000;
 
 /** Le dernier swipe de chaque membre sur chaque recette : la base des goûts et des envies. */
 export const getFamilySwipes = cache(async function getFamilySwipes(familyId: string): Promise<Map<string, Map<string, Avis>>> {
-  const ids = (await getProfiles(familyId)).map((p) => p.id);
-  if (ids.length === 0) return new Map();
+  // Les avis des membres de la famille, en une seule requête (la jointure remplace « lire les profils, puis leurs avis »).
   // « * » : liked_at peut manquer tant que la migration des envies n'est pas passée.
-  const rows = check(await db().from("swipes").select("*").in("profile_id", ids)) as {
+  const rows = await toutesLesLignes<{
     profile_id: string;
     recipe_id: string;
     liked: boolean;
     swiped_at: string;
     liked_at?: string | null;
-  }[];
+  }>((de, a) =>
+    db().from("swipes").select("*, profiles!inner(family_id)").eq("profiles.family_id", familyId).order("profile_id").order("recipe_id").range(de, a),
+  );
   const parRecette = new Map<string, Map<string, Avis>>();
   for (const r of rows) {
     const avis: Avis = {
@@ -560,21 +564,26 @@ export async function getDeck(
 export const getCurrentTrip = cache(loadCurrentTrip);
 
 /** Sans cache : relu juste après une écriture. */
-export async function loadCurrentTrip(familyId: string): Promise<Trip | null> {
+/**
+ * La course en cours : la plus ancienne des listes ouvertes (c'est celle que tout le monde garde quand deux écrans en ont ouvert
+ * chacun une au même moment). Avec `tripId`, cette course-là précisément : le Menu et la liste se mettent à jour sur la course
+ * où le geste a eu lieu, jamais sur une autre qui serait apparue entre-temps.
+ */
+export async function loadCurrentTrip(familyId: string, tripId?: string): Promise<Trip | null> {
   const since = new Date(Date.now() - TRIP_MAX_AGE_MS).toISOString();
-  return check(
-    await db()
-      .from("shopping_trips")
-      .select(
-        `id, created_by, departs_at, deadline_at, status, validated_at, created_at, people,
+  const requete = db()
+    .from("shopping_trips")
+    .select(
+      `id, created_by, departs_at, deadline_at, status, validated_at, created_at, people,
          trip_requests(id, profile_id, free_text, recipe_ids, updated_at),
          trip_recipes(*),
          shopping_list_items(*)`,
-      )
-      .eq("family_id", familyId)
-      .neq("status", "done")
-      .gte("created_at", since)
-      .order("created_at", { ascending: false })
+    )
+    .eq("family_id", familyId);
+  return check(
+    await (tripId ? requete.eq("id", tripId) : requete.neq("status", "done").gte("created_at", since))
+      .order("created_at", { ascending: true })
+      .order("id")
       .order("updated_at", { referencedTable: "trip_requests" })
       .order("created_at", { referencedTable: "shopping_list_items" })
       .order("name", { referencedTable: "shopping_list_items" })

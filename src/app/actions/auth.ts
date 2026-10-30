@@ -78,7 +78,7 @@ export async function joinFamily(_prev: { error?: string }, formData: FormData):
  * tout de suite ce qu'on mange ce soir. Un prénom déjà dans la famille est la même personne qui revient
  * (sur un autre téléphone) : on la retrouve au lieu de la doubler.
  */
-export async function rejoindreAvecPrenom(jeton: string, _prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
+export async function rejoindreAvecPrenom(jeton: string, _prev: { error?: string; existant?: string }, formData: FormData): Promise<{ error?: string; existant?: string }> {
   if (await tropDEssais()) return { error: "Trop d'essais. Attends un quart d'heure avant de réessayer." };
   const famille = await familleInvitee(jeton);
   if (!famille) {
@@ -90,6 +90,9 @@ export async function rejoindreAvecPrenom(jeton: string, _prev: { error?: string
   const { data: membres } = await db().from("profiles").select("id, name, style").eq("family_id", famille.id);
   const cle = (n: string) => normalizeName(n);
   const deja = (membres ?? []).find((m) => cle(String(m.name)) === cle(prenom));
+  // Un prénom déjà dans la famille : est-ce la même personne qui revient, ou une autre qui porte le même prénom ? On le demande
+  // (sans mot de passe, répondre « oui » à la place de quelqu'un d'autre donnerait accès à son profil).
+  if (deja && formData.get("confirme") !== "1") return { existant: String(deja.name) };
   let profileId = deja?.id as string | undefined;
   const style: Style = deja ? cleanStyle(deja.style) : "fun";
   if (!profileId) {

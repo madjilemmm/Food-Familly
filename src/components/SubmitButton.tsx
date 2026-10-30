@@ -9,15 +9,20 @@ export function SubmitButton({
   pendingLabel = "Un instant…",
   className = "kd-btn kd-btn--large",
   disabled,
+  name,
+  value,
 }: {
   children: React.ReactNode;
   pendingLabel?: string;
   className?: string;
   disabled?: boolean;
+  /** Envoyé avec le formulaire (deux boutons d'envoi qui n'ont pas le même sens). */
+  name?: string;
+  value?: string;
 }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending || disabled} className={className}>
+    <button type="submit" name={name} value={value} disabled={pending || disabled} className={className}>
       {pending ? (
         <>
           <Spinner />

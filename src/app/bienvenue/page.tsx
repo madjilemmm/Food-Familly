@@ -5,7 +5,9 @@ import { ActionsAccueil } from "./ActionsAccueil";
 
 export const metadata = { title: "Bienvenue — Kaddie" };
 
-export default function WelcomePage() {
+export default async function WelcomePage({ searchParams }: { searchParams: Promise<{ session?: string }> }) {
+  // Renvoyé ici par un geste dont la session avait pris fin : on le dit, au lieu d'un faux « pas de réseau ».
+  const { session } = await searchParams;
   return (
     <Scene
       as="main"
@@ -19,6 +21,11 @@ export default function WelcomePage() {
       </div>
       <div className="mx-auto w-full max-w-md pb-4">
         <NoterEtape etape="accueil" frequence="visite" />
+        {session === "expiree" && (
+          <p role="status" className="mb-4 rounded-pastille border-[3px] border-blanc px-4 py-3 text-center font-semibold">
+            Ta session a pris fin. Reconnecte-toi avec le code de ta famille : rien n&apos;est perdu.
+          </p>
+        )}
         <ActionsAccueil />
         <Link href="/confidentialite" className="kd-petit mt-2 flex min-h-11 items-center justify-center text-blanc underline underline-offset-4">
           Confidentialité

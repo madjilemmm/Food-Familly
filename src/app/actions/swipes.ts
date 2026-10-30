@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
-import { enviesPour, getProfiles } from "@/lib/data";
+import { enviesPour, getProfiles, getRecipes } from "@/lib/data";
+import { estPourLaRecette } from "@/lib/domain/shopping-list";
 import { notifyMatch, relancerDernierVote } from "@/lib/notifications";
 import { oublierDuMenu, platsDuMenu, synchroniserMenu } from "@/lib/menu";
 import { changed } from "./_shared";
@@ -55,6 +56,8 @@ export async function swipe(
   // Seul à en avoir envie : un « Miam » de plus ferait un match. On prévient qui l'aimerait sans doute.
   if (liked && likers == null) after(() => relancerDernierVote(user.familyId, recipeId, user.profileId).catch(() => {}));
   const noms = new Map((await getProfiles(user.familyId)).map((p) => [p.id, p.name]));
+  // Les titres de la famille : un titre peut contenir une virgule, « pour A, B » se lit avec eux.
+  const titresDuMenu = auMenu ? (await getRecipes(user.familyId)).map((r) => r.title) : [];
   return {
     match: likers != null,
     avec: autres.flatMap((id) => noms.get(id) ?? []),
@@ -63,7 +66,7 @@ export async function swipe(
     entre: ajoutes.includes(recipeId),
     // Les articles de la liste qui viennent de ce plat (un article commun à deux plats compte pour les deux).
     ingredients: auMenu
-      ? menu!.trip.shopping_list_items.filter((i) => i.source === "recipe" && (i.for_recipes ?? "").split(", ").includes(recipe.title as string)).length
+      ? menu!.trip.shopping_list_items.filter((i) => i.source === "recipe" && estPourLaRecette(i.for_recipes, recipe.title as string, titresDuMenu)).length
       : 0,
   };
 }

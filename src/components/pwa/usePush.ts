@@ -28,6 +28,26 @@ async function saveSubscription(sub: PushSubscription) {
   if (!res.ok) throw new Error("Enregistrement refusé");
 }
 
+/**
+ * Retire l'abonnement de ce téléphone (côté serveur et côté navigateur), sans jamais échouer : on l'appelle en quittant la famille.
+ */
+export async function desabonnerCetAppareil() {
+  try {
+    if (!("serviceWorker" in navigator)) return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager?.getSubscription();
+    if (!sub) return;
+    await fetch("/api/push/subscribe", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: sub.endpoint }),
+    }).catch(() => {});
+    await sub.unsubscribe().catch(() => {});
+  } catch {
+    // Pas d'abonnement à retirer, ou pas de réseau : quitter la famille passe avant.
+  }
+}
+
 export function usePush() {
   const [state, setState] = useState<PushState>("loading");
   const [error, setError] = useState<string | null>(null);

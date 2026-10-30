@@ -165,7 +165,10 @@ const CREMERIE: Produit[] = [
   p("la-laitiere", "La Laitière", "cremerie", ["la laitiere", "laitiere"], { type: "dessert lacté" }),
   p("kinder-pingui", "Kinder Pingui", "cremerie", ["pingui"], { type: "gâteau frais" }),
   p("kinder-delice", "Kinder Délice", "epicerie", ["kinder delice"], { type: "gâteau" }),
-  p("pate-a-tarte", "Pâte à tarte", "cremerie", ["pate a tarte", "pâte brisée", "pate brisee", "pâte feuilletée", "pate feuilletee", "pâte sablée", "pate sablee"]),
+  // Trois pâtes qui ne se remplacent pas : chacune garde sa ligne (« pâte à tarte » seule se lit comme une pâte brisée).
+  p("pate-brisee", "Pâte brisée", "cremerie", ["pate a tarte", "pate brisee"]),
+  p("pate-feuilletee", "Pâte feuilletée", "cremerie", ["pate feuilletee"]),
+  p("pate-sablee", "Pâte sablée", "cremerie", ["pate sablee"]),
   p("pate-a-pizza", "Pâte à pizza", "cremerie", ["pate a pizza", "pâte pizza"]),
   p("pate-a-crepe", "Pâte à crêpes", "cremerie", ["pate a crepe", "pâte à crêpe", "pate a crepes"]),
   p("gnocchi", "Gnocchis", "cremerie", ["gnocchi", "gnocci"]),
@@ -363,7 +366,7 @@ export const CATALOGUE: Produit[] = [...FRUITS_LEGUMES, ...BOULANGERIE, ...BOUCH
 export const AMBIGUS: Record<string, Ambigu> = {
   kinder: { rayon: "epicerie", choix: ["kinder-bueno", "kinder-country", "kinder-surprise", "kinder-chocolat", "kinder-pingui", "kinder-delice"] },
   creme: { rayon: "cremerie", choix: ["creme-fraiche", "creme-liquide", "creme-dessert", "creme-soin"] },
-  pate: { rayon: "epicerie", choix: ["pates", "pate-charcuterie", "pate-a-tarte", "pate-a-pizza"] },
+  pate: { rayon: "epicerie", choix: ["pates", "pate-charcuterie", "pate-brisee", "pate-feuilletee", "pate-a-pizza"] },
   coco: { rayon: "autre", choix: ["noix-de-coco", "lait-de-coco"] },
   jus: { rayon: "boissons", choix: ["jus-orange", "jus-pomme", "jus-fruits"] },
   sauce: { rayon: "epicerie", choix: ["sauce-tomate", "sauce-bolognaise", "sauce-pates", "sauce-soja", "sauce-barbecue"] },

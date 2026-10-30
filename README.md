@@ -39,7 +39,7 @@ Stack : Next.js 15 (App Router, TypeScript), Tailwind CSS 4, Supabase (Postgres,
 | Propositions des courses | Un score explicable : compatibilité des personnes concernées (moyenne des goûts, l'inconnu est neutre, un désaccord pèse) + contexte (demandé, envies, retenu récemment, retiré la dernière fois). Les « autres idées » passent à tour de rôle par personne, et quelqu'un qui n'a eu aucun plat aux dernières courses remonte : personne n'est oublié parce que ses goûts sont minoritaires. Tous les poids sont dans `REGLAGES`. |
 | Paquet de swipe | D'abord des plats jamais vus, classés pour moi (mes goûts, ce dont les autres ont envie, la découverte), sans trois plats du même style d'affilée ; un favori revient une carte sur 5 (aimé : après 3 semaines, refusé : après 6), donc le paquet ne s'épuise jamais. Quand il reste moins de 8 plats à découvrir, une dizaine de plats principaux bien notés arrivent tout seuls de Marmiton ; ceux que personne n'a aimés en 4 semaines laissent la place. |
 | Goûts | À sa première connexion, chacun remplit un petit questionnaire (régime et allergies, **tes envies** : styles de plats, temps de cuisine, piquant, puis des cartes d'ingrédients qu'on peut arrêter quand on veut) (modifiable dans Réglages → **Mes goûts**, ou « Plus tard »). Trois niveaux : **interdit** (régime, allergie : la recette disparaît pour **toute la famille**, du swipe, des matchs, des plats des courses et de l'import Marmiton), **j'aime pas** (disparaît de **mon** paquet ; pour les autres, en **mode strict** — par défaut, réglable dans Ma famille — elle disparaît aussi, sinon elle passe en fin de paquet avec « Madji n'aime pas »), **j'adore** (en tête de mon paquet). Les régimes sont des groupes d'aliments : « sans porc » attrape lardons, jambon, chorizo… Tout reste visible dans **Recettes**, avec une étiquette. Pour une allergie, vérifiez toujours les étiquettes : le tri se fait sur les noms des ingrédients. |
-| Relance | 10 minutes avant l'heure limite, ceux qui n'ont pas encore répondu reçoivent « Plus que 10 min », une seule fois. Supabase (pg_cron) appelle `/api/cron/relance` chaque minute. |
+| Relance | 10 minutes avant l'heure limite, ceux qui n'ont pas encore répondu reçoivent « Plus que 10 min », une seule fois. Supabase (pg_cron) appelle `/api/cron/relance` chaque minute. Pour qu'on ne puisse pas la solliciter à vide : définissez `CRON_SECRET` dans Vercel et ajoutez `"Authorization": "Bearer <le même secret>"` aux en-têtes de la tâche `kaddie-relance` (sans `CRON_SECRET`, elle reste ouverte). |
 | Recettes importées | Uniquement des plats principaux populaires que des jeunes mangent volontiers (burgers, pâtes, tacos, curry coco, gratins…), cherchés selon les **envies** de la famille ; rien de « léger », d'abats ni de trop long pour la personne la plus pressée. Chaque recette garde ses étapes, sa durée et son nombre de personnes : on la consulte en touchant un match ou un plat. |
 | Nombre de personnes | Au départ en courses, « Pour combien ? » (toute la famille par défaut) : la liste recalcule les quantités de chaque recette (600 g pour 6 → 300 g pour 3 ; œufs et pièces arrondis à l'unité, une pincée reste une pincée). |
 | Liste de courses | Les doublons sont fusionnés (« 1 oignon » + « 2 oignons » = 3 oignons, 400 g + 1 kg = 1,4 kg) et regroupés par rayon. Régénérer la liste garde les articles ajoutés à la main et ce qui est déjà coché. |
@@ -241,7 +241,7 @@ Tout se fait dans l'appli, ⚙️ → **Ma famille** :
 |---|---|
 | Pas de bouton « Activer les notifications », mais un message d'installation | L'appli est ouverte dans Safari : ouvrez-la depuis l'icône de l'écran d'accueil. |
 | « Tester » ne fait rien | Vérifiez les 3 variables VAPID dans Vercel, puis redéployez. Ensuite, sur le téléphone : ⚙️ → Désactiver, puis réactivez. |
-| Les écrans ne se mettent pas à jour tout seuls | Vérifiez l'option *Realtime → Settings → Allow public access*. Sans elle, l'appli se rafraîchit quand même toutes les 30 secondes et à chaque retour dans l'appli. |
+| Les écrans ne se mettent pas à jour tout seuls | Vérifiez l'option *Realtime → Settings → Allow public access*. Sans elle, l'appli se rafraîchit quand même toutes les 2 minutes et à chaque retour dans l'appli. |
 | « Variable d'environnement manquante » | Une variable manque dans Vercel. Ajoutez-la, puis redéployez. |
 | L'appli affiche une ancienne version | Fermez-la complètement (glisser vers le haut) puis rouvrez-la. |
 | L'envoi d'une photo échoue | Vérifiez que le bucket `recipe-photos` existe dans Supabase (Storage). Sinon, relancez la migration. |
@@ -253,12 +253,16 @@ Tout se fait dans l'appli, ⚙️ → **Ma famille** :
 ```bash
 npm run dev        # serveur de développement
 npm run build      # build de production
-npm test           # tests unitaires (Vitest) : moteur de recommandation (12 scénarios familiaux), liste, heures, session
+npm test           # tests unitaires (Vitest) : recommandation, liste et quantités, allergènes (55 plats d'essai), import, heures, session
 npm run lint       # ESLint
 npm run typecheck  # TypeScript
 npm run vapid      # nouvelle paire de clés VAPID
 npm run icons      # régénère les icônes depuis scripts/generate-icons.mjs
 ```
+
+À chaque envoi, GitHub lance types, règles de code, tests unitaires et compilation (`.github/workflows/controles.yml`).
+Les scénarios de bout en bout (plusieurs téléphones, pannes d'écriture, formats d'écran) sont dans `tests/e2e/` : ils demandent
+PostgreSQL et PostgREST en local, voir `tests/e2e/README.md`.
 
 ### Organisation
 
@@ -353,4 +357,4 @@ Kaddie retient ce que la famille mange, sans qu'on le lui dise (règles : `src/l
 
 Après chaque écriture, le serveur envoie un **broadcast** Supabase vide sur le canal de la famille (`famille-<id>`).
 Les écrans ouverts reçoivent ce signal et rechargent leurs données côté serveur (`router.refresh()`).
-Il y a aussi un rafraîchissement de secours toutes les 30 s et au retour au premier plan.
+Il y a aussi un rafraîchissement de secours toutes les 2 minutes (seulement quand le temps réel est coupé) et au retour au premier plan après 30 s d'absence.

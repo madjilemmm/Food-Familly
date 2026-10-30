@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/supabase/server";
 import { getAppris, getFoyer, getHistorique, getProfiles, getRecipesWithIngredients, loadCurrentTrip, TRIP_MAX_AGE_MS, type Trip } from "@/lib/data";
-import { platsDeLaCourse } from "@/lib/views";
+import { classerLesPlats, donneesDesPlats, platsDeLaCourse } from "@/lib/views";
 import { cleMaison } from "@/lib/domain/maison";
 import { foyerValide } from "@/lib/domain/foyer";
 import { articlesDe } from "@/lib/domain/articles";
@@ -31,21 +31,43 @@ export async function assurerCourse(familyId: string): Promise<Trip> {
     .neq("status", "done")
     .lt("created_at", new Date(Date.now() - TRIP_MAX_AGE_MS).toISOString());
   const maintenant = new Date().toISOString();
-  const { error } = await db().from("shopping_trips").insert({ family_id: familyId, created_by: null, departs_at: maintenant, deadline_at: maintenant });
-  if (error) throw new Error(error.message);
-  // Deux écrans au même moment ont pu en ouvrir deux : on garde la première, les autres
-  // (vides) sont supprimées, jamais closes (une course close compterait comme faite).
-  const { data: ouvertes } = await db()
+  const { data: creee, error } = await db()
     .from("shopping_trips")
+    .insert({ family_id: familyId, created_by: null, departs_at: maintenant, deadline_at: maintenant })
     .select("id")
-    .eq("family_id", familyId)
-    .neq("status", "done")
-    .order("created_at")
-    .order("id");
-  for (const t of (ouvertes ?? []).slice(1)) await db().from("shopping_trips").delete().eq("id", t.id);
+    .single();
+  // Base migrée (une seule liste ouverte par famille) : « déjà ouverte » veut dire qu'un autre écran l'a ouverte au même moment.
+  if (error && error.code !== "23505") throw new Error(error.message);
+  // Sans cette garantie, deux écrans au même moment ont pu en ouvrir deux : tout le monde garde la plus ancienne (voir
+  // loadCurrentTrip), et chaque écran ne retire que celle qu'il vient d'ouvrir (supprimée, jamais close : une course close
+  // compterait comme faite). Aucun écran ne supprime la liste d'un autre : celui-ci pourrait être en train d'y écrire.
+  if (creee) {
+    const { data: ouvertes } = await db()
+      .from("shopping_trips")
+      .select("id")
+      .eq("family_id", familyId)
+      .neq("status", "done")
+      .order("created_at")
+      .order("id");
+    if ((ouvertes ?? []).length > 1 && ouvertes![0].id !== creee.id) await db().from("shopping_trips").delete().eq("id", creee.id);
+  }
   const ouverte = await loadCurrentTrip(familyId);
   if (!ouverte) throw new Error("Impossible d'ouvrir la liste");
   return ouverte;
+}
+
+/** La course a pu disparaître entre-temps (une liste ouverte en double, retirée par l'écran qui l'avait ouverte) : on reprend avec celle qui reste. */
+const courseDisparue = (error: { code?: string } | null) => error?.code === "23503";
+
+/**
+ * Un plat est au Menu mais rien n'est sur la liste, alors qu'il a des ingrédients : la liste n'a pas suivi (deux écrans au même
+ * moment, une écriture interrompue). On la refait : rien n'attend qu'on ajoute un plat pour la réparer.
+ */
+async function rattraper(familyId: string, trip: Trip): Promise<Trip> {
+  const menu = platsDuMenu(trip);
+  if (menu.length === 0 || trip.shopping_list_items.some((i) => i.source === "recipe" || i.source === "maison")) return trip;
+  const { data } = await db().from("recipe_ingredients").select("recipe_id").in("recipe_id", menu).limit(1);
+  return data?.length ? reconstruireListe(familyId, trip.id) : trip;
 }
 
 /** Les plats du Menu : ceux gardés pour la course en cours. */
@@ -58,19 +80,21 @@ export const platsDuMenu = (trip: Trip) => trip.trip_recipes.filter((r) => r.sel
  * Un plat retiré à la main ne revient pas pendant cette course. Rien n'est écrit s'il n'y a
  * rien à ajouter.
  */
-export async function synchroniserMenu(familyId: string): Promise<{ trip: Trip; ajoutes: string[] }> {
-  const trip = await assurerCourse(familyId);
+export async function synchroniserMenu(familyId: string, essai = 0): Promise<{ trip: Trip; ajoutes: string[] }> {
+  // Les données du classement se chargent pendant que la course s'ouvre : elles n'en dépendent pas.
+  const [trip, donnees] = await Promise.all([assurerCourse(familyId), donneesDesPlats(familyId)]);
   const gardes = platsDuMenu(trip).length;
-  if (gardes >= MENU_MAX) return { trip, ajoutes: [] };
+  if (gardes >= MENU_MAX) return { trip: await rattraper(familyId, trip), ajoutes: [] };
   const dejaDecides = new Set(trip.trip_recipes.map((r) => r.recipe_id));
   // Toujours « ouverte » : une liste faite à l'ancienne continue de recevoir les matchs.
-  const [plats, membres] = await Promise.all([platsDeLaCourse(familyId, { ...trip, status: "open" }), getProfiles(familyId)]);
+  const plats = classerLesPlats(donnees, { ...trip, status: "open" });
+  const membres = donnees[0];
   const ajoutes = plats
     .filter((p) => p.propose && !dejaDecides.has(p.id))
     .filter((p) => membres.length === 1 || p.raison.type === "demande" || p.raison.qui.length >= 2)
     .slice(0, MENU_MAX - gardes)
     .map((p) => p.id);
-  if (ajoutes.length === 0) return { trip, ajoutes };
+  if (ajoutes.length === 0) return { trip: await rattraper(familyId, trip), ajoutes };
   // Un repas de famille : pour tout le monde (qui en a envie est gardé pour l'affichage).
   const pour = trip.people ?? Math.max((await getFoyer(familyId)) ?? 1, membres.length);
   const { error } = await db()
@@ -79,8 +103,9 @@ export async function synchroniserMenu(familyId: string): Promise<{ trip: Trip; 
       ajoutes.map((id) => ({ trip_id: trip.id, recipe_id: id, selected: true, eaters: membres.map((m) => m.id), people: pour })),
       { onConflict: "trip_id,recipe_id", ignoreDuplicates: true },
     );
+  if (courseDisparue(error) && essai < 2) return synchroniserMenu(familyId, essai + 1);
   if (error) throw new Error(error.message);
-  return { trip: await reconstruireListe(familyId), ajoutes };
+  return { trip: await reconstruireListe(familyId, trip.id), ajoutes };
 }
 
 /**
@@ -88,10 +113,12 @@ export async function synchroniserMenu(familyId: string): Promise<{ trip: Trip; 
  * mangent, et les demandes écrites, découpées en articles (« des céréales, du Nutella »).
  * Les articles ajoutés à la main restent ; ce qui était coché le reste ; ce qu'on a déjà
  * à la maison ne revient pas. Renvoie la course relue.
+ * `tripId` : la course où le geste a eu lieu. Sans lui, « la course en cours » aurait pu devenir une autre entre-temps
+ * (une liste ouverte au même moment par un autre écran) et le Menu resterait sans ses articles.
  */
-export async function reconstruireListe(familyId: string): Promise<Trip> {
-  const trip = await loadCurrentTrip(familyId);
-  if (!trip) return assurerCourse(familyId);
+export async function reconstruireListe(familyId: string, tripId?: string): Promise<Trip> {
+  const trip = await loadCurrentTrip(familyId, tripId);
+  if (!trip) return tripId ? reconstruireListe(familyId) : assurerCourse(familyId);
   const menu = new Set(platsDuMenu(trip));
   const [tousLesPlats, hist, appris] = await Promise.all([platsDeLaCourse(familyId, trip), getHistorique(familyId), getAppris(familyId)]);
   const plats = tousLesPlats.filter((p) => menu.has(p.id));
@@ -100,8 +127,10 @@ export async function reconstruireListe(familyId: string): Promise<Trip> {
   const pourCombien = new Map(plats.map((p) => [p.id, p.convives.n]));
   const previous = trip.shopping_list_items;
   const aLaMaison = new Set(previous.filter((i) => i.source === "maison").map((i) => itemKey(i.name, i.unit)));
+  // Les quantités de chaque plat ne sont pas arrondies avant d'être additionnées : on arrondit une fois, sur la somme.
   const merged = mergeIngredients(
-    recipes.map((r) => ({ recipeTitle: r.title, ingredients: scaleIngredients(r.recipe_ingredients, r.servings, pourCombien.get(r.id) ?? 1) })),
+    recipes.map((r) => ({ recipeTitle: r.title, ingredients: scaleIngredients(r.recipe_ingredients, r.servings, pourCombien.get(r.id) ?? 1, true) })),
+    { arrondir: true },
   )
     .filter((m) => !aLaMaison.has(m.key))
     // Sans doute toujours à la maison (sel, huile…) : à vérifier avant de partir, pas d'office sur la liste.
@@ -151,11 +180,11 @@ export async function reconstruireListe(familyId: string): Promise<Trip> {
       })),
     ...ecrites.map((a) => ({ trip_id: trip.id, ...a, source: "request" as const, cle: cleProduit(a.name, appris) })),
   ]);
-  return (await loadCurrentTrip(familyId)) ?? trip;
+  return (await loadCurrentTrip(familyId, trip.id)) ?? trip;
 }
 
 /** Mettre un plat au Menu (ou l'en retirer) à la main ; la liste suit, et Kaddie complète le Menu. */
-export async function choisirPlat(familyId: string, recipeId: string, auMenu: boolean) {
+export async function choisirPlat(familyId: string, recipeId: string, auMenu: boolean, essai = 0): Promise<void> {
   const [trip, membres] = await Promise.all([assurerCourse(familyId), getProfiles(familyId)]);
   const { error } = await db()
     .from("trip_recipes")
@@ -165,8 +194,9 @@ export async function choisirPlat(familyId: string, recipeId: string, auMenu: bo
         : { trip_id: trip.id, recipe_id: recipeId, selected: false },
       { onConflict: "trip_id,recipe_id" },
     );
+  if (courseDisparue(error) && essai < 2) return choisirPlat(familyId, recipeId, auMenu, essai + 1);
   if (error) throw new Error(error.message);
-  await reconstruireListe(familyId);
+  await reconstruireListe(familyId, trip.id);
   if (!auMenu) await synchroniserMenu(familyId);
 }
 
@@ -175,7 +205,7 @@ export async function oublierDuMenu(familyId: string, recipeId: string) {
   const trip = await loadCurrentTrip(familyId);
   if (!trip) return;
   await db().from("trip_recipes").delete().eq("trip_id", trip.id).eq("recipe_id", recipeId);
-  await reconstruireListe(familyId);
+  await reconstruireListe(familyId, trip.id);
 }
 
 /**
@@ -190,5 +220,5 @@ export async function changerFoyer(familyId: string, n: number) {
   if (!trip) return;
   await db().from("shopping_trips").update({ people: pour }).eq("id", trip.id);
   await db().from("trip_recipes").update({ people: pour }).eq("trip_id", trip.id).eq("selected", true);
-  await reconstruireListe(familyId);
+  await reconstruireListe(familyId, trip.id);
 }

@@ -39,7 +39,8 @@ export async function requireUser(): Promise<CurrentUser> {
 export async function requireProfile() {
   const user = await requireUser();
   const profile = await getProfile(user.familyId, user.profileId);
-  if (!profile) redirect("/profil");
+  // Le profil n'existe plus (retiré de la famille depuis un autre téléphone) : « C'est qui ? » le dit.
+  if (!profile) redirect("/profil?retire=1");
   // Style changé depuis un autre appareil : on resynchronise le cookie.
   if (profile.style !== user.style) redirect("/api/session/refresh?next=/");
   return profile;

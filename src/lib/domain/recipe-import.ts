@@ -25,11 +25,16 @@ export type ImportedRecipe = {
   steps?: string[];
 };
 
-/** « 8 personnes », « 4 », « 6 parts » → le nombre ; sinon null. */
+/**
+ * « 8 personnes », « 4 », « 6 parts », « pour 4 » → le nombre ; sinon null. « 8 muffins » ou « 12 crêpes » comptent des pièces, pas des
+ * personnes : on ne les prend pas pour un nombre de convives (les quantités seraient ajustées sur une fausse base).
+ */
 export function servingsCountOf(value: unknown): number | null {
   const v = Array.isArray(value) ? value[0] : value;
-  const n = Number(String(v ?? "").match(/\d+/)?.[0]);
-  return Number.isFinite(n) && n > 0 && n <= 50 ? n : null;
+  const texte = String(v ?? "").trim();
+  const n = Number(texte.match(/\d+/)?.[0]);
+  const parlePersonnes = /^\d+$/.test(texte) || /\b(personnes?|pers\.?|parts?|portions?|convives?|couverts?|gourmands?|invit[ée]s?)\b/i.test(texte);
+  return parlePersonnes && Number.isFinite(n) && n > 0 && n <= 50 ? n : null;
 }
 
 /** recipeInstructions : texte, liste d'étapes, ou sections d'étapes. */
@@ -172,10 +177,10 @@ export function extractRecipe(html: string): ImportedRecipe | null {
     title: cleanTitle(String(recipe.name ?? fallbackTitle ?? "")),
     imageUrl: pickImage(recipe.image) ?? (fallbackImage && !isPlaceholderImage(fallbackImage) ? fallbackImage : null),
     servings: servingsOf(recipe.recipeYield),
-    ingredients: lines.flatMap((l) => {
-      const parsed = parseIngredientLine(decodeEntities(String(l)));
+    ingredients: lines.flatMap((l) => decouperLigne(decodeEntities(String(l))).flatMap((ligne) => {
+      const parsed = parseIngredientLine(ligne);
       return parsed ? [parsed] : [];
-    }),
+    })),
     category: Array.isArray(recipe.recipeCategory)
       ? String(recipe.recipeCategory[0] ?? "") || null
       : typeof recipe.recipeCategory === "string"
@@ -192,6 +197,12 @@ export function extractRecipe(html: string): ImportedRecipe | null {
 }
 
 // ─── Découpage d'une ligne d'ingrédient ───────────────────────────────
+
+/** « Sel, poivre » ou « Sel et poivre » : deux articles, pas un seul nommé « Sel, poivre ». */
+export function decouperLigne(ligne: string): string[] {
+  const m = ligne.trim().match(/^(sel|poivre)\s*(?:,|et|&)\s*(sel|poivre)(\s+(?:du moulin|fin|gris))?\s*$/i);
+  return m && m[1].toLowerCase() !== m[2].toLowerCase() ? [m[1], `${m[2]}${m[3] ?? ""}`] : [ligne];
+}
 
 const FRACTIONS: Record<string, number> = { "½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1 / 3, "⅔": 2 / 3 };
 
@@ -235,12 +246,13 @@ const SECTION_HEADERS = /^(pr[ée]paration|ingr[ée]dients?|pour la .+|pour le .
 const SIZE_WORDS = /^(petite?s?|grande?s?|grosse?s?|gros|beaux?|belles?|bonne?s?)\s+/i;
 
 function parseQuantity(s: string): { value: number | null; rest: string } {
-  const m = s.match(/^(\d+(?:[.,]\d+)?)?\s*([½¼¾⅓⅔])|^(\d+)\s*\/\s*(\d+)|^(\d+(?:[.,]\d+)?)(?:\s*(?:à|-)\s*\d+(?:[.,]\d+)?)?/);
+  const m = s.match(/^(\d+(?:[.,]\d+)?)?\s*([½¼¾⅓⅔])|^(\d+)\s*\/\s*(\d+)|^(\d+(?:[.,]\d+)?)(?:\s*(?:à|-)\s*(\d+(?:[.,]\d+)?))?/);
   if (!m) return { value: null, rest: s };
   let value: number;
   if (m[2]) value = Number((m[1] ?? "0").replace(",", ".")) + FRACTIONS[m[2]];
   else if (m[3]) value = Number(m[3]) / Number(m[4]);
-  else value = Number(m[5].replace(",", "."));
+  // « 2 à 3 c. à soupe » : la plus grande borne, pour ne pas en manquer.
+  else value = Math.max(Number(m[5].replace(",", ".")), Number((m[6] ?? "0").replace(",", ".")));
   return { value: Number.isFinite(value) && value > 0 ? Math.round(value * 100) / 100 : null, rest: s.slice(m[0].length).trim() };
 }
 
@@ -284,7 +296,7 @@ export function parseIngredientLine(raw: string): ImportedIngredient | null {
 /** Le premier mot-clé trouvé gagne : les expressions précises d'abord. */
 const AISLE_KEYWORDS: [AisleId, string[]][] = [
   ["hygiene", ["papier toilette", "essuie tout", "mouchoir", "sac poubelle", "liquide vaisselle", "lave vaisselle", "lessive", "adoucissant", "javel", "nettoyant", "eponge", "dentifrice", "brosse a dent", "shampoing", "shampooing", "apres shampoing", "gel douche", "savon", "deodorant", "coton", "rasoir", "couche", "serviette hygienique", "tampon", "creme solaire", "papier alu", "film alimentaire", "papier cuisson"]],
-  ["epicerie", ["lait de coco", "creme de marron", "pate de curry", "pain de mie"]],
+  ["epicerie", ["lait de coco", "creme de marron", "pate de curry", "pain de mie", "cube de bouillon", "bouillon", "fond de veau", "fond de volaille", "fond de boeuf", "fumet de poisson"]],
   ["surgeles", ["surgele", "glace", "sorbet"]],
   ["cremerie", ["pate brisee", "pate feuilletee", "pate sablee", "pate a pizza", "creme fraiche", "creme liquide", "creme epaisse", "lait", "beurre", "oeuf", "fromage", "gruyere", "emmental", "comte", "parmesan", "mozzarella", "chevre", "feta", "ricotta", "mascarpone", "yaourt", "yogourt", "creme", "raclette", "reblochon", "camembert", "roquefort", "cheddar"]],
   ["boucherie", ["chair a saucisse", "saucisse", "lardon", "jambon", "bacon", "chorizo", "boeuf", "veau", "porc", "poulet", "dinde", "agneau", "canard", "lapin", "viande", "steak", "escalope", "roti", "paleron", "macreuse", "gigot", "cote", "filet mignon", "merguez", "blanquette", "bourguignon", "os a moelle", "volaille", "pintade", "magret", "foie"]],

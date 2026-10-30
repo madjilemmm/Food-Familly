@@ -56,7 +56,15 @@ export type PlatDeLaCourse = {
  * Sert à l'écran de préparation ET au calcul de la liste : les deux voient la même chose.
  */
 export async function platsDeLaCourse(familyId: string, trip: Trip): Promise<PlatDeLaCourse[]> {
-  const [members, envies, avis, hist, recipes, tastes, etiquettes, profils] = await Promise.all([
+  return classerLesPlats(await donneesDesPlats(familyId), trip);
+}
+
+/**
+ * Ce que le classement des plats lit : rien n'y dépend de la course, donc tout peut se charger pendant qu'on ouvre la course
+ * (lib/menu.ts : une attente de moins à chaque affichage).
+ */
+export function donneesDesPlats(familyId: string) {
+  return Promise.all([
     getProfiles(familyId),
     getFamilyEnvies(familyId),
     getFamilySwipes(familyId),
@@ -66,6 +74,12 @@ export async function platsDeLaCourse(familyId: string, trip: Trip): Promise<Pla
     getEtiquettes(familyId),
     getProfilsGouts(familyId),
   ]);
+}
+export type DonneesDesPlats = Awaited<ReturnType<typeof donneesDesPlats>>;
+
+/** Le classement lui-même (calcul pur) : demandes, envies, choix déjà faits et idées, pour une course. */
+export function classerLesPlats(donnees: DonneesDesPlats, trip: Trip): PlatDeLaCourse[] {
+  const [members, envies, avis, hist, recipes, tastes, etiquettes, profils] = donnees;
   const now = Date.now();
   const ids = members.map((m) => m.id);
   const noms = new Map(members.map((m) => [m.id, m.name]));

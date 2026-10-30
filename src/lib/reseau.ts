@@ -9,6 +9,19 @@ export const MESSAGE_RESEAU = "Pas de réseau : rien n'est parti, mais rien n'es
 const MESSAGE_MISE_A_JOUR = "Kaddie vient d'être mise à jour : recharge la page pour continuer.";
 const MESSAGE_IMPREVU = "Ça n'a pas marché. Réessaie dans un instant.";
 
+/** La session a pris fin (cookie effacé ou expiré) : le serveur répond « non connecté ». Ce n'est pas le réseau. */
+export class SessionExpiree extends Error {
+  constructor() {
+    super("Session expirée");
+    this.name = "SessionExpiree";
+  }
+}
+/** Là où l'on renvoie une session expirée : l'accueil, qui dit pourquoi. */
+export const ADRESSE_SESSION_EXPIREE = "/bienvenue?session=expiree";
+
+/** Le serveur ne reconnaît plus l'action : l'appli a été mise à jour depuis que cet écran est ouvert. Rien n'a été refusé. */
+export const estActionInconnue = (e: unknown) => unstable_isUnrecognizedActionError(e);
+
 /** La requête n'a pas pu partir (réseau coupé, appli mise en veille…) : rien n'a été fait côté serveur. */
 export function estErreurReseau(e: unknown): boolean {
   return e instanceof TypeError || (typeof navigator !== "undefined" && navigator.onLine === false);
@@ -18,6 +31,12 @@ export function estErreurReseau(e: unknown): boolean {
 export function messageErreur(e: unknown, reseau = MESSAGE_RESEAU): string {
   unstable_rethrow(e);
   if (unstable_isUnrecognizedActionError(e)) return MESSAGE_MISE_A_JOUR;
+  return estErreurReseau(e) ? reseau : MESSAGE_IMPREVU;
+}
+
+/** Ce que dit l'écran après un échec, côté téléphone : le réseau, une mise à jour de l'appli, ou un imprévu (jamais « pas de réseau » pour autre chose). */
+export function raisonDeLEchec(e: unknown, reseau = MESSAGE_RESEAU): string {
+  if (estActionInconnue(e)) return MESSAGE_MISE_A_JOUR;
   return estErreurReseau(e) ? reseau : MESSAGE_IMPREVU;
 }
 

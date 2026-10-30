@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireProfile, requireUser } from "@/lib/auth";
 import { getFamily, getProfiles } from "@/lib/data";
-import { deleteFamily, forgetProfile, leaveFamily } from "@/app/actions/auth";
+import { deleteFamily, forgetProfile } from "@/app/actions/auth";
+import { QuitterFamille } from "@/components/pwa/QuitterFamille";
 import { NotificationsCard } from "@/components/pwa/NotificationsCard";
 import { BandeauScene, IconeRetour } from "@/components/ui";
 import { CodeFamille } from "@/components/family/FamilyCode";
@@ -89,15 +90,14 @@ export default async function SettingsPage() {
       </section>
 
       <div className="flex flex-col items-center gap-2 text-center">
-        <ConfirmButton
-          action={leaveFamily}
+        <QuitterFamille
           question={`Quitter ${family?.name ?? "cette famille"} ?`}
           detail={family ? `Pour revenir sur ce téléphone, il faudra le code : ${family.join_code}` : undefined}
           confirmLabel="Oui, quitter"
           className="min-h-14 px-2 text-encre-douce underline underline-offset-4"
         >
           Quitter cette famille sur ce téléphone
-        </ConfirmButton>
+        </QuitterFamille>
         <ConfirmButton
           action={deleteFamily}
           question={`Supprimer ${family?.name ?? "la famille"} ?`}

@@ -259,7 +259,7 @@ function EtapeRegime({
           ajouter();
         }}
       >
-        <input ref={champ} aria-label="Autre" placeholder="Autre : céleri, kiwi…" maxLength={40} className="kd-champ min-w-0 flex-1" />
+        <input ref={champ} aria-label="Autre" placeholder="Autre : kiwi, sulfites…" maxLength={40} className="kd-champ min-w-0 flex-1" />
         <button type="submit" className="kd-btn kd-btn--secondaire shrink-0 px-4">
           Ajouter
         </button>

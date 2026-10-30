@@ -157,3 +157,38 @@ describe("étapes et nombre de personnes", () => {
     expect(stepsOf("Une.\nDeux.")).toEqual(["Une.", "Deux."]);
   });
 });
+
+describe("ce que l'import ne doit pas deviner", () => {
+  it("« 8 muffins » compte des pièces, pas 8 personnes", async () => {
+    const { servingsCountOf } = await import("./recipe-import");
+    expect(servingsCountOf("8 muffins")).toBeNull();
+    expect(servingsCountOf("12 crêpes")).toBeNull();
+    expect(servingsCountOf("une dizaine de crêpes")).toBeNull();
+    expect(servingsCountOf("Pour 6 personnes")).toBe(6);
+    expect(servingsCountOf("6 parts")).toBe(6);
+    expect(servingsCountOf("4 à 6 personnes")).toBe(4);
+    expect(servingsCountOf("4")).toBe(4);
+    expect(servingsCountOf(6)).toBe(6);
+  });
+  it("« 2 à 3 c. à soupe » : la plus grande borne, pour ne pas en manquer", async () => {
+    const { parseIngredientLine } = await import("./recipe-import");
+    expect(parseIngredientLine("2 à 3 c. à soupe de farine")).toMatchObject({ quantity: 3, unit: "c. à soupe", name: "Farine" });
+    expect(parseIngredientLine("1-2 oignons")).toMatchObject({ quantity: 2, name: "Oignons" });
+    expect(parseIngredientLine("250 g de beurre")).toMatchObject({ quantity: 250, unit: "g" });
+  });
+  it("« Sel, poivre » donne deux articles", async () => {
+    const { decouperLigne } = await import("./recipe-import");
+    expect(decouperLigne("Sel, poivre")).toEqual(["Sel", "poivre"]);
+    expect(decouperLigne("Sel et poivre du moulin")).toEqual(["Sel", "poivre du moulin"]);
+    expect(decouperLigne("Poivre, sel")).toEqual(["Poivre", "sel"]);
+    expect(decouperLigne("Sel, poivre, muscade")).toEqual(["Sel, poivre, muscade"]);
+    expect(decouperLigne("2 pommes, 1 poire")).toEqual(["2 pommes, 1 poire"]);
+  });
+  it("un cube de bouillon de volaille se range à l'épicerie, pas à la boucherie", async () => {
+    const { guessAisle } = await import("./recipe-import");
+    expect(guessAisle("Cube de bouillon de volaille")).toBe("epicerie");
+    expect(guessAisle("Bouillon de volaille")).toBe("epicerie");
+    expect(guessAisle("Fond de veau")).toBe("epicerie");
+    expect(guessAisle("Poulet")).toBe("boucherie");
+  });
+});

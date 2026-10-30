@@ -65,7 +65,7 @@ export default async function PortraitPage() {
       {aSwiper > 0 && (
         <p>
           Encore {aSwiper} plat{aSwiper > 1 ? "s" : ""} à swiper et Kaddie te connaîtra mieux.{" "}
-          <Link href="/envies" className="font-semibold text-violet underline underline-offset-4">
+          <Link href="/envies" className="py-3 font-semibold text-violet underline underline-offset-4">
             Swiper
           </Link>
         </p>

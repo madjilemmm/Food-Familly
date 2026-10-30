@@ -1,5 +1,6 @@
 import { CLASSIQUE_MIN, type RepasCuisine } from "./classiques";
 import { listeDeNoms, phraseEnvie } from "./convives";
+import { estPourLaRecette } from "./shopping-list";
 
 /*
  * La mémoire de la maison : ce que la famille a mangé, dit en une phrase datée sous le plat de ce soir.
@@ -116,7 +117,7 @@ export function mangesDeduits(decisions: Decision[], courses: CourseFaite[], exp
 export function platsCoches(menu: { id: string; titre: string }[], articles: { for_recipes?: string | null; source: string; checked: boolean }[]): string[] {
   return menu
     .filter((p) => {
-      const siens = articles.filter((a) => a.source === "recipe" && (a.for_recipes ?? "").split(", ").includes(p.titre));
+      const siens = articles.filter((a) => a.source === "recipe" && estPourLaRecette(a.for_recipes, p.titre, menu.map((m) => m.titre)));
       return siens.length > 0 && siens.every((a) => a.checked);
     })
     .map((p) => p.id);

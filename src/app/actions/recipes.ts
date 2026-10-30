@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
+import { loadCurrentTrip } from "@/lib/data";
+import { reconstruireListe } from "@/lib/menu";
 import { db } from "@/lib/supabase/server";
 import { BUCKET_PHOTOS, cheminDansLeStockage } from "@/lib/photos";
 import { isAisle } from "@/lib/domain/aisles";
@@ -95,6 +97,10 @@ export async function saveRecipe(_prev: { error?: string }, formData: FormData):
 
   let recipeId = id;
   let oldPhoto: string | null = null;
+  const creee = !id;
+  // Au Menu de la course en cours ? Alors sa liste d'articles doit suivre ce qui vient d'être enregistré.
+  const course = id ? await loadCurrentTrip(user.familyId) : null;
+  const auMenu = Boolean(course?.trip_recipes.some((r) => r.recipe_id === id && r.selected));
 
   try {
     if (recipeId) {
@@ -106,15 +112,13 @@ export async function saveRecipe(_prev: { error?: string }, formData: FormData):
         .maybeSingle();
       if (!existing) return { error: "Cette recette n'existe plus." };
       oldPhoto = existing.photo_url;
-      const { error } = await db().from("recipes").update({ title, emoji, ...details }).eq("id", recipeId).eq("family_id", user.familyId);
-      if (error) throw error;
     } else {
       const { data, error } = await db().from("recipes").insert({ title, emoji, family_id: user.familyId, ...details }).select("id").single();
       if (error) throw error;
       recipeId = data.id as string;
     }
 
-    // Photo : nouvelle, supprimée ou inchangée
+    // Photo : nouvelle, supprimée ou inchangée (envoyée maintenant, rattachée à la recette tout à la fin)
     let photoUrl: string | null | undefined;
     if (photo instanceof File && photo.size > 0) photoUrl = await uploadPhoto(recipeId!, photo);
     else if (remotePhoto) {
@@ -127,22 +131,50 @@ export async function saveRecipe(_prev: { error?: string }, formData: FormData):
         });
     }
     else if (removePhoto) photoUrl = null;
-    if (photoUrl !== undefined) {
+
+    // Ingrédients : les nouveaux sont écrits avant que les anciens soient retirés. Si une écriture échoue en route, la recette
+    // garde ses ingrédients (jamais « plus d'ingrédients » avec un titre déjà changé).
+    const { data: anciens } = await db().from("recipe_ingredients").select("id").eq("recipe_id", recipeId);
+    let nouveaux: string[] = [];
+    if (ingredients.length > 0) {
+      const { data, error } = await db()
+        .from("recipe_ingredients")
+        .insert(ingredients.map((ing, position) => ({ ...ing, position, recipe_id: recipeId })))
+        .select("id");
+      if (error) throw error;
+      nouveaux = (data ?? []).map((r) => r.id as string);
+    }
+    const aRetirer = (anciens ?? []).map((r) => r.id as string);
+    if (aRetirer.length > 0) {
+      const { error } = await db().from("recipe_ingredients").delete().in("id", aRetirer);
+      if (error) {
+        // La recette reste comme elle était : on retire ce qui vient d'être ajouté.
+        if (nouveaux.length > 0) await db().from("recipe_ingredients").delete().in("id", nouveaux);
+        throw error;
+      }
+    }
+
+    // Le titre et le reste en dernier : une panne avant laisse la recette telle qu'elle était.
+    if (!creee) {
+      const { error } = await db()
+        .from("recipes")
+        .update({ title, emoji, ...details, ...(photoUrl !== undefined ? { photo_url: photoUrl } : {}) })
+        .eq("id", recipeId)
+        .eq("family_id", user.familyId);
+      if (error) throw error;
+    } else if (photoUrl !== undefined) {
       await db().from("recipes").update({ photo_url: photoUrl }).eq("id", recipeId);
+    }
+    if (photoUrl !== undefined) {
       const oldPath = cheminDansLeStockage(oldPhoto);
       if (oldPath) await db().storage.from(BUCKET).remove([oldPath]);
     }
-
-    // Ingrédients : remplacés en bloc
-    await db().from("recipe_ingredients").delete().eq("recipe_id", recipeId);
-    if (ingredients.length > 0) {
-      const { error } = await db()
-        .from("recipe_ingredients")
-        .insert(ingredients.map((ing, position) => ({ ...ing, position, recipe_id: recipeId })));
-      if (error) throw error;
-    }
+    // Une recette du Menu modifiée : la liste suit (quantités, ingrédients, titre).
+    if (auMenu) await reconstruireListe(user.familyId, course!.id).catch((err) => console.error("Liste non mise à jour après la recette :", err));
   } catch (err) {
     console.error(err);
+    // Une recette créée à l'instant et pas terminée n'est pas gardée à moitié.
+    if (creee && recipeId) await db().from("recipes").delete().eq("id", recipeId);
     return { error: err instanceof Error ? err.message : "L'enregistrement a échoué." };
   }
 
@@ -159,7 +191,11 @@ export async function deleteRecipe(recipeId: string) {
     .eq("family_id", user.familyId)
     .maybeSingle();
   if (!data) return;
+  const course = await loadCurrentTrip(user.familyId);
+  const auMenu = Boolean(course?.trip_recipes.some((r) => r.recipe_id === recipeId && r.selected));
   await db().from("recipes").delete().eq("id", recipeId).eq("family_id", user.familyId);
+  // Une recette du Menu supprimée : ses articles quittent la liste, le Menu ne la garde pas.
+  if (auMenu) await reconstruireListe(user.familyId, course!.id).catch((err) => console.error("Liste non mise à jour après la suppression :", err));
   const path = cheminDansLeStockage(data?.photo_url ?? null);
   if (path) await db().storage.from(BUCKET).remove([path]);
   changed();

@@ -2,7 +2,7 @@
 
 import { requireUser, type CurrentUser } from "@/lib/auth";
 import { db } from "@/lib/supabase/server";
-import { getAppris, getCoursesPassees, getCurrentTrip, type Trip } from "@/lib/data";
+import { getAppris, getCoursesPassees, getCurrentTrip, loadCurrentTrip, type Trip } from "@/lib/data";
 import { articlesDe } from "@/lib/domain/articles";
 import { aAjouter, type Suggestion } from "@/lib/domain/habitudes";
 import { cleProduit } from "@/lib/domain/reconnaissance";
@@ -41,6 +41,20 @@ export async function jePars() {
 }
 
 /**
+ * « Je ne pars plus » : la personne qui avait annoncé son départ l'annule ; la liste redevient celle de tout le monde
+ * (« Je prends le relais » : une autre personne dit « Je pars » à son tour).
+ */
+export async function jeNePartsPlus() {
+  const user = await requireUser();
+  const trip = await assurerCourse(user.familyId);
+  // Pas la personne qui est partie : rien à annuler (déjà annulé depuis un autre écran, ou quelqu'un a pris le relais).
+  if (trip.created_by !== user.profileId) return;
+  const { error } = await db().from("shopping_trips").update({ created_by: null }).eq("id", trip.id).eq("created_by", user.profileId);
+  if (error) throw new Error(error.message);
+  changed();
+}
+
+/**
  * Mettre un plat au Menu, ou l'en retirer : la liste suit (n'importe qui dans la famille).
  * « Pas ce soir » retire seulement le plat ; « Pas pour moi » (refus) le retire et note mon « Bof » :
  * c'est un vrai signal pour mes goûts, comme au swipe (on n'oublie pas que j'ai pu l'aimer avant).
@@ -60,16 +74,24 @@ export async function choisirPourLeMenu(recipeId: string, auMenu: boolean, refus
 /**
  * « J'ai fini les courses » (n'importe qui) : les plats achetés passent « à cuisiner »,
  * et une nouvelle liste s'ouvre d'elle-même au prochain écran.
+ * `tripId` : la liste que l'écran montrait. Si quelqu'un l'a déjà terminée, il n'y a rien à refaire : on ne ferme pas
+ * la nouvelle liste (vide) qui vient de s'ouvrir, et on ne prévient pas deux fois la famille.
  */
-export async function finishTrip() {
+export async function finishTrip(tripId?: string) {
   const user = await requireUser();
-  const trip = await currentTripOrThrow(user);
+  const trip = tripId ? await loadCurrentTrip(user.familyId, tripId) : await currentTripOrThrow(user);
+  if (!trip) throw new Error("Course inconnue");
+  if (trip.status === "done") return;
   await noterSansReponse(user.familyId, trip).catch(() => {});
   const maintenant = new Date().toISOString();
   // validated_at : la date des plats retenus (historique, récap) ; finished_at : vraiment faites.
   const fin = { status: "done", validated_at: trip.validated_at ?? maintenant, created_by: trip.created_by ?? user.profileId };
-  const { error } = await db().from("shopping_trips").update({ ...fin, finished_at: maintenant }).eq("id", trip.id);
-  if (error) await db().from("shopping_trips").update(fin).eq("id", trip.id);
+  // « .neq("status", "done") » : si deux personnes appuient au même moment, une seule ferme la course (et prévient la famille).
+  const fermer = (champs: Record<string, unknown>) => db().from("shopping_trips").update(champs).eq("id", trip.id).neq("status", "done").select("id");
+  const premiere = await fermer({ ...fin, finished_at: maintenant });
+  // Base pas encore migrée (pas de « finished_at ») : on ferme sans.
+  const fermee = premiere.error ? (await fermer(fin)).data : premiere.data;
+  if (!fermee?.length) return;
   // Pas de redirection ici : le bouton recharge l'écran des courses (voir ConfirmButton « apres »).
   changed(async () => notifyCoursesFinies(user.familyId, fin.created_by, ceQuiAEtePris(trip, await getAppris(user.familyId))));
 }

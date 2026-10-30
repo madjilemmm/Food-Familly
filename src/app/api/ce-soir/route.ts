@@ -18,7 +18,8 @@ export async function POST(req: Request) {
     raison?: string;
     reponse?: string;
   };
-  if (commande === "ceSeraCa" && typeof recipeId === "string") await ceSeraCa(recipeId, typeof raison === "string" ? raison : undefined);
+  // « dejaChoisi » : quelqu'un a décidé avant, l'écran se recharge sur son choix.
+  if (commande === "ceSeraCa" && typeof recipeId === "string") return NextResponse.json({ ok: true, ...(await ceSeraCa(recipeId, typeof raison === "string" ? raison : undefined)) });
   else if (commande === "autreIdee" && typeof recipeId === "string") await autreIdee(recipeId);
   else if (commande === "changer") await changerCeSoir();
   else if (commande === "allergie") await aucuneAllergie();

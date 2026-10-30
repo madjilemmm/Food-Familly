@@ -13,7 +13,14 @@ export type TastesInput = { diets: string[]; autres: string[]; cards: Record<str
 const DIET_KEYS = new Set(DIETS.map((d) => d.key));
 const CARD_KEYS = new Set(INGREDIENTS.map((f) => f.key));
 
-/** Enregistre mes goûts (remplace tout). « done » = questionnaire terminé. */
+/** Un nom sûr à mettre dans un filtre « in » ; les autres (guillemets, virgules, parenthèses saisis à la main) se retirent un à un. */
+const SIMPLE = /^[A-Za-z0-9_:\- ]+$/;
+
+/**
+ * Enregistre mes goûts (remplace tout). « done » = questionnaire terminé.
+ * Ce qui doit exister est écrit d'abord, ce qui ne doit plus exister est retiré ensuite : si une écriture échoue en route,
+ * il reste au pire un goût de trop (on réessaie), jamais un interdit de moins.
+ */
 export async function saveTastes(input: TastesInput): Promise<{ ok?: boolean; error?: string }> {
   const user = await requireUser();
   const diets = [...new Set((input.diets ?? []).filter((k) => DIET_KEYS.has(k)))];
@@ -33,12 +40,21 @@ export async function saveTastes(input: TastesInput): Promise<{ ok?: boolean; er
       .map(([food, level]) => ({ food, level })),
   ].map((r) => ({ ...r, profile_id: user.profileId }));
 
-  const { error: delError } = await db().from("profile_tastes").delete().eq("profile_id", user.profileId);
-  if (delError) return { error: "L'enregistrement a échoué. Réessaie." };
+  const echec = { error: "L'enregistrement a échoué. Réessaie." };
+  const { data: actuels, error: lecture } = await db().from("profile_tastes").select("food").eq("profile_id", user.profileId);
+  if (lecture) return echec;
   if (rows.length) {
-    const { error } = await db().from("profile_tastes").insert(rows);
-    if (error) return { error: "L'enregistrement a échoué. Réessaie." };
+    const { error } = await db().from("profile_tastes").upsert(rows, { onConflict: "profile_id,food" });
+    if (error) return echec;
   }
+  const voulus = new Set(rows.map((r) => r.food));
+  const aRetirer = (actuels ?? []).map((r) => r.food as string).filter((f) => !voulus.has(f));
+  const simples = aRetirer.filter((f) => SIMPLE.test(f));
+  const retraits = await Promise.all([
+    simples.length ? db().from("profile_tastes").delete().eq("profile_id", user.profileId).in("food", simples) : null,
+    ...aRetirer.filter((f) => !SIMPLE.test(f)).map((f) => db().from("profile_tastes").delete().eq("profile_id", user.profileId).eq("food", f)),
+  ]);
+  if (retraits.some((r) => r?.error)) return echec;
   const now = new Date().toISOString();
   await db()
     .from("profiles")

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import type { Profile } from "@/lib/data";
-import { getAppris, getCeSoirChoisi, getDerniereCourse, getFamily, getProfiles, getRecipes } from "@/lib/data";
+import { requireProfile } from "@/lib/auth";
+import { getAppris, getCeSoirChoisi, getCoursesPassees, getDerniereCourse, getFamily, getHistorique, getProfiles, getRecipes } from "@/lib/data";
 import { aPreparer } from "@/lib/views";
 import { platsDuMenu, synchroniserMenu } from "@/lib/menu";
 import { listeDeNoms } from "@/lib/domain/convives";
@@ -12,6 +12,7 @@ import { BilanCourses } from "./BilanCourses";
 import { AVerifier } from "./AVerifier";
 import { DerniereDemande } from "./DerniereDemande";
 import { JePars } from "./JePars";
+import { JeNePartsPlus, PrendreLeRelais } from "./DepartCourses";
 import { ShoppingList } from "./ShoppingList";
 
 /** « Je pars faire les courses » reste affiché quelques heures, le temps des courses. */
@@ -22,17 +23,22 @@ const DEPART_VISIBLE_MS = 6 * 60 * 60 * 1000;
  * (lib/menu.ts) ; chacun peut ajouter un article ou cocher. Personne n'a à lancer
  * de course : « Je pars faire les courses » prévient seulement la famille.
  */
-export async function CoursesScreen({ me, notifications }: { me: Profile; notifications?: React.ReactNode }) {
-  const [{ trip }, profiles, appris, derniere, recipes, choisi, famille] = await Promise.all([
-    synchroniserMenu(me.family_id),
-    getProfiles(me.family_id),
-    getAppris(me.family_id),
-    getDerniereCourse(me.family_id),
-    getRecipes(me.family_id),
-    getCeSoirChoisi(me.family_id),
-    getFamily(me.family_id),
+export async function CoursesScreen({ familyId, notifications }: { familyId: string; notifications?: React.ReactNode }) {
+  // Le profil se charge avec le reste (la famille vient du cookie) : une attente de moins.
+  const [me, { trip }, profiles, appris, derniere, recipes, choisi, famille] = await Promise.all([
+    requireProfile(),
+    synchroniserMenu(familyId),
+    getProfiles(familyId),
+    getAppris(familyId),
+    getDerniereCourse(familyId),
+    getRecipes(familyId),
+    getCeSoirChoisi(familyId),
+    getFamily(familyId),
+    // Ce que « Avant de partir » lira (aPreparer) : déjà en route, il n'attendra pas la course.
+    getHistorique(familyId),
+    getCoursesPassees(familyId),
   ]);
-  const prep = await aPreparer(me.family_id, trip);
+  const prep = await aPreparer(familyId, trip);
   const titres = new Map(recipes.map((r) => [r.id, r.title]));
   const menu = platsDuMenu(trip).flatMap((id) => titres.get(id) ?? []);
   const ceSoir = choisi ? titres.get(choisi.recipeId) : undefined;
@@ -61,17 +67,26 @@ export async function CoursesScreen({ me, notifications }: { me: Profile; notifi
         ) : (
           <>Rien à cuisiner pour l&apos;instant : {seul ? "swipe des plats" : "quand vous êtes au moins deux à dire « Miam »"}, leurs ingrédients arrivent ici. </>
         )}
-        <Link href={ROUTES.menu} className="font-semibold whitespace-nowrap text-violet underline underline-offset-4">
+        {/* py-3 : la zone d'appui fait 44 px de haut sans changer la ligne */}
+        <Link href={ROUTES.menu} className="py-3 font-semibold whitespace-nowrap text-violet underline underline-offset-4">
           Voir Ce soir
         </Link>
       </p>
 
       {/* Quelqu'un d'autre est parti : une dernière demande, d'un appui. */}
       {qui && <DerniereDemande qui={qui} choix={[...prep.reportes, ...prep.habituels].slice(0, 4).map((s) => s.nom)} versCaddie={false} />}
+      {qui && !seul && (
+        <p className="mb-6">
+          <PrendreLeRelais />
+        </p>
+      )}
 
-      {/* Après « Je pars », l'écran se met à jour : la confirmation reste, le bouton disparaît. */}
+      {/* Après « Je pars », l'écran se met à jour : la confirmation reste, le bouton disparaît ; on peut encore y renoncer. */}
       {enCourse === me.id && !seul ? (
-        <p className="mb-6 font-semibold">La famille est prévenue : une dernière envie peut encore arriver sur la liste.</p>
+        <div className="mb-6">
+          <p className="font-semibold">La famille est prévenue : une dernière envie peut encore arriver sur la liste.</p>
+          <JeNePartsPlus />
+        </div>
       ) : (
         !enCourse && !seul && <JePars />
       )}

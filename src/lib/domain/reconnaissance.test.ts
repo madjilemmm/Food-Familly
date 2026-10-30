@@ -57,6 +57,10 @@ describe("reconnaissance", () => {
     expect(lu("beurre de cacahuète").nom).toBe("Beurre de cacahuète");
     expect(cleProduit("Danette chocolat")).not.toBe(cleProduit("Danette vanille"));
     expect(cleProduit("Pâtes")).not.toBe(cleProduit("Pâté"));
+    // Trois pâtes qui ne se remplacent pas : chacune garde sa ligne sur la liste.
+    expect(cleProduit("pâte brisée")).not.toBe(cleProduit("pâte feuilletée"));
+    expect(cleProduit("pâte feuilletée")).not.toBe(cleProduit("pâte sablée"));
+    expect(cleProduit("pâte à tarte")).toBe(cleProduit("pâte brisée"));
   });
 
   it("un mot ambigu propose des choix sans bloquer", () => {

@@ -4,16 +4,34 @@ import { useEffect, useState } from "react";
 import { addItems, setItemsChecked } from "@/app/actions/list";
 import { swipe } from "@/app/actions/swipes";
 import { definirHorsLigne, ENVOYER, lireAttente, marquerEnvoyees, oublierEnvoyees, retirerDeLAttente, type Entree } from "@/lib/attente";
-import { estErreurReseau } from "@/lib/reseau";
+import { estActionInconnue, estErreurReseau } from "@/lib/reseau";
 
 /** Tant qu'il reste quelque chose à envoyer, on réessaie régulièrement. */
 const REESSAI_MS = 15_000;
+/** Après une mise à jour de l'appli, on recharge pour repartir avec la nouvelle version, au plus une fois par minute. */
+const RECHARGE_MIN_MS = 60_000;
+const CLE_RECHARGE = "kaddie.rechargeFile";
+
+/** Recharge l'écran une fois (sans boucle si le serveur répond toujours pareil). */
+function rechargerUneFois() {
+  try {
+    const dernier = Number(sessionStorage.getItem(CLE_RECHARGE) ?? 0);
+    if (Date.now() - dernier < RECHARGE_MIN_MS) return;
+    sessionStorage.setItem(CLE_RECHARGE, String(Date.now()));
+  } catch {
+    // Sans mémoire de session, on ne recharge pas : la file reste, le prochain essai se fera tout seul.
+    return;
+  }
+  window.location.reload();
+}
 
 /**
  * Envoie la file d'attente du téléphone (lib/attente) : tout de suite après une action,
  * au retour du réseau, au retour dans l'appli, et toutes les 15 s s'il reste quelque chose.
  * Les ajouts partent avant les coches (on peut cocher un article ajouté hors connexion).
  * Si le serveur refuse (course terminée entre-temps…), l'opération est abandonnée et on le dit.
+ * Si l'appli vient d'être mise à jour (le serveur ne reconnaît plus l'action), rien n'est refusé : la file est gardée
+ * et l'écran se recharge pour repartir avec la nouvelle version.
  */
 export function FileAttente() {
   const [refus, setRefus] = useState(false);
@@ -32,6 +50,10 @@ export function FileAttente() {
       } catch (e) {
         if (estErreurReseau(e)) {
           definirHorsLigne(true);
+          return false;
+        }
+        if (estActionInconnue(e)) {
+          rechargerUneFois();
           return false;
         }
         // Refusé par le serveur : réessayer ne servirait à rien.
