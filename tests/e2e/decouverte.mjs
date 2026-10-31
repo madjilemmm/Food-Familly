@@ -231,7 +231,7 @@ const scenarios = {
       vues.push(e.carte); const neuve = !deja.has(e.carte); deja.add(e.carte); if (neuve) neuves++;
       const r = await swiper(p, AIME.test(e.carte) || vues.length % 3 === 0); temps.push(r.ms); if (r.bloque) bloques++;
       if (vues.length % 100 === 0) tranches.push(`${neuves} neuves sur ${vues.length}`);
-      await p.waitForTimeout(250);
+      await p.waitForTimeout(Number(process.env.RYTHME_FLUX ?? 250));
     }
     const part = (xs) => (xs.length ? Math.round((100 * xs.filter((t) => AIME.test(t)).length) / xs.length) : 0);
     const s = await stats();

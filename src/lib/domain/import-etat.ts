@@ -10,7 +10,7 @@ const ATTENTE_APRES_RIEN = [3 * MIN, 10 * MIN, 30 * MIN, 2 * 60 * MIN, 6 * 60 * 
 /** Délai avant de retenter après une panne de la source (erreur, trop lent) : 1, 5, 15 minutes. */
 const ATTENTE_APRES_ERREUR = [1 * MIN, 5 * MIN, 15 * MIN];
 /** Après un import réussi, on laisse un court répit : les nouvelles cartes arrivent, pas besoin de relancer tout de suite. */
-const ATTENTE_APRES_SUCCES = 10_000;
+const ATTENTE_APRES_SUCCES = 3_000;
 /** Une recherche qui n'a rien donné n'est pas refaite avant ce délai. */
 export const OUBLI_TERME_MS = 3 * 24 * 60 * MIN;
 

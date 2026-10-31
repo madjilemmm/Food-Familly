@@ -11,7 +11,7 @@ describe("quand retenter un import", () => {
   it("une panne de la source se retente vite, puis de moins en moins", () => {
     expect([1, 2, 3, 8].map((n) => (prochainEssai("erreur", n, T) - T) / MIN)).toEqual([1, 5, 15, 15]);
   });
-  it("après un succès, un court répit seulement", () => expect(prochainEssai("ajoutees", 0, T) - T).toBe(10_000));
+  it("après un succès, un court répit seulement", () => expect(prochainEssai("ajoutees", 0, T) - T).toBe(3_000));
 });
 
 describe("l'état à annoncer", () => {

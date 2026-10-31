@@ -26,6 +26,9 @@ import { ajouterALaFrontiere, ecarter, jugerDesPages, lireFrontiere, marquerExpl
 /** Pour les essais de bout en bout : une fausse source locale à la place de marmiton.org (jamais renseignée en production). */
 const BASE = process.env.MARMITON_BASE ?? "https://www.marmiton.org";
 const PAR_IMPORT = 12;
+/** Quand la pile est presque vide, un import voit plus grand. */
+const PAR_IMPORT_URGENT = 24;
+const URGENCE_SOUS = 8;
 /** On prépare la suite avant d'être à court : sous ce nombre de plats jamais vus, un import est tenté. */
 const RESERVE = 24;
 /** Plus on cherche large, moins on tombe sur ce que la famille a déjà vu : 6 recherches et les voisines de 5 recettes (3 aimées, 2 au hasard). */
@@ -47,13 +50,14 @@ const DELAI_PAGE_MS = 6_000;
 /** Assez de plats à découvrir ? Sinon on en ajoute (appelé après l'affichage du swipe). */
 export async function remplirSiBesoin(familyId: string, nouveautes: number) {
   if (nouveautes >= RESERVE) return;
+  const combien = nouveautes < URGENCE_SOUS ? PAR_IMPORT_URGENT : PAR_IMPORT;
   // Un seul import à la fois, pour toute la famille, sur tous les serveurs ; et pas avant le délai prévu après un essai vide ou en panne.
   if ((await prendreLeVerrou(familyId, VERROU_MS)) === "refuse") return;
   let ajoutees = 0;
   let termesVides: string[] = [];
   let resultat: "ajoutees" | "rien" | "erreur" = "erreur";
   try {
-    ({ ajoutees, termesVides, resultat } = await remplir(familyId));
+    ({ ajoutees, termesVides, resultat } = await remplir(familyId, combien));
   } catch (err) {
     console.warn("Import impossible :", err);
   } finally {
@@ -65,17 +69,17 @@ export async function remplirSiBesoin(familyId: string, nouveautes: number) {
 
 export { lireEtatImport };
 
-async function remplir(familyId: string): Promise<{ ajoutees: number; termesVides: string[]; resultat: "ajoutees" | "rien" | "erreur" }> {
+async function remplir(familyId: string, combien: number): Promise<{ ajoutees: number; termesVides: string[]; resultat: "ajoutees" | "rien" | "erreur" }> {
   await oublierLesRecettesBoudees(familyId);
   // La source principale : le catalogue commun (recettes complètes, avec photo, de sources autorisées), sans appel au réseau.
-  const duCatalogue = await piocherDansLeCatalogue(familyId, PAR_IMPORT).catch((err) => {
+  const duCatalogue = await piocherDansLeCatalogue(familyId, combien).catch((err) => {
     console.warn("Catalogue commun impossible :", err);
     return 0;
   });
   // Marmiton n'est plus qu'un complément. IMPORT_MARMITON=0 le coupe (conditions d'utilisation de Marmiton : pas d'extraction de sa base hors usage privé).
   let deMarmiton = { ajoutees: 0, termesVides: [] as string[], joignable: true };
-  if (duCatalogue < PAR_IMPORT && process.env.IMPORT_MARMITON !== "0") {
-    deMarmiton = await importer(familyId, PAR_IMPORT - duCatalogue).catch((err) => {
+  if (duCatalogue < combien && process.env.IMPORT_MARMITON !== "0") {
+    deMarmiton = await importer(familyId, combien - duCatalogue).catch((err) => {
       console.warn("Import Marmiton impossible :", err);
       return { ajoutees: 0, termesVides: [], joignable: false };
     });
