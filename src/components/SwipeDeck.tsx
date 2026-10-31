@@ -78,10 +78,12 @@ export function SwipeDeck({
       if (suite.length >= PILE_MINI || revoir) return suite === d ? d : suite;
       const presentes = new Set(suite.map((r) => r.id));
       const ecarte = new Set(recents.current.slice(-Math.min(RECENTS_MAX, Math.floor(initialDeck.length / 3))));
-      const reprises = initialDeck.filter((r) => !presentes.has(r.id) && !ecarte.has(r.id));
-      return reprises.length ? [...suite, ...reprises] : suite;
+      let reprises = initialDeck.filter((r) => !presentes.has(r.id) && !ecarte.has(r.id));
+      // Un tout petit catalogue : mieux vaut un plat revu qu'un écran vide.
+      if (!reprises.length && suite.length === 0) reprises = initialDeck.filter((r) => !presentes.has(r.id));
+      return reprises.length ? [...suite, ...reprises] : suite === d ? d : suite;
     });
-  }, [initialDeck, revoir]);
+  }, [initialDeck, revoir, deck.length]);
   // Pile vide : si une recherche de nouveautés est en cours (ou va démarrer), on redemande le paquet quelques fois, 20 secondes au plus ;
   // ensuite l'écran dit clairement où l'on en est. Jamais d'attente sans fin.
   const router = useRouter();
