@@ -102,12 +102,31 @@ export function titreDepuisLien(lien: string): string {
   return (lien.match(/recette_(.+?)_\d+\.aspx/)?.[1] ?? "").replace(/-/g, " ");
 }
 
+/** Ce qui rend le choix des recettes à lire personnel : une note (−1 à 1) pour un titre, et ce qui rapproche deux plats (pour varier). */
+export type Perso = {
+  note: (titre: string) => number;
+  /** Une clé de ressemblance (le style du plat, par exemple) : on évite d'en lire trop d'une même clé d'un coup. */
+  cle: (titre: string) => string;
+  /** La part des lectures laissée à la découverte (au hasard, hors goûts connus). 0,3 par défaut. */
+  exploration?: number;
+};
+
 /**
  * Parmi les recettes à voir (la file d'exploration), celles à lire maintenant : on écarte d'avance celles dont le titre (lu dans l'adresse) ressemble
- * déjà à un plat de la famille (elles seraient refusées après coup : inutile de les télécharger), puis on tire au hasard, `max` au plus.
+ * déjà à un plat de la famille (elles seraient refusées après coup : inutile de les télécharger). Ensuite :
+ * - sans `perso` : un tirage au hasard ;
+ * - avec `perso` : surtout les mieux notées par les goûts de la famille (sans en lire trop d'un même style d'affilée), et une part de découverte au hasard,
+ *   mêlée aux autres pour que les nouveautés ajoutées ne soient pas toutes du même genre.
  * Les écartées sont rendues pour qu'on ne les reconsidère pas.
  */
-export function choisirALire(aVoir: string[], titres: string[], max: number, seuil: number, hasard: () => number = Math.random): { aLire: string[]; ecartees: string[] } {
+export function choisirALire(
+  aVoir: string[],
+  titres: string[],
+  max: number,
+  seuil: number,
+  hasard: () => number = Math.random,
+  perso?: Perso,
+): { aLire: string[]; ecartees: string[] } {
   const ecartees: string[] = [];
   const restantes: string[] = [];
   for (const l of new Set(aVoir)) (tropProche(titreDepuisLien(l), titres, seuil) ? ecartees : restantes).push(l);
@@ -116,5 +135,40 @@ export function choisirALire(aVoir: string[], titres: string[], max: number, seu
     const j = Math.floor(hasard() * (i + 1));
     [restantes[i], restantes[j]] = [restantes[j], restantes[i]];
   }
-  return { aLire: restantes.slice(0, max), ecartees };
+  if (!perso) return { aLire: restantes.slice(0, max), ecartees };
+
+  const part = Math.min(0.9, Math.max(0, perso.exploration ?? 0.3));
+  const nDecouverte = Math.round(max * part);
+  const nGouts = max - nDecouverte;
+  // Les mieux notées, avec un malus par plat de même clé déjà retenu (pas dix burgers d'affilée) ; le hasard du mélange départage les égalités.
+  const notees = restantes.map((l) => ({ l, titre: titreDepuisLien(l), note: perso.note(titreDepuisLien(l)) }));
+  const retenues: string[] = [];
+  const parCle = new Map<string, number>();
+  const pris = new Set<string>();
+  while (retenues.length < nGouts) {
+    let meilleur: (typeof notees)[number] | null = null;
+    let meilleurScore = -Infinity;
+    for (const c of notees) {
+      if (pris.has(c.l)) continue;
+      const score = c.note - 0.12 * (parCle.get(perso.cle(c.titre)) ?? 0);
+      if (score > meilleurScore) (meilleur = c), (meilleurScore = score);
+    }
+    if (!meilleur) break;
+    pris.add(meilleur.l);
+    retenues.push(meilleur.l);
+    const k = perso.cle(meilleur.titre);
+    parCle.set(k, (parCle.get(k) ?? 0) + 1);
+  }
+  const decouverte = restantes.filter((l) => !pris.has(l)).slice(0, nDecouverte);
+  // Mêlées : une découverte toutes les 1/part lectures, pour que la part de découverte soit lue même quand les goûts suffisent à remplir.
+  const pas = part > 0 ? Math.max(2, Math.round(1 / part)) : Infinity;
+  const aLire: string[] = [];
+  let g = 0;
+  let d = 0;
+  while (g < retenues.length || d < decouverte.length) {
+    const tourDecouverte = (aLire.length + 1) % pas === 0;
+    if ((tourDecouverte && d < decouverte.length) || g >= retenues.length) aLire.push(decouverte[d++]);
+    else aLire.push(retenues[g++]);
+  }
+  return { aLire, ecartees };
 }

@@ -72,3 +72,26 @@ describe("choisirALire : la file d'exploration", () => {
     expect(a).not.toEqual(b);
   });
 });
+
+describe("choisirALire personnalisé : la file lue selon les goûts de la famille", () => {
+  const lien = (titre: string, id: number) => `https://x.test/recettes/recette_${titre.replace(/ /g, "-")}_${id}.aspx`;
+  const burgers = Array.from({ length: 20 }, (_, i) => lien(`burger variante${i} special${i}`, i));
+  const salades = Array.from({ length: 20 }, (_, i) => lien(`salade variante${i} fraiche${i}`, 100 + i));
+  const perso = { note: (t: string) => (t.startsWith("burger") ? 0.8 : t.startsWith("salade") ? -0.6 : 0), cle: (t: string) => t.split(" ")[0] };
+  it("lit d'abord ce que la famille aime, bien plus que ce qu'elle n'aime pas", () => {
+    const { aLire } = choisirALire([...salades, ...burgers], [], 10, 0.9, () => 0.5, perso);
+    expect(aLire).toHaveLength(10);
+    expect(aLire.filter((l) => l.includes("burger")).length).toBeGreaterThanOrEqual(7);
+  });
+  it("garde une part de découverte (hors goûts connus), mêlée dès le début", () => {
+    const { aLire } = choisirALire([...salades, ...burgers], [], 10, 0.9, () => 0.5, { ...perso, exploration: 0.3 });
+    expect(aLire.slice(0, 5).some((l) => l.includes("salade"))).toBe(true);
+  });
+  it("sans goûts connus, aucune préférence : un tirage au hasard, sans erreur", () => {
+    const r = choisirALire([...salades, ...burgers], [], 10, 0.9, Math.random, { note: () => 0, cle: () => "x" });
+    expect(new Set(r.aLire).size).toBe(10);
+  });
+  it("n'en lit pas plus qu'il n'y en a", () => {
+    expect(choisirALire(burgers.slice(0, 3), [], 10, 0.9, Math.random, perso).aLire).toHaveLength(3);
+  });
+});

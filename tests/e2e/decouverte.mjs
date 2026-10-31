@@ -233,7 +233,9 @@ const scenarios = {
       if (vues.length % 100 === 0) tranches.push(`${neuves} neuves sur ${vues.length}`);
       await p.waitForTimeout(250);
     }
+    const part = (xs) => (xs.length ? Math.round((100 * xs.filter((t) => AIME.test(t)).length) / xs.length) : 0);
     const s = await stats();
+    mesure(`pertinence : part de plats que Madji aime (burgers, pâtes, poulet, curry…) par tranche de 100 cartes : ${[0, 1, 2, 3].map((n) => part(vues.slice(n * 100, n * 100 + 100)) + " %").join(" · ")} ; sur les 100 premières NOUVEAUTÉS : ${part([...new Set(vues)].slice(0, 100))} %`);
     mesure(`${vues.length} cartes, ${neuves} jamais vues (${Math.round((100 * neuves) / vues.length)} %) — cumul : ${tranches.join(" · ")}`);
     mesure(`écrans sans carte : ${vides} ; swipes sans suite : ${bloques} ; carte suivante : médiane ${mediane(temps)} ms, 95e centile ${centile(temps, 0.95)} ms`);
     mesure(`source : ${s.recherches} recherches, ${s.fiches} fiches lues dont ${s.fichesUniques} différentes (${s.fiches - s.fichesUniques} relues) ; ${(s.fiches / Math.max(1, neuves)).toFixed(1)} fiches lues par carte nouvelle`);

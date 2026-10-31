@@ -5,7 +5,7 @@ import { safeFetch } from "@/lib/safe-fetch";
 import { recipeConflicts } from "@/lib/domain/foods";
 import { getFamilyEnvies, getFamilySwipes, getFamilyTastes, getProfiles, getProfilsGouts, getRecipes } from "@/lib/data";
 import { dureeMax, lireEnvies, pourJeunes } from "@/lib/domain/envies";
-import { etiquettesPreferees } from "@/lib/domain/profil-gouts";
+import { etiquettesDe, etiquettesPreferees, prediction } from "@/lib/domain/profil-gouts";
 import { choisirALire, choisirTermes, recettesAOublier, titreDepuisLien, tropProche } from "@/lib/domain/recherche";
 import { piocherDansLeCatalogue } from "@/lib/catalogue";
 import { prendreLeVerrou, terminerImport, lireEtatImport } from "@/lib/import-etat";
@@ -191,7 +191,16 @@ async function importer(familyId: string, combien: number): Promise<{ ajoutees: 
   }
   const nbFile = aVoir.length;
   // Inutile de télécharger une fiche dont le titre (lu dans l'adresse) ressemble déjà à un plat de la famille : elle serait écartée après coup.
-  const { aLire, ecartees } = choisirALire(aVoir, titres, ESSAIS_MAX, SEUIL_DOUBLON);
+  // Personnalisé : les candidates sont notées avec les profils de goûts de la famille (d'après leur titre), les mieux notées d'abord, avec une part de découverte.
+  const noteDuTitre = (titre: string) => {
+    const tags = etiquettesDe([titre], null);
+    const notes = [...profils.values()].map((p) => prediction(p, tags) ?? 0);
+    if (notes.length === 0) return 0;
+    // Le goût de la famille, sans oublier celui qui aime le moins : 70 % de la moyenne, 30 % de la note la plus basse.
+    return 0.7 * (notes.reduce((a, b) => a + b, 0) / notes.length) + 0.3 * Math.min(...notes);
+  };
+  const perso = process.env.IMPORT_SANS_PERSO === "1" ? undefined : { note: noteDuTitre, cle: (titre: string) => etiquettesDe([titre], null).find((t) => t.startsWith("style:")) ?? "autre" };
+  const { aLire, ecartees } = choisirALire(aVoir, titres, ESSAIS_MAX, SEUIL_DOUBLON, Math.random, perso);
   if (frontiere) await ecarter(familyId, ecartees);
 
   // Rien que la famille ne peut pas manger (ni, en mode strict, ce que quelqu'un n'aime pas), rien de trop long.
