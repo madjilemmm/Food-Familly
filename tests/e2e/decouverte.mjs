@@ -128,6 +128,7 @@ const scenarios = {
     const dernier = new Map(); const ecarts = [];
     vues.forEach((t, i) => { if (dernier.has(t)) ecarts.push(i - dernier.get(t)); dernier.set(t, i); });
     const suite = vues.filter((t, i) => i > 0 && t === vues[i - 1]).length;
+    vues.forEach((t, i) => { if (i > 0 && ecarts.length && (t === vues[i - 1])) mesure(`  répétition au rang ${i} : …${vues.slice(Math.max(0, i - 3), i + 3).join(" | ")}…  (ids : ${sql(`select string_agg(id::text, ',') from recipes where title = '${t.replace(/'/g, "''")}'`)})`); });
     mesure(`${vues.length} cartes d'affilée sur ${distincts} plats distincts ; écrans sans carte : ${vides} ; swipes sans suite : ${bloques}`);
     mesure(`retour d'un plat : au plus tôt après ${Math.min(...ecarts)} cartes, médiane ${mediane(ecarts)} ; même plat deux fois de suite : ${suite} ; carte suivante : médiane ${mediane(temps)} ms, max ${Math.max(...temps)} ms`);
     const s0 = await stats(); await p.waitForTimeout(10_000); const s1 = await stats();
@@ -150,7 +151,8 @@ const scenarios = {
     }
     const s = await stats(); mesure(`${vues.length} cartes (${new Set(vues).size} plats distincts) avec la source en panne ; écrans sans carte : ${vides} ; tentatives vers la source : ${s.refusees}`);
     ok(vides === 0 && bloques === 0, "la panne ne coupe pas le swipe");
-    ok(s.refusees <= 8, `la source en panne n'est pas martelée (${s.refusees} tentatives)`);
+    // Une tentative complète = 6 recherches + les voisines de 5 recettes (≈ 11 requêtes) ; ensuite le délai s'allonge.
+    ok(s.refusees <= 24, `la source en panne n'est pas martelée (${s.refusees} requêtes, soit ${Math.ceil(s.refusees / 11)} tentative(s) complète(s) sur ${vues.length} cartes)`);
     // La source revient : de nouvelles recettes arrivent.
     await source("/__mode?m=ok"); sql("update import_decouverte set prochain_essai = now() - interval '1 minute', verrou_jusqu = null");
     const avant = Number(sql("select count(*) from recipes where source_url is not null"));
@@ -180,12 +182,14 @@ const scenarios = {
     const nb = Number(sql("select count(*) from swipes where liked = false"));
     mesure(`${refuses.length} plats refusés, ${nb} refus en base`);
     ok(nb >= refuses.length, "chaque « Bof » est enregistré");
-    await p.waitForTimeout(8000); // laisser l'import apporter des nouveautés
+    // Laisser l'import apporter des nouveautés avant de rouvrir (au plus 60 s).
+    for (let i = 0; i < 30 && Number(sql("select count(*) from recipes r where not exists (select 1 from swipes s where s.recipe_id = r.id)")) < 12; i++) await p.waitForTimeout(2000);
     await p.goto(BASE + "/envies"); await p.waitForTimeout(1500);
     const nouveautes = Number(sql("select count(*) from recipes r where not exists (select 1 from swipes s where s.recipe_id = r.id)"));
-    const premieres = []; for (let i = 0; i < 8; i++) { const e = await etat(p); if (!e.carte) break; premieres.push(e.carte); await swiper(p, false); await p.waitForTimeout(300); }
+    const premieres = []; const statuts = []; for (let i = 0; i < 8; i++) { const e = await etat(p); if (!e.carte) break; premieres.push(e.carte); statuts.push(sql(`select coalesce(string_agg(case when s.liked then 'aimé' else 'refusé' end, ','), 'jamais swipé') from recipes r left join swipes s on s.recipe_id = r.id where r.title = '${e.carte.replace(/'/g, "''")}'`)); await swiper(p, false); await p.waitForTimeout(300); }
     const revus = premieres.filter((t) => refuses.includes(t)).length;
     mesure(`${nouveautes} nouveautés en base ; sur les ${premieres.length} cartes suivantes, ${revus} plats déjà refusés`);
+    premieres.forEach((t, i) => mesure(`  « ${t} » : ${statuts[i]}`));
     ok(nouveautes > 8 ? revus === 0 : true, "avec des nouveautés disponibles, aucun plat refusé ne repasse devant");
     // 29 jours plus tard (l'ancien nettoyage supprimait alors les recettes importées refusées, et leurs refus avec).
     sql("update swipes set swiped_at = now() - interval '29 days'; update recipes set created_at = now() - interval '29 days' where source_url is not null");
