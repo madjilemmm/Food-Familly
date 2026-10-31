@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "motion/react";
@@ -35,6 +35,8 @@ const PREMIERS_CHOIX = 3;
 const PILE_MINI = 8;
 /** Les plats swipés à l'instant ne reviennent pas tout de suite (la page peut arriver avec un paquet qui ne les connaît pas encore). */
 const RECENTS_MAX = 30;
+/** La pile redemande la suite du paquet au serveur tous les… swipes. */
+const TIRER_TOUS_LES = 5;
 
 export function SwipeDeck({
   initialDeck,
@@ -61,32 +63,56 @@ export function SwipeDeck({
   // L'état local n'est pas réinitialisé par les rafraîchissements de la page :
   // le paquet reste stable pendant qu'on swipe.
   const [deck, setDeck] = useState(initialDeck);
-  // Le paquet est recalculé par le serveur à chaque affichage : nouveautés d'abord, puis plats déjà vus (les plus anciens d'abord).
-  // Pendant qu'on swipe : les recettes qui arrivent (import) s'insèrent devant les plats revus ; si la pile devient courte, elle se
-  // réapprovisionne avec la suite du paquet, sauf les derniers plats swipés ici.
+  // Le paquet est recalculé par le serveur : nouveautés d'abord, puis plats déjà vus (les plus anciens d'abord). Il arrive de deux façons :
+  // avec la page (rafraîchie après un swipe) et par /api/paquet, que la pile interroge elle-même (les swipes passent l'un après l'autre côté
+  // serveur : quand on swipe vite, la page n'est plus rafraîchie entre deux, et la pile ne doit pas en dépendre).
+  // Les recettes qui arrivent (import) s'insèrent devant les plats revus ; si la pile devient courte, elle se réapprovisionne avec la suite
+  // du paquet, sauf les derniers plats swipés ici.
   const vues = useRef(new Set(initialDeck.map((r) => r.id)));
   const recents = useRef<string[]>([]);
+  const compteur = useRef(0);
+  const integrer = useCallback(
+    (serveur: CarteDuPaquet[]) => {
+      // Les recettes arrivées depuis la dernière fois, repérées ici (et non dans la mise à jour de l'état, qui doit rester sans effet de bord).
+      const nouvelles = serveur.filter((r) => !vues.current.has(r.id));
+      nouvelles.forEach((r) => vues.current.add(r.id));
+      const ecarte = new Set(recents.current.slice(-Math.min(RECENTS_MAX, Math.floor(serveur.length / 3))));
+      setDeck((d) => {
+        const dejaLa = new Set(d.map((r) => r.id));
+        const aInserer = nouvelles.filter((r) => !dejaLa.has(r.id));
+        let suite = d;
+        if (aInserer.length > 0) {
+          const premierRevu = d.findIndex((r) => r.dejaVu && !r.hier);
+          suite = premierRevu === -1 ? [...d, ...aInserer] : [...d.slice(0, premierRevu), ...aInserer, ...d.slice(premierRevu)];
+        }
+        if (suite.length >= PILE_MINI || revoir) return suite;
+        const presentes = new Set(suite.map((r) => r.id));
+        let reprises = serveur.filter((r) => !presentes.has(r.id) && !ecarte.has(r.id));
+        // Un tout petit catalogue : mieux vaut un plat revu qu'un écran vide.
+        if (!reprises.length && suite.length === 0) reprises = serveur.filter((r) => !presentes.has(r.id));
+        return reprises.length ? [...suite, ...reprises] : suite;
+      });
+    },
+    [revoir],
+  );
+  useEffect(() => integrer(initialDeck), [initialDeck, integrer, deck.length]);
+  // La suite du paquet, demandée au serveur : tous les TIRER_TOUS_LES swipes, et dès que la pile devient courte. Une demande à la fois.
+  const enVol = useRef(false);
+  const tirer = useCallback(async () => {
+    if (enVol.current || revoir) return;
+    enVol.current = true;
+    try {
+      const r = await fetch("/api/paquet", { cache: "no-store" });
+      if (r.ok) integrer((await r.json()) as CarteDuPaquet[]);
+    } catch {
+      // Hors connexion ou serveur occupé : la pile continue avec ce qu'elle a, la prochaine demande réessaiera.
+    } finally {
+      enVol.current = false;
+    }
+  }, [integrer, revoir]);
   useEffect(() => {
-    // Les recettes arrivées depuis le dernier affichage, repérées ici (et non dans la mise à jour de l'état, qui doit rester sans effet de bord).
-    const nouvelles = initialDeck.filter((r) => !vues.current.has(r.id));
-    nouvelles.forEach((r) => vues.current.add(r.id));
-    const ecarte = new Set(recents.current.slice(-Math.min(RECENTS_MAX, Math.floor(initialDeck.length / 3))));
-    setDeck((d) => {
-      const dejaLa = new Set(d.map((r) => r.id));
-      const aInserer = nouvelles.filter((r) => !dejaLa.has(r.id));
-      let suite = d;
-      if (aInserer.length > 0) {
-        const premierRevu = d.findIndex((r) => r.dejaVu && !r.hier);
-        suite = premierRevu === -1 ? [...d, ...aInserer] : [...d.slice(0, premierRevu), ...aInserer, ...d.slice(premierRevu)];
-      }
-      if (suite.length >= PILE_MINI || revoir) return suite;
-      const presentes = new Set(suite.map((r) => r.id));
-      let reprises = initialDeck.filter((r) => !presentes.has(r.id) && !ecarte.has(r.id));
-      // Un tout petit catalogue : mieux vaut un plat revu qu'un écran vide.
-      if (!reprises.length && suite.length === 0) reprises = initialDeck.filter((r) => !presentes.has(r.id));
-      return reprises.length ? [...suite, ...reprises] : suite;
-    });
-  }, [initialDeck, revoir, deck.length]);
+    if (deck.length < PILE_MINI + 4) void tirer();
+  }, [deck.length, tirer]);
   // Pile vide : si une recherche de nouveautés est en cours (ou va démarrer), on redemande le paquet quelques fois, 20 secondes au plus ;
   // ensuite l'écran dit clairement où l'on en est. Jamais d'attente sans fin.
   const router = useRouter();
@@ -118,6 +144,8 @@ export function SwipeDeck({
     if (!top) return;
     const carte = top;
     recents.current = [...recents.current.filter((id) => id !== carte.id), carte.id].slice(-RECENTS_MAX);
+    compteur.current += 1;
+    if (compteur.current % TIRER_TOUS_LES === 0) setTimeout(() => void tirer(), 1200);
     setDeck((d) => d.slice(1));
     setFaits((n) => n + 1);
     setAnnonce(deck[1] ? `Plat suivant : ${deck[1].title}` : "Plus de plats pour l'instant");
