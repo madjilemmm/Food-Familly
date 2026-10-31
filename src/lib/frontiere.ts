@@ -20,13 +20,18 @@ export type Frontiere = {
 };
 
 export async function lireFrontiere(familyId: string): Promise<Frontiere | null> {
-  const { data, error } = await db().from("import_frontiere").select("url, etat, explore").eq("family_id", familyId).limit(20000);
-  if (error) return null;
-  const lignes = data ?? [];
+  // Supabase ne renvoie pas plus de 1 000 lignes par requête : on lit page par page.
+  const lignes: { url: string; etat: string; explore: boolean }[] = [];
+  for (let debut = 0; debut < 30_000; debut += 1000) {
+    const { data, error } = await db().from("import_frontiere").select("url, etat, explore").eq("family_id", familyId).order("url").range(debut, debut + 999);
+    if (error) return null;
+    lignes.push(...((data ?? []) as { url: string; etat: string; explore: boolean }[]));
+    if ((data ?? []).length < 1000) break;
+  }
   return {
-    aVoir: lignes.filter((l) => l.etat === "a_voir").map((l) => l.url as string),
-    connus: new Set(lignes.map((l) => l.url as string)),
-    explorees: new Set(lignes.filter((l) => l.explore).map((l) => l.url as string)),
+    aVoir: lignes.filter((l) => l.etat === "a_voir").map((l) => l.url),
+    connus: new Set(lignes.map((l) => l.url)),
+    explorees: new Set(lignes.filter((l) => l.explore).map((l) => l.url)),
   };
 }
 

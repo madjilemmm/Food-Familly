@@ -67,21 +67,24 @@ export function SwipeDeck({
   const vues = useRef(new Set(initialDeck.map((r) => r.id)));
   const recents = useRef<string[]>([]);
   useEffect(() => {
+    // Les recettes arrivées depuis le dernier affichage, repérées ici (et non dans la mise à jour de l'état, qui doit rester sans effet de bord).
+    const nouvelles = initialDeck.filter((r) => !vues.current.has(r.id));
+    nouvelles.forEach((r) => vues.current.add(r.id));
+    const ecarte = new Set(recents.current.slice(-Math.min(RECENTS_MAX, Math.floor(initialDeck.length / 3))));
     setDeck((d) => {
-      const nouvelles = initialDeck.filter((r) => !vues.current.has(r.id));
-      nouvelles.forEach((r) => vues.current.add(r.id));
+      const dejaLa = new Set(d.map((r) => r.id));
+      const aInserer = nouvelles.filter((r) => !dejaLa.has(r.id));
       let suite = d;
-      if (nouvelles.length > 0) {
+      if (aInserer.length > 0) {
         const premierRevu = d.findIndex((r) => r.dejaVu && !r.hier);
-        suite = premierRevu === -1 ? [...d, ...nouvelles] : [...d.slice(0, premierRevu), ...nouvelles, ...d.slice(premierRevu)];
+        suite = premierRevu === -1 ? [...d, ...aInserer] : [...d.slice(0, premierRevu), ...aInserer, ...d.slice(premierRevu)];
       }
-      if (suite.length >= PILE_MINI || revoir) return suite === d ? d : suite;
+      if (suite.length >= PILE_MINI || revoir) return suite;
       const presentes = new Set(suite.map((r) => r.id));
-      const ecarte = new Set(recents.current.slice(-Math.min(RECENTS_MAX, Math.floor(initialDeck.length / 3))));
       let reprises = initialDeck.filter((r) => !presentes.has(r.id) && !ecarte.has(r.id));
       // Un tout petit catalogue : mieux vaut un plat revu qu'un écran vide.
       if (!reprises.length && suite.length === 0) reprises = initialDeck.filter((r) => !presentes.has(r.id));
-      return reprises.length ? [...suite, ...reprises] : suite === d ? d : suite;
+      return reprises.length ? [...suite, ...reprises] : suite;
     });
   }, [initialDeck, revoir, deck.length]);
   // Pile vide : si une recherche de nouveautés est en cours (ou va démarrer), on redemande le paquet quelques fois, 20 secondes au plus ;
