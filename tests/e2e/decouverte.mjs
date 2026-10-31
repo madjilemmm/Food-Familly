@@ -90,7 +90,7 @@ const scenarios = {
       i++; await p.waitForTimeout(700); // un rythme de pouce humain, pas une rafale
     }
     const distinctes = new Set(vues).size;
-    mesure(`${vues.length} cartes vues, ${distinctes} titres distincts, doublons : ${vues.length - distinctes}`);
+    mesure(`${vues.length} cartes vues, ${distinctes} titres distincts, retours : ${vues.length - distinctes}`);
     mesure(`temps jusqu'à la carte suivante : médiane ${mediane(temps)} ms, 95e centile ${centile(temps, 0.95)} ms, max ${Math.max(...temps)} ms`);
     mesure(`temps total passé devant un écran sans carte : ${Math.round(attente / 1000)} s ; écrans « sans carte » rencontrés : ${vides}${dernierVide ? ` (dernier : « ${dernierVide} »)` : ""} ; swipes sans carte suivante après 10 s : ${bloques}`);
     const s = await stats(); mesure(`la source a reçu ${s.recherches} recherches et ${s.fiches} fiches pour ${vues.length} swipes`);
@@ -103,58 +103,61 @@ const scenarios = {
     mesure(`plus longue série du même type de plat d'affilée : ${run(vues)}`);
     const sources = sql("select count(*) from recipes where source_url is not null");
     mesure(`recettes importées de la source en base : ${sources}`);
-    ok(vues.length === distinctes, "aucune recette proposée deux fois dans la session");
+    const dernier = new Map(); const ecarts = []; vues.forEach((t, i) => { if (dernier.has(t)) ecarts.push(i - dernier.get(t)); dernier.set(t, i); });
+    mesure(`plats revenus : ${ecarts.length} fois${ecarts.length ? `, au plus tôt après ${Math.min(...ecarts)} cartes` : ""}`);
+    ok(vues.filter((t, i) => i > 0 && t === vues[i - 1]).length === 0, "jamais le même plat deux fois de suite");
+    ok(ecarts.length === 0 || Math.min(...ecarts) >= 8, "un plat ne revient jamais avant 8 cartes");
     ok(bloques === 0, "aucun swipe sans carte suivante");
     ok(p.erreurs.length === 0, `aucune erreur JS dans la page (${p.erreurs.length})`);
-    ok(dernierVide === null || /fait le tour|cherche|n'arrive pas/i.test(dernierVide), "si la pile se vide, un message explicite s'affiche");
+    ok(vides === 0, `jamais d'écran sans carte (${vides})`);
     await p.ctx.close();
   },
 
-  // 2. Le catalogue est limité : la source ne montre que 40 recettes. La pile finit par se vider ; il faut un message clair, pas une boucle.
+  // 2. Le catalogue est fini (la source ne montre que 40 recettes) : le swipe ne s'arrête JAMAIS, les plats reviennent, jamais deux fois de suite.
   async epuisement() {
     remiseAZero(); await source("/__reset"); await source("/__pool?n=40");
-    const p = await ouvrir(browser);
-    let vues = 0; let texte = ""; const evolution = []; const t0 = Date.now(); let terminal = false;
-    while (!terminal && Date.now() - t0 < 240_000) {
+    const p = await ouvrir(browser); const vues = []; let vides = 0; let bloques = 0; const temps = [];
+    while (vues.length < 300) {
       const e = await etat(p);
-      if (e.carte) { vues++; await swiper(p, false); continue; }
-      texte = e.vide ?? ""; if (!evolution.length || evolution.at(-1) !== texte) evolution.push(texte);
-      if (/fait le tour|n'arrive pas/i.test(texte)) terminal = true; else await p.waitForTimeout(1500);
+      if (!e.carte) { vides++; if (vides > 40) break; await p.waitForTimeout(1500); continue; }
+      vues.push(e.carte);
+      const r = await swiper(p, AIME.test(e.carte)); temps.push(r.ms); if (r.bloque) bloques++;
+      await p.waitForTimeout(300);
     }
-    mesure(`${vues} cartes vues (toutes refusées) avant la fin ; messages successifs : ${evolution.join("  →  ")} ; message final après ${Math.round((Date.now() - t0) / 1000)} s`);
-    const s0 = await stats(); await p.waitForTimeout(20_000); const s1 = await stats();
-    mesure(`requêtes vers la source pendant 20 s sur l'écran final : ${s1.recherches - s0.recherches} recherches, ${s1.fiches - s0.fiches} fiches`);
-    ok(/fait le tour/i.test(texte), `l'épuisement est dit clairement (« ${texte} »)`);
-    ok(s1.recherches - s0.recherches <= 2, "plus de martèlement de la source une fois épuisé");
-    mesure(`mémoire en base : ${sql("select dernier_resultat||' / essais vides='||essais_vides||' / prochain essai dans '||round(extract(epoch from (prochain_essai-now()))/60)||' min' from import_decouverte limit 1")}`);
-    ok((await p.getByRole("link", { name: /revoir/i }).count()) > 0, "un lien pour revoir ses plats est proposé");
-    ok((await p.getByRole("link", { name: /ajouter une recette/i }).count()) > 0, "un lien pour ajouter sa propre recette est proposé");
-    // « Revoir » : la demande explicite fait revenir les plats refusés, un par un, sans rien cacher.
-    await p.goto(BASE + "/envies?revoir=refuses"); await p.waitForTimeout(1200);
-    const e = await etat(p);
-    ok(Boolean(e.carte), `« revoir mes refus » montre bien des plats refusés à la demande (« ${e.carte ?? e.vide} »)`);
+    const distincts = new Set(vues).size;
+    const dernier = new Map(); const ecarts = [];
+    vues.forEach((t, i) => { if (dernier.has(t)) ecarts.push(i - dernier.get(t)); dernier.set(t, i); });
+    const suite = vues.filter((t, i) => i > 0 && t === vues[i - 1]).length;
+    mesure(`${vues.length} cartes d'affilée sur ${distincts} plats distincts ; écrans sans carte : ${vides} ; swipes sans suite : ${bloques}`);
+    mesure(`retour d'un plat : au plus tôt après ${Math.min(...ecarts)} cartes, médiane ${mediane(ecarts)} ; même plat deux fois de suite : ${suite} ; carte suivante : médiane ${mediane(temps)} ms, max ${Math.max(...temps)} ms`);
+    const s0 = await stats(); await p.waitForTimeout(10_000); const s1 = await stats();
+    mesure(`source : ${s0.recherches} recherches et ${s0.fiches} fiches au total ; 10 s de plus à l'arrêt : ${s1.recherches - s0.recherches} recherches`);
+    ok(vues.length >= 300, `le swipe va jusqu'à 300 cartes sans s'arrêter (${vues.length})`);
+    ok(vides === 0, `aucun écran sans carte (${vides})`);
+    ok(suite === 0, "jamais le même plat deux fois de suite");
+    ok(Math.min(...ecarts) >= Math.min(8, Math.floor(distincts / 4)), `un plat ne revient pas avant ${Math.min(8, Math.floor(distincts / 4))} cartes au moins (minimum constaté : ${Math.min(...ecarts)})`);
+    ok(bloques === 0, "aucun swipe sans carte suivante");
     await p.ctx.close();
   },
 
-  // 3. La source est en panne (500). Rien ne doit tourner dans le vide, ni inonder la source.
+  // 3. La source est en panne (500) : le swipe continue avec les plats déjà là, la source n'est pas martelée.
   async panne() {
     remiseAZero(); await source("/__reset"); await source("/__mode?m=fail");
-    const p = await ouvrir(browser);
-    let vues = 0;
-    for (let i = 0; i < 400; i++) { const e = await etat(p); if (!e.carte) break; vues++; await swiper(p, false); }
-    let texte = ""; const t0 = Date.now();
-    for (let i = 0; i < 40; i++) { await p.waitForTimeout(1500); const e = await etat(p); texte = e.vide ?? ""; if (/n'arrive pas|fait le tour/i.test(texte)) break; }
-    mesure(`après ${vues} cartes, avec la source en panne : « ${texte} » en ${Math.round((Date.now() - t0) / 1000)} s`);
-    const s = await stats(); mesure(`tentatives vers la source en panne pendant la phase : ${s.refusees}`);
-    ok(/n'arrive pas|fait le tour/i.test(texte), "la panne est dite clairement au bout de quelques secondes (pas de « cherche… » sans fin)");
-    const avant = (await stats()).refusees; await p.waitForTimeout(15_000); const apres = (await stats()).refusees;
-    mesure(`tentatives pendant 15 s de plus : ${apres - avant}`);
-    ok(apres - avant <= 2, "pas de martèlement d'une source en panne (attente qui s'allonge)");
-    // La source revient : on lève l'attente (comme le ferait le temps qui passe) et on rouvre.
+    const p = await ouvrir(browser); const vues = []; let vides = 0; let bloques = 0;
+    for (let i = 0; i < 120; i++) {
+      const e = await etat(p); if (!e.carte) { vides++; await p.waitForTimeout(1500); continue; }
+      vues.push(e.carte); const r = await swiper(p, i % 2 === 0); if (r.bloque) bloques++; await p.waitForTimeout(300);
+    }
+    const s = await stats(); mesure(`${vues.length} cartes (${new Set(vues).size} plats distincts) avec la source en panne ; écrans sans carte : ${vides} ; tentatives vers la source : ${s.refusees}`);
+    ok(vides === 0 && bloques === 0, "la panne ne coupe pas le swipe");
+    ok(s.refusees <= 8, `la source en panne n'est pas martelée (${s.refusees} tentatives)`);
+    // La source revient : de nouvelles recettes arrivent.
     await source("/__mode?m=ok"); sql("update import_decouverte set prochain_essai = now() - interval '1 minute', verrou_jusqu = null");
-    await p.goto(BASE + "/envies");
-    let carte = null; for (let i = 0; i < 40 && !carte; i++) { await p.waitForTimeout(1500); const e = await etat(p); carte = e.carte ?? null; if (!carte) await p.reload(); }
-    ok(Boolean(carte), `la source revient : de nouvelles cartes apparaissent (« ${carte} »)`);
+    const avant = Number(sql("select count(*) from recipes where source_url is not null"));
+    for (let i = 0; i < 12; i++) { const e = await etat(p); if (e.carte) await swiper(p, false); await p.waitForTimeout(800); }
+    await p.waitForTimeout(6000);
+    const apres = Number(sql("select count(*) from recipes where source_url is not null"));
+    ok(apres > avant, `la source revient : de nouvelles recettes arrivent (${avant} → ${apres})`);
     await p.ctx.close();
   },
 
@@ -169,50 +172,44 @@ const scenarios = {
     await source("/__mode?m=ok"); await p.ctx.close();
   },
 
-  // 5. La mémoire des refus : on refuse beaucoup, on revient plus tard — rien de refusé ne revient avant 90 jours, et les « Bof » ne sont jamais effacés.
+  // 5. La mémoire des refus : un « Bof » est gardé pour toujours ; tant qu'il reste des nouveautés, aucun plat refusé ne repasse devant.
   async refus() {
     remiseAZero(); await source("/__reset");
     const p = await ouvrir(browser); const refuses = [];
-    for (let i = 0; i < 45; i++) { const e = await etat(p); if (!e.carte) break; refuses.push(e.carte); await swiper(p, false); }
+    for (let i = 0; i < 30; i++) { const e = await etat(p); if (!e.carte) break; refuses.push(e.carte); await swiper(p, false); await p.waitForTimeout(300); }
     const nb = Number(sql("select count(*) from swipes where liked = false"));
     mesure(`${refuses.length} plats refusés, ${nb} refus en base`);
+    ok(nb >= refuses.length, "chaque « Bof » est enregistré");
+    await p.waitForTimeout(8000); // laisser l'import apporter des nouveautés
     await p.goto(BASE + "/envies"); await p.waitForTimeout(1500);
-    const revues = []; for (let i = 0; i < 30; i++) { const e = await etat(p); if (!e.carte) break; revues.push(e.carte); await swiper(p, false); }
-    const retours = revues.filter((t) => refuses.includes(t));
-    mesure(`après rechargement : ${revues.length} cartes, dont ${retours.length} déjà refusées`);
-    ok(retours.length === 0, "aucun plat refusé n'est reproposé après rechargement");
-    // 28 jours plus tard (l'ancien nettoyage supprimait alors les recettes importées refusées, et leurs refus avec).
+    const nouveautes = Number(sql("select count(*) from recipes r where not exists (select 1 from swipes s where s.recipe_id = r.id)"));
+    const premieres = []; for (let i = 0; i < 8; i++) { const e = await etat(p); if (!e.carte) break; premieres.push(e.carte); await swiper(p, false); await p.waitForTimeout(300); }
+    const revus = premieres.filter((t) => refuses.includes(t)).length;
+    mesure(`${nouveautes} nouveautés en base ; sur les ${premieres.length} cartes suivantes, ${revus} plats déjà refusés`);
+    ok(nouveautes > 8 ? revus === 0 : true, "avec des nouveautés disponibles, aucun plat refusé ne repasse devant");
+    // 29 jours plus tard (l'ancien nettoyage supprimait alors les recettes importées refusées, et leurs refus avec).
     sql("update swipes set swiped_at = now() - interval '29 days'; update recipes set created_at = now() - interval '29 days' where source_url is not null");
     const avant = Number(sql("select count(*) from swipes"));
     await p.goto(BASE + "/envies"); await p.waitForTimeout(8000);
-    const apres = Number(sql("select count(*) from swipes"));
-    ok(apres >= avant, `29 jours plus tard, aucun refus n'a été effacé (${avant} → ${apres})`);
-    const vus2 = []; for (let i = 0; i < 30; i++) { const e = await etat(p); if (!e.carte) break; vus2.push(e.carte); await swiper(p, false); }
-    ok(vus2.filter((t) => refuses.includes(t)).length === 0, `29 jours plus tard : 0 plat refusé reproposé (${vus2.length} cartes vues)`);
+    ok(Number(sql("select count(*) from swipes")) >= avant, `29 jours plus tard, aucun refus n'a été effacé (${avant} → ${sql("select count(*) from swipes")})`);
     await p.ctx.close();
   },
 
-  // 6. Le temps qui passe : après des semaines, quoi revient ? (aimés après 21 jours ; refusés après 90 jours seulement, jamais cachés)
+  // 6. Le temps qui passe : après quelques jours, les plats déjà vus reviennent en reprise, les aimés avant les refusés.
   async jours() {
-    remiseAZero(); await source("/__reset");
-    const p = await ouvrir(browser); const aimes = []; const refuses = [];
-    for (let i = 0; i < 60; i++) { const e = await etat(p); if (!e.carte) break; const aime = AIME.test(e.carte); (aime ? aimes : refuses).push(e.carte); await swiper(p, aime); }
-    mesure(`session de départ : ${aimes.length} plats aimés, ${refuses.length} refusés`);
+    remiseAZero(); await source("/__reset"); await source("/__pool?n=40");
+    const p = await ouvrir(browser); const aimes = new Set(); const refuses = new Set();
+    for (let i = 0; i < 60; i++) { const e = await etat(p); if (!e.carte) break; const aime = AIME.test(e.carte); (aime ? aimes : refuses).add(e.carte); await swiper(p, aime); await p.waitForTimeout(250); }
+    mesure(`session de départ : ${aimes.size} plats aimés, ${refuses.size} refusés`);
     sql("drop table if exists _sauv_swipes; create table _sauv_swipes as select * from swipes");
-    const apresJours = async (jours) => {
-      // Les choix de départ ont maintenant `jours` jours ; ceux faits pendant la mesure sont jetés à chaque tour.
-      sql(`delete from swipes; insert into swipes select * from _sauv_swipes; update swipes set swiped_at = now() - interval '${jours} days'`);
+    for (const j of [3, 25, 100]) {
+      sql(`delete from swipes; insert into swipes select * from _sauv_swipes; update swipes set swiped_at = now() - interval '${j} days'`);
       await p.goto(BASE + "/envies"); await p.waitForTimeout(1500);
-      const vues = []; for (let i = 0; i < 30; i++) { const e = await etat(p); if (!e.carte) break; vues.push(e.carte); await swiper(p, false); }
-      return vues;
-    };
-    for (const j of [3, 10, 25, 100]) {
-      const v = await apresJours(j);
-      const a = v.filter((t) => aimes.includes(t)).length, r = v.filter((t) => refuses.includes(t)).length;
-      mesure(`${j} jours plus tard — ${v.length} cartes : ${a} plats aimés revus, ${r} plats refusés revus`);
-      if (j <= 10) ok(a === 0 && r === 0, `${j} jours : rien de ce qu'on a déjà tranché ne revient`);
-      if (j === 25) ok(r === 0, "25 jours : aucun plat refusé ne revient");
-      if (j === 100) ok(a + r > 0, "100 jours : des plats d'autrefois peuvent revenir (le rythme de retour existe)");
+      const vues = []; for (let i = 0; i < 30; i++) { const e = await etat(p); if (!e.carte) break; vues.push(e.carte); await swiper(p, false); await p.waitForTimeout(200); }
+      const premierAime = vues.findIndex((t) => aimes.has(t)), premierRefuse = vues.findIndex((t) => refuses.has(t));
+      mesure(`${j} jours plus tard — ${vues.length} cartes ; premier plat aimé revu : n° ${premierAime + 1 || "-"} ; premier plat refusé revu : n° ${premierRefuse + 1 || "-"}`);
+      ok(vues.length === 30, `${j} jours : le swipe continue (${vues.length} cartes)`);
+      if (premierAime >= 0 && premierRefuse >= 0) ok(premierAime < premierRefuse, `${j} jours : les plats aimés reviennent avant les plats refusés`);
     }
     sql("drop table if exists _sauv_swipes");
     await p.ctx.close();

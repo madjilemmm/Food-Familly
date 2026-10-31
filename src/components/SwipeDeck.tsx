@@ -27,10 +27,14 @@ import { CarteGeste, PILE } from "./CarteGeste";
  */
 /** « contient » : les allergènes courants, dits comme sur « Ce soir » (« Contient du lait »). */
 type Accord = { avec: string[]; auMenu: boolean };
-type CarteDuPaquet = Recipe & { hier?: boolean; voix?: string; voixNb?: number; contient?: string | null };
+type CarteDuPaquet = Recipe & { hier?: boolean; voix?: string; voixNb?: number; contient?: string | null; dejaVu?: boolean; revu?: "aime" | "refuse" };
 
 /** Les trois premiers choix expliquent « Miam » : l'utilisateur sait à quoi ses envies servent. */
 const PREMIERS_CHOIX = 3;
+/** Sous ce nombre de cartes devant soi, la pile se réapprovisionne avec la suite du paquet (nouveautés, puis plats revus) : elle ne s'arrête jamais. */
+const PILE_MINI = 8;
+/** Les plats swipés à l'instant ne reviennent pas tout de suite (la page peut arriver avec un paquet qui ne les connaît pas encore). */
+const RECENTS_MAX = 30;
 
 export function SwipeDeck({
   initialDeck,
@@ -57,16 +61,27 @@ export function SwipeDeck({
   // L'état local n'est pas réinitialisé par les rafraîchissements de la page :
   // le paquet reste stable pendant qu'on swipe.
   const [deck, setDeck] = useState(initialDeck);
-  // Nouvelles recettes arrivées pendant qu'on swipe (import Marmiton) : ajoutées au bout de la pile.
+  // Le paquet est recalculé par le serveur à chaque affichage : nouveautés d'abord, puis plats déjà vus (les plus anciens d'abord).
+  // Pendant qu'on swipe : les recettes qui arrivent (import) s'insèrent devant les plats revus ; si la pile devient courte, elle se
+  // réapprovisionne avec la suite du paquet, sauf les derniers plats swipés ici.
   const vues = useRef(new Set(initialDeck.map((r) => r.id)));
+  const recents = useRef<string[]>([]);
   useEffect(() => {
-    const nouvelles = initialDeck.filter((r) => !vues.current.has(r.id));
-    if (nouvelles.length > 0) {
+    setDeck((d) => {
+      const nouvelles = initialDeck.filter((r) => !vues.current.has(r.id));
       nouvelles.forEach((r) => vues.current.add(r.id));
-      setDeck((d) => [...d, ...nouvelles]);
-      return;
-    }
-    }, [initialDeck]);
+      let suite = d;
+      if (nouvelles.length > 0) {
+        const premierRevu = d.findIndex((r) => r.dejaVu && !r.hier);
+        suite = premierRevu === -1 ? [...d, ...nouvelles] : [...d.slice(0, premierRevu), ...nouvelles, ...d.slice(premierRevu)];
+      }
+      if (suite.length >= PILE_MINI || revoir) return suite === d ? d : suite;
+      const presentes = new Set(suite.map((r) => r.id));
+      const ecarte = new Set(recents.current.slice(-Math.min(RECENTS_MAX, Math.floor(initialDeck.length / 3))));
+      const reprises = initialDeck.filter((r) => !presentes.has(r.id) && !ecarte.has(r.id));
+      return reprises.length ? [...suite, ...reprises] : suite;
+    });
+  }, [initialDeck, revoir]);
   // Pile vide : si une recherche de nouveautés est en cours (ou va démarrer), on redemande le paquet quelques fois, 20 secondes au plus ;
   // ensuite l'écran dit clairement où l'on en est. Jamais d'attente sans fin.
   const router = useRouter();
@@ -97,6 +112,7 @@ export function SwipeDeck({
   function decide(liked: boolean) {
     if (!top) return;
     const carte = top;
+    recents.current = [...recents.current.filter((id) => id !== carte.id), carte.id].slice(-RECENTS_MAX);
     setDeck((d) => d.slice(1));
     setFaits((n) => n + 1);
     setAnnonce(deck[1] ? `Plat suivant : ${deck[1].title}` : "Plus de plats pour l'instant");
@@ -258,7 +274,15 @@ function Carte({
         className="kd-carte--pleine"
         titre={recipe.title}
         photo={recipe.photo_url}
-        pastille={recipe.hier ? "Mangé hier" : recipe.voix ? (recipe.voixNb === 1 ? "Ta voix fait le match" : "La famille en a envie") : recipe.pastille}
+        pastille={
+          recipe.hier
+            ? "Mangé hier"
+            : recipe.voix
+              ? recipe.voixNb === 1
+                ? "Ta voix fait le match"
+                : "La famille en a envie"
+              : (recipe.pastille ?? (recipe.revu === "aime" ? "Tu l'avais aimé" : recipe.revu === "refuse" ? "Tu avais dit Bof" : undefined))
+        }
         infos={
           recipe.hier
             ? "C'était bon ? Miam : on le refait"

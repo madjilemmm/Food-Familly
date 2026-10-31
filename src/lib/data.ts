@@ -486,7 +486,7 @@ export async function getDeck(
   profileId: string,
   moment: Moment = null,
   revoir: Revoir = null,
-): Promise<(Recipe & { dejaVu?: boolean; hier?: boolean; voix?: string; voixNb?: number })[]> {
+): Promise<(Recipe & { dejaVu?: boolean; revu?: "aime" | "refuse"; hier?: boolean; voix?: string; voixNb?: number })[]> {
   const [recipes, avis, envies, ctx, profiles, etiquettes, profils, hist, cuisines] = await Promise.all([
     getRecipes(familyId),
     getFamilySwipes(familyId),
@@ -538,7 +538,7 @@ export async function getDeck(
   const ordonne = ordonnerPaquet(cartes, now, moment, revoir).map(
     ({ cache: _c, fin, avis, signaux: _s, enviesDesAutres: _e, vuParLaFamille: _v, style: _st, minutes: _m, matchProbable: _mp, lassitude: _l, ...r }) => {
       const c = conflicts.get(r.id)!;
-      const carte = { ...r, ...(avis ? { dejaVu: true } : {}) };
+      const carte = { ...r, ...(avis ? { dejaVu: true, revu: avis.liked ? ("aime" as const) : ("refuse" as const) } : {}) };
       return fin && c.pasFanDe.length ? { ...carte, pastille: nAimePas(c.pasFanDe) } : carte;
     },
   );

@@ -28,6 +28,10 @@ export const REGLAGES = {
   RETOUR_REFUSE_JOURS: 90,
   /** Dans le paquet, un plat déjà vu revient au plus une carte sur 5 (le reste : des découvertes). */
   RYTHME_RETOUR: 5,
+  /** Plus de nouveauté : le swipe ne s'arrête pas, les plats déjà vus reviennent (REPRISE_MAX au plus dans le paquet, les plus anciens d'abord). */
+  REPRISE_MAX: 30,
+  /** Un plat refusé passe, dans la reprise, comme s'il avait été vu ce nombre de jours plus tard : les plats aimés ou oubliés reviennent avant lui. */
+  REPRISE_REFUS_JOURS: 45,
 
   // ─── Score individuel (de −1 à 1 ; null = on ne sait rien) ───
   AIME: 0.6,
@@ -218,8 +222,8 @@ export function momentDe(date: Date): Moment {
  * (mes goûts, ce dont les autres ont envie, la découverte) ; un plat déjà vu et revenu
  * (aimé : 3 semaines, refusé : 6 semaines) toutes les RYTHME_RETOUR cartes ;
  * pas plus de deux plats du même style d'affilée quand on peut l'éviter ;
- * les plats qu'un autre n'aime pas à la fin. Quand il n'y a plus de nouveauté, le paquet est court, voire vide : l'écran le dit
- * (source épuisée ou en panne) et propose de revoir ses plats à la demande ; rien n'est rejoué automatiquement.
+ * les plats qu'un autre n'aime pas à la fin. Quand il n'y a plus de nouveauté, les plats déjà vus reviennent (REPRISE_MAX), les plus anciens
+ * d'abord : le swipe ne s'arrête jamais. Le paquet n'est vide que si les goûts de la famille cachent tout.
  */
 export function ordonnerPaquet<C extends CartePaquet>(cartes: C[], now: number, moment: Moment = null, revoir: Revoir = null): C[] {
   // Revoir, à la demande : les plats aimés, ou ceux qu'on a refusés, du plus récent au plus ancien. Jamais mélangé aux nouveautés, jamais automatique.
@@ -264,9 +268,15 @@ export function ordonnerPaquet<C extends CartePaquet>(cartes: C[], now: number, 
     melange.push(c);
   }
   melange.push(...retours.slice(r));
-  // Plus rien de nouveau : on ne remplit PAS la pile avec des plats refusés ou déjà vus pour cacher un manque de contenu. Les retours (aimés après
-  // 3 semaines, refusés après 3 mois) restent au rythme prévu ; le reste se revoit à la demande (paramètre « revoir »).
-  return [...varier(melange), ...finales];
+  // Plus rien de nouveau : le swipe ne s'arrête pas. Les plats déjà vus reviennent après les nouveautés, le plus ancien d'abord (un plat
+  // qu'on vient de swiper repasse en dernier : jamais deux fois de suite), les refusés après les aimés. Jamais un plat caché par les goûts.
+  // Le paquet est recalculé à chaque affichage : dès que de nouvelles recettes arrivent, elles repassent devant.
+  const rang = (c: C) => c.avis!.swipedAt + (c.avis!.likedAt != null ? 0 : REGLAGES.REPRISE_REFUS_JOURS * JOUR) + (c.fin ? 365 * JOUR : 0);
+  const reprises = cartes
+    .filter((c) => !c.cache && c.avis && !disponible(c))
+    .sort((a, b) => rang(a) - rang(b))
+    .slice(0, REGLAGES.REPRISE_MAX);
+  return [...varier(melange), ...finales, ...reprises];
 }
 
 /**

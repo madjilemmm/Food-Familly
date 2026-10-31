@@ -222,7 +222,7 @@ describe("paquet de swipe", () => {
     // Deux autres en ont vraiment envie : il passe même devant un ingrédient adoré.
     expect(p.map((c) => c.id)).toEqual(["e", "d", "a", "c"]);
   });
-  it("un plat aimé revient après 3 semaines, un refusé après 3 mois ; jamais avant", () => {
+  it("un plat aimé revient au milieu des nouveautés après 3 semaines, un refusé après 3 mois ; avant, il n'est qu'en reprise, après toutes les nouveautés", () => {
     const nouveautes = Array.from({ length: 12 }, (_, i) => carte(`nouveau-${i}`));
     const p = ordonnerPaquet(
       [
@@ -234,7 +234,10 @@ describe("paquet de swipe", () => {
       ],
       now,
     );
-    expect(p.map((c) => c.id).filter((id) => !id.startsWith("nouveau")).sort()).toEqual(["aime-25j", "refuse-100j"]);
+    const ids = p.map((c) => c.id);
+    const dernierNouveau = Math.max(...ids.map((id, i) => (id.startsWith("nouveau") ? i : -1)));
+    expect(ids.slice(0, dernierNouveau + 1).filter((id) => !id.startsWith("nouveau")).sort()).toEqual(["aime-25j", "refuse-100j"]);
+    expect(ids.slice(dernierNouveau + 1)).toEqual(["refuse-60j", "aime-10j"]);
   });
   it("les favoris reviennent une carte sur 5, au milieu des découvertes", () => {
     const nouvelles = Array.from({ length: 8 }, (_, i) => carte(`n${i}`, { created_at: `2026-10-0${i + 1}` }));
@@ -320,7 +323,7 @@ describe("Paquet du moment", () => {
   });
 });
 
-describe("Politique de répétition : rien n'est rejoué pour cacher un manque de contenu", () => {
+describe("Politique de répétition : le swipe ne s'arrête jamais, les plats déjà vus reviennent après les nouveautés", () => {
   const vue = (id: string, liked: boolean, ilYA: number): CartePaquet & { id: string } => ({
     id,
     created_at: "2026-10-01",
@@ -332,12 +335,28 @@ describe("Politique de répétition : rien n'est rejoué pour cacher un manque d
     style: null,
     avis: { liked, swipedAt: jours(ilYA), likedAt: liked ? jours(ilYA) : null },
   });
-  it("tout a été swipé récemment : le paquet est vide, pas rempli de plats refusés ou déjà vus", () => {
-    expect(ordonnerPaquet([vue("refuse", false, 3), vue("aime-recent", true, 1), vue("aime-ancien", true, 5)], now)).toEqual([]);
+  it("tout a été swipé récemment : le paquet n'est pas vide, le plus ancien revient d'abord, le plat swipé à l'instant en dernier", () => {
+    const ids = ordonnerPaquet([vue("a-l-instant", true, 0.001), vue("aime-ancien", true, 5), vue("aime-recent", true, 1)], now).map((c) => c.id);
+    expect(ids).toEqual(["aime-ancien", "aime-recent", "a-l-instant"]);
   });
-  it("un plat refusé il y a 2 mois n'est pas rejoué ; un plat aimé il y a 3 semaines revient", () => {
+  it("les plats refusés reviennent après les plats aimés ou oubliés, jamais avant", () => {
+    const ids = ordonnerPaquet([vue("refuse-vieux", false, 10), vue("aime-recent", true, 2), vue("aime-vieux", true, 8)], now).map((c) => c.id);
+    expect(ids).toEqual(["aime-vieux", "aime-recent", "refuse-vieux"]);
+  });
+  it("les nouveautés passent toujours devant les plats revus", () => {
+    const nouveau = { ...vue("nouveau", true, 1), avis: undefined, vuParLaFamille: false };
+    const ids = ordonnerPaquet([vue("vu", true, 3), nouveau], now).map((c) => c.id);
+    expect(ids).toEqual(["nouveau", "vu"]);
+  });
+  it("la reprise est limitée (paquet léger) et chaque plat n'y est qu'une fois", () => {
+    const beaucoup = Array.from({ length: 80 }, (_, i) => vue(`p${i}`, true, 1 + i / 100));
+    const ids = ordonnerPaquet(beaucoup, now).map((c) => c.id);
+    expect(ids).toHaveLength(30);
+    expect(new Set(ids).size).toBe(30);
+  });
+  it("un plat refusé il y a 2 mois reste en fin de reprise, un plat aimé il y a 3 semaines revient par le rythme habituel", () => {
     const ids = ordonnerPaquet([vue("refuse-2-mois", false, 60), vue("aime-3-semaines", true, 22)], now).map((c) => c.id);
-    expect(ids).toEqual(["aime-3-semaines"]);
+    expect(ids).toEqual(["aime-3-semaines", "refuse-2-mois"]);
   });
   it("un plat caché (interdit) ne revient jamais, même à la demande", () => {
     expect(ordonnerPaquet([{ ...vue("x", true, 2), cache: true }], now)).toEqual([]);
