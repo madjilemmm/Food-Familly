@@ -22,7 +22,7 @@ const mesure = (m) => console.log("▸", m);
 
 function remiseAZero() {
   execSync("bash tests/e2e/stack/reset.sh", { stdio: "ignore" });
-  sql("truncate import_decouverte");
+  sql("truncate import_decouverte, import_frontiere");
 }
 
 async function ouvrir(browser, nom = "Madji", { contexte = {} } = {}) {
@@ -67,7 +67,7 @@ const AIME = /poulet|burger|pizza|tacos|pates|spaghetti|lasagne|gratin|croque|fa
 const style = (t) => (t.match(AIME)?.[0] ?? "autre").toLowerCase();
 
 const choisis = process.argv.slice(2);
-const tous = ["longue", "epuisement", "panne", "lente", "refus", "jours", "concurrent", "coupure"];
+const tous = ["longue", "epuisement", "panne", "lente", "refus", "jours", "concurrent", "coupure", "flux"];
 const aLancer = choisis.length ? choisis : tous;
 const browser = await lancer();
 
@@ -216,6 +216,33 @@ const scenarios = {
       if (premierAime >= 0 && premierRefuse >= 0) ok(premierAime < premierRefuse, `${j} jours : les plats aimés reviennent avant les plats refusés`);
     }
     sql("drop table if exists _sauv_swipes");
+    await p.ctx.close();
+  },
+
+  // 9. Le flux : un fonds très large (appli lancée avec DIVERSE=1 POOL=1200). 400 cartes d'affilée, presque toutes JAMAIS VUES, sans écran vide,
+  // sans qu'une page de la source soit lue deux fois, et avec peu de requêtes par carte nouvelle.
+  async flux() {
+    remiseAZero(); await source("/__reset");
+    const p = await ouvrir(browser); const vues = []; const deja = new Set(); let neuves = 0; let vides = 0; let bloques = 0; const temps = [];
+    const tranches = [];
+    while (vues.length < 400) {
+      const e = await etat(p);
+      if (!e.carte) { vides++; if (vides > 60) break; await p.waitForTimeout(1500); continue; }
+      vues.push(e.carte); const neuve = !deja.has(e.carte); deja.add(e.carte); if (neuve) neuves++;
+      const r = await swiper(p, AIME.test(e.carte) || vues.length % 3 === 0); temps.push(r.ms); if (r.bloque) bloques++;
+      if (vues.length % 100 === 0) tranches.push(`${neuves} neuves sur ${vues.length}`);
+      await p.waitForTimeout(250);
+    }
+    const s = await stats();
+    mesure(`${vues.length} cartes, ${neuves} jamais vues (${Math.round((100 * neuves) / vues.length)} %) — cumul : ${tranches.join(" · ")}`);
+    mesure(`écrans sans carte : ${vides} ; swipes sans suite : ${bloques} ; carte suivante : médiane ${mediane(temps)} ms, 95e centile ${centile(temps, 0.95)} ms`);
+    mesure(`source : ${s.recherches} recherches, ${s.fiches} fiches lues dont ${s.fichesUniques} différentes (${s.fiches - s.fichesUniques} relues) ; ${(s.fiches / Math.max(1, neuves)).toFixed(1)} fiches lues par carte nouvelle`);
+    mesure(`en base : ${sql("select count(*) from recipes where source_url is not null")} recettes importées ; frontière : ${sql("select string_agg(etat || ' ' || n, ' · ') from (select etat, count(*) n from import_frontiere group by etat order by etat) t")}`);
+    ok(vues.length >= 400, `400 cartes d'affilée (${vues.length})`);
+    ok(vides === 0 && bloques === 0, `jamais d'écran vide ni de swipe sans suite (${vides} / ${bloques})`);
+    ok(neuves / vues.length >= 0.95, `au moins 95 % de cartes jamais vues (${Math.round((100 * neuves) / vues.length)} %)`);
+    ok(s.fiches === s.fichesUniques, `aucune fiche relue (${s.fiches - s.fichesUniques} relues)`);
+    ok(p.erreurs.length === 0, "aucune erreur JS");
     await p.ctx.close();
   },
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choisirTermes, recettesAOublier, termesDeRecherche, tropProche } from "./recherche";
+import { choisirALire, choisirTermes, recettesAOublier, termesDeRecherche, titreDepuisLien, tropProche } from "./recherche";
 
 describe("recherches de nouvelles recettes", () => {
   it("d'abord des plats voisins des matchs, puis les styles aimés, la saison, les envies", () => {
@@ -48,5 +48,27 @@ describe("recettes importées oubliées", () => {
   });
   it("une recette dans une course reste", () => {
     expect(recettesAOublier([{ id: "course", creeLe: vieille }], new Set(), new Set(["course"]), maintenant)).toEqual([]);
+  });
+});
+
+describe("choisirALire : la file d'exploration", () => {
+  const lien = (titre: string, id: number) => `https://x.test/recettes/recette_${titre.replace(/ /g, "-")}_${id}.aspx`;
+  it("lit le titre dans l'adresse", () => expect(titreDepuisLien(lien("gratin dauphinois", 12))).toBe("gratin dauphinois"));
+  it("écarte d'avance ce qui ressemble à un plat de la famille, sans le lire", () => {
+    const r = choisirALire([lien("gratin dauphinois facile", 1), lien("risotto aux cepes", 2)], ["Gratin dauphinois"], 10, 0.6);
+    expect(r.ecartees).toEqual([lien("gratin dauphinois facile", 1)]);
+    expect(r.aLire).toEqual([lien("risotto aux cepes", 2)]);
+  });
+  it("n'en lit pas plus que le maximum, sans doublon", () => {
+    const liens = Array.from({ length: 30 }, (_, i) => lien(`plat numero${i} unique${i}`, i));
+    const r = choisirALire([...liens, ...liens], [], 10, 0.7);
+    expect(r.aLire).toHaveLength(10);
+    expect(new Set(r.aLire).size).toBe(10);
+  });
+  it("mélange la file : pas toujours les mêmes en premier", () => {
+    const liens = Array.from({ length: 30 }, (_, i) => lien(`plat numero${i} unique${i}`, i));
+    const a = choisirALire(liens, [], 5, 0.7, () => 0.1).aLire;
+    const b = choisirALire(liens, [], 5, 0.7, () => 0.9).aLire;
+    expect(a).not.toEqual(b);
   });
 });

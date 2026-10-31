@@ -96,3 +96,25 @@ export function tropProche(titre: string, existants: string[], seuil = 0.6): boo
     return communs / new Set([...a, ...b]).size >= seuil;
   });
 }
+
+/** Le titre d'une recette lu dans son adresse (« …/recette_gratin-dauphinois_12345.aspx » → « gratin dauphinois »). */
+export function titreDepuisLien(lien: string): string {
+  return (lien.match(/recette_(.+?)_\d+\.aspx/)?.[1] ?? "").replace(/-/g, " ");
+}
+
+/**
+ * Parmi les recettes à voir (la file d'exploration), celles à lire maintenant : on écarte d'avance celles dont le titre (lu dans l'adresse) ressemble
+ * déjà à un plat de la famille (elles seraient refusées après coup : inutile de les télécharger), puis on tire au hasard, `max` au plus.
+ * Les écartées sont rendues pour qu'on ne les reconsidère pas.
+ */
+export function choisirALire(aVoir: string[], titres: string[], max: number, seuil: number, hasard: () => number = Math.random): { aLire: string[]; ecartees: string[] } {
+  const ecartees: string[] = [];
+  const restantes: string[] = [];
+  for (const l of new Set(aVoir)) (tropProche(titreDepuisLien(l), titres, seuil) ? ecartees : restantes).push(l);
+  // Mélange de Fisher-Yates : la file n'est pas lue dans l'ordre où elle a été découverte (sinon, toujours les mêmes familles de plats).
+  for (let i = restantes.length - 1; i > 0; i--) {
+    const j = Math.floor(hasard() * (i + 1));
+    [restantes[i], restantes[j]] = [restantes[j], restantes[i]];
+  }
+  return { aLire: restantes.slice(0, max), ecartees };
+}
