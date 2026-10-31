@@ -88,13 +88,21 @@ const mots = (titre: string) => new Set(normalizeName(titre).split(" ").filter((
 
 /** Deux titres trop proches (« Gratin dauphinois » / « Gratin dauphinois facile ») : le second n'apporte rien. */
 export function tropProche(titre: string, existants: string[], seuil = 0.6): boolean {
-  const a = mots(titre);
-  if (a.size === 0) return false;
-  return existants.some((t) => {
-    const b = mots(t);
-    const communs = [...a].filter((m) => b.has(m)).length;
-    return communs / new Set([...a, ...b]).size >= seuil;
-  });
+  return tropProcheDe(existants, seuil)(titre);
+}
+
+/** La même règle, préparée une fois pour beaucoup de titres à tester (les mots des plats existants ne sont découpés qu'une fois). */
+export function tropProcheDe(existants: string[], seuil = 0.6): (titre: string) => boolean {
+  const ensembles = existants.map(mots);
+  return (titre) => {
+    const a = mots(titre);
+    if (a.size === 0) return false;
+    return ensembles.some((b) => {
+      let communs = 0;
+      for (const m of a) if (b.has(m)) communs++;
+      return communs / (a.size + b.size - communs) >= seuil;
+    });
+  };
 }
 
 /** Le titre d'une recette lu dans son adresse (« …/recette_gratin-dauphinois_12345.aspx » → « gratin dauphinois »). */
@@ -103,6 +111,9 @@ export function titreDepuisLien(lien: string): string {
 }
 
 /** Ce qui rend le choix des recettes à lire personnel : une note (−1 à 1) pour un titre, et ce qui rapproche deux plats (pour varier). */
+/** Au plus ce nombre de candidates notées à chaque import (la file peut en compter des milliers). */
+export const NOTEES_MAX = 300;
+
 export type Perso = {
   note: (titre: string) => number;
   /** Une clé de ressemblance (le style du plat, par exemple) : on évite d'en lire trop d'une même clé d'un coup. */
@@ -129,7 +140,8 @@ export function choisirALire(
 ): { aLire: string[]; ecartees: string[] } {
   const ecartees: string[] = [];
   const restantes: string[] = [];
-  for (const l of new Set(aVoir)) (tropProche(titreDepuisLien(l), titres, seuil) ? ecartees : restantes).push(l);
+  const proche = tropProcheDe(titres, seuil);
+  for (const l of new Set(aVoir)) (proche(titreDepuisLien(l)) ? ecartees : restantes).push(l);
   // Mélange de Fisher-Yates : la file n'est pas lue dans l'ordre où elle a été découverte (sinon, toujours les mêmes familles de plats).
   for (let i = restantes.length - 1; i > 0; i--) {
     const j = Math.floor(hasard() * (i + 1));
@@ -141,7 +153,12 @@ export function choisirALire(
   const nDecouverte = Math.round(max * part);
   const nGouts = max - nDecouverte;
   // Les mieux notées, avec un malus par plat de même clé déjà retenu (pas dix burgers d'affilée) ; le hasard du mélange départage les égalités.
-  const notees = restantes.map((l) => ({ l, titre: titreDepuisLien(l), note: perso.note(titreDepuisLien(l)) }));
+  // Note et clé calculées UNE fois par candidate, sur un échantillon borné de la file (déjà mélangée) : le choix reste rapide quand la file
+  // compte des milliers de recettes (sinon le serveur reste bloqué plusieurs secondes).
+  const notees = restantes.slice(0, NOTEES_MAX).map((l) => {
+    const titre = titreDepuisLien(l);
+    return { l, note: perso.note(titre), cle: perso.cle(titre) };
+  });
   const retenues: string[] = [];
   const parCle = new Map<string, number>();
   const pris = new Set<string>();
@@ -150,14 +167,13 @@ export function choisirALire(
     let meilleurScore = -Infinity;
     for (const c of notees) {
       if (pris.has(c.l)) continue;
-      const score = c.note - 0.12 * (parCle.get(perso.cle(c.titre)) ?? 0);
+      const score = c.note - 0.12 * (parCle.get(c.cle) ?? 0);
       if (score > meilleurScore) (meilleur = c), (meilleurScore = score);
     }
     if (!meilleur) break;
     pris.add(meilleur.l);
     retenues.push(meilleur.l);
-    const k = perso.cle(meilleur.titre);
-    parCle.set(k, (parCle.get(k) ?? 0) + 1);
+    parCle.set(meilleur.cle, (parCle.get(meilleur.cle) ?? 0) + 1);
   }
   const decouverte = restantes.filter((l) => !pris.has(l)).slice(0, nDecouverte);
   // Mêlées : une découverte toutes les 1/part lectures, pour que la part de découverte soit lue même quand les goûts suffisent à remplir.
